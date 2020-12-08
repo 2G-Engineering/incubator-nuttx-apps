@@ -28,7 +28,7 @@ config NETUTILS_NTPCLIENT_PORTNO
 
 config NETUTILS_NTPCLIENT_STACKSIZE
 	int "NTP client daemon stack stack size"
-	default 2048
+	default DEFAULT_TASK_STACKSIZE
 
 config NETUTILS_NTPCLIENT_SERVERPRIO
 	int "NTP client daemon priority"
@@ -41,5 +41,9 @@ config NETUTILS_NTPCLIENT_POLLDELAYSEC
 config NETUTILS_NTPCLIENT_SIGWAKEUP
 	int "NTP client wakeup signal number"
 	default 18
+
+config NETUTILS_NTPCLIENT_WITH_AUTH
+	bool "NTP client with authentication"
+	default n
 
 endif # NETUTILS_NTPCLIENT

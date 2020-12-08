@@ -61,7 +61,7 @@
 
 #  define TEST_MSGLEN       (31)
 #else
-   /* Message lenght is the size of the message plus the null terminator */
+   /* Message length is the size of the message plus the null terminator */
 
 #  define TEST_MSGLEN       (strlen(TEST_MESSAGE)+1)
 #endif
@@ -359,7 +359,7 @@ void mqueue_test(void)
   /* Wake up the receiver thread with a signal */
 
   printf("mqueue_test: Killing receiver\n");
-  pthread_kill(receiver, 9);
+  pthread_kill(receiver, SIGUSR1);
 
   /* Wait a bit to see if the thread exits on its own */
 
@@ -431,5 +431,3 @@ void mqueue_test(void)
       printf("mqueue_test: ERROR mq_unlink failed\n");
     }
 }
-
-

@@ -194,9 +194,9 @@ int ftpd_daemon(int s_argc, char **s_argv)
       return EXIT_FAILURE;
     }
 
-  /* Configure acounts */
+  /* Configure accounts */
 
-  (void)ftpd_accounts(handle);
+  ftpd_accounts(handle);
 
   /* Then drive the FTPD server. */
 

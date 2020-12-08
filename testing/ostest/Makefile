@@ -33,13 +33,13 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 # ostest built-in application info
 
 PROGNAME = ostest
 PRIORITY = SCHED_PRIORITY_DEFAULT
-STACKSIZE = 2048
+STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
 MODULE = $(CONFIG_TESTING_OSTEST)
 
 # NuttX OS Test
@@ -63,7 +63,7 @@ ifneq ($(CONFIG_STDIO_DISABLE_BUFFERING),y)
 CSRCS += setvbuf.c
 endif
 
-ifeq ($(CONFIG_TLS),y)
+ifneq ($(CONFIG_TLS_NELEM),0)
 CSRCS += tls.c
 endif
 
@@ -80,7 +80,7 @@ CSRCS += cancel.c cond.c mutex.c timedmutex.c sem.c semtimed.c barrier.c
 CSRCS += timedwait.c
 CSRCS += pthread_rwlock.c pthread_rwlock_cancel.c
 
-ifneq ($(CONFIG_NPTHREAD_KEYS),0)
+ifneq ($(CONFIG_TLS_NELEM),0)
 CSRCS += specific.c
 endif
 

@@ -33,7 +33,7 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 WGET = wget
 CP = cp -R
@@ -48,8 +48,8 @@ PSMQ_EXT = tar.gz
 PSMQ_SOURCES = psmq-$(PSMQ_VERSION)
 PSMQ_TARBALL = $(PSMQ_SOURCES).$(PSMQ_EXT)
 
-CFLAGS += -I$(APPDIR)/include/system
-CFLAGS += -I$(APPDIR)/system/psmq/$(PSMQ_SOURCES)
+CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPDIR)$(DELIM)include$(DELIM)system}
+CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPDIR)$(DELIM)system$(DELIM)psmq$(DELIM)$(PSMQ_SOURCES)}
 
 # mandatory source files to compile
 CSRCS = $(PSMQ_SOURCES)/lib/psmq.c \
@@ -110,7 +110,6 @@ $(PSMQ_TARBALL):
 	@echo "Downloading: $@"
 	$(Q) $(WGET) -O $@ $(PSMQ_URL)/$@
 	$(Q) $(NXTOOLSDIR)/check-hash.sh sha256 $(PSMQ_SRC_SHA256) $@
-	$(Q) touch $@
 
 $(PSMQ_SOURCES): $(PSMQ_TARBALL)
 	@echo "Unpacking $< -> $@"

@@ -6,8 +6,8 @@
  *   Author: Simon Piriou <spiriou31@gmail.com>
  *           Gregory Nutt <gnutt@nuttx.org>
  *
- * Adapted for NuttX from the driver_ext.c of WPA suplicant written originally
- * by Jouni Malinen
+ * Adapted for NuttX from the driver_ext.c of WPA suplicant written
+ * originally by Jouni Malinen
  *
  *   Copyright (c) 2003-2015, Jouni Malinen <j@w1.fi>
  *
@@ -41,10 +41,11 @@
  ****************************************************************************/
 
 /* This file implements a driver interface for the Linux Wireless Extensions.
- * When used with WE-18 or newer, this interface can be used as-is with number
- * of drivers. In addition to this, some of the common functions in this file
- * can be used by other driver interface implementations that use generic WE
- * ioctls, but require private ioctls for some of the functionality.
+ * When used with WE-18 or newer, this interface can be used as-is with
+ * number of drivers. In addition to this, some of the common functions
+ * in this file can be used by other driver interface implementations that
+ * use generic WE ioctls, but require private ioctls for some of the
+ * functionality.
  */
 
 /****************************************************************************
@@ -56,6 +57,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -70,6 +72,76 @@
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: wpa_driver_wext_get_key_ext
+ *
+ * Description:
+ *
+ * Input Parameters:
+ *   sockfd - Opened network socket
+ *   ifname - Interface name
+ *
+ * Returned Value:
+ *
+ ****************************************************************************/
+
+int wpa_driver_wext_get_key_ext(int sockfd, FAR const char *ifname,
+                                enum wpa_alg_e *alg, FAR char *key,
+                                size_t *req_len)
+{
+  struct iw_encode_ext *ext;
+  struct iwreq iwr;
+  int ret;
+
+  ext = malloc(sizeof(*ext) + *req_len);
+  if (ext == NULL)
+    {
+      return -1;
+    }
+
+  memset(&iwr, 0, sizeof(iwr));
+  strncpy(iwr.ifr_name, ifname, IFNAMSIZ);
+
+  iwr.u.encoding.pointer = (caddr_t) ext;
+  iwr.u.encoding.length = sizeof(*ext) + *req_len;
+
+  ret = ioctl(sockfd, SIOCGIWENCODEEXT, (unsigned long)&iwr);
+  if (ret >= 0)
+    {
+      switch (ext->alg)
+        {
+          case IW_ENCODE_ALG_NONE:
+            *alg = WPA_ALG_NONE;
+            break;
+
+          case IW_ENCODE_ALG_WEP:
+            *alg = WPA_ALG_WEP;
+            break;
+
+          case IW_ENCODE_ALG_TKIP:
+            *alg = WPA_ALG_TKIP;
+            break;
+
+          case IW_ENCODE_ALG_CCMP:
+            *alg = WPA_ALG_CCMP;
+            break;
+
+          default:
+            free(ext);
+            return -1;
+        }
+
+     if (key && ext->key_len < *req_len)
+       {
+         memcpy(key, ext->key, ext->key_len);
+         *req_len = ext->key_len;
+       }
+  }
+
+  free(ext);
+  return ret;
+}
+
+/****************************************************************************
  * Name: wpa_driver_wext_set_key_ext
  *
  * Description:
@@ -82,8 +154,8 @@
  *
  ****************************************************************************/
 
-int wpa_driver_wext_set_key_ext(int sockfd,  FAR const char *ifname,
-                                enum wpa_alg_e alg, FAR const uint8_t *key,
+int wpa_driver_wext_set_key_ext(int sockfd, FAR const char *ifname,
+                                enum wpa_alg_e alg, FAR const char *key,
                                 size_t key_len)
 {
   struct iwreq iwr;
@@ -208,20 +280,49 @@ int wpa_driver_wext_associate(FAR struct wpa_wconfig_s *wconfig)
       goto close_socket;
     }
 
-  ret = wpa_driver_wext_set_key_ext(sockfd, wconfig->ifname, wconfig->alg,
-                                    wconfig->passphrase, wconfig->phraselen);
-  if (ret < 0)
+  if (wconfig->freq)
     {
-      nerr("ERROR: Fail set key: %d\n", ret);
-      ret = -1;
-      goto close_socket;
+      ret = wapi_set_freq(sockfd, wconfig->ifname,
+                          wconfig->freq,
+                          wconfig->flag == WAPI_FREQ_FIXED ?
+                          IW_FREQ_FIXED : IW_FREQ_AUTO);
+      if (ret < 0)
+        {
+          nerr("WARNING: Fail set freq: %d\n", ret);
+        }
     }
 
-  ret = wapi_set_essid(sockfd, wconfig->ifname,
-                      (FAR const char *)wconfig->ssid, WAPI_ESSID_ON);
-  if (ret < 0)
+  if (wconfig->phraselen > 0)
     {
-      nerr("ERROR: Fail set ssid: %d\n", ret);
+      ret = wpa_driver_wext_set_key_ext(sockfd, wconfig->ifname,
+                                        wconfig->alg,
+                                        wconfig->passphrase,
+                                        wconfig->phraselen);
+      if (ret < 0)
+        {
+          nerr("ERROR: Fail set key: %d\n", ret);
+          goto close_socket;
+        }
+    }
+
+  if (wconfig->ssid)
+    {
+      ret = wapi_set_essid(sockfd, wconfig->ifname,
+                           wconfig->ssid, WAPI_ESSID_ON);
+      if (ret < 0)
+        {
+          nerr("ERROR: Fail set ssid: %d\n", ret);
+          goto close_socket;
+        }
+    }
+  else if (wconfig->bssid)
+    {
+      ret = wapi_set_ap(sockfd, wconfig->ifname,
+                        (FAR const struct ether_addr *)wconfig->bssid);
+      if (ret < 0)
+        {
+          nerr("ERROR: Fail set bssid: %d\n", ret);
+        }
     }
 
 close_socket:
@@ -240,8 +341,11 @@ close_socket:
  *
  ****************************************************************************/
 
-int wpa_driver_wext_set_auth_param(int sockfd, FAR const char *ifname,
-                                   int idx, uint32_t value)
+static int wpa_driver_wext_process_auth_param(int sockfd,
+                                              FAR const char *ifname,
+                                              int idx,
+                                              uint32_t *value,
+                                              bool set)
 {
   struct iwreq iwr;
   int errcode;
@@ -252,19 +356,125 @@ int wpa_driver_wext_set_auth_param(int sockfd, FAR const char *ifname,
   memset(&iwr, 0, sizeof(iwr));
   strncpy(iwr.ifr_name, ifname, IFNAMSIZ);
   iwr.u.param.flags = idx & IW_AUTH_INDEX;
-  iwr.u.param.value = value;
+  iwr.u.param.value = set ? *value : 0;
 
-  if (ioctl(sockfd, SIOCSIWAUTH, (unsigned long)&iwr) < 0)
+  if (ioctl(sockfd, set ? SIOCSIWAUTH : SIOCGIWAUTH,
+            (unsigned long)&iwr) < 0)
     {
       errcode = errno;
       if (errcode != EOPNOTSUPP)
         {
-          nerr("ERROR: SIOCSIWAUTH(param %d value 0x%x) failed: %d)",
-               idx, value, errcode);
+          nerr("ERROR: SIOCSIWAUTH(param %d value 0x%" PRIx32
+               ") failed: %d)",
+               idx, *value, errcode);
         }
 
       ret = errcode == EOPNOTSUPP ? -2 : -1;
     }
 
+  if (ret == 0 && !set)
+    {
+      *value = iwr.u.param.value;
+    }
+
   return ret;
+}
+
+/****************************************************************************
+ * Name: wpa_driver_wext_set_auth_param
+ *
+ * Description:
+ *
+ * Input Parameters:
+ *
+ * Returned Value:
+ *
+ ****************************************************************************/
+
+int wpa_driver_wext_set_auth_param(int sockfd, FAR const char *ifname,
+                                   int idx, uint32_t value)
+{
+  return wpa_driver_wext_process_auth_param(sockfd, ifname,
+                                            idx, &value, true);
+}
+
+/****************************************************************************
+ * Name: wpa_driver_wext_get_auth_param
+ *
+ * Description:
+ *
+ * Input Parameters:
+ *
+ * Returned Value:
+ *
+ ****************************************************************************/
+
+int wpa_driver_wext_get_auth_param(int sockfd, FAR const char *ifname,
+                                   int idx, uint32_t *value)
+{
+  return wpa_driver_wext_process_auth_param(sockfd, ifname,
+                                            idx, value, false);
+}
+
+/****************************************************************************
+ * Name: wpa_driver_wext_disconnect
+ *
+ * Description:
+ *
+ * Input Parameters:
+ *
+ * Returned Value:
+ *
+ ****************************************************************************/
+
+void wpa_driver_wext_disconnect(int sockfd, FAR const char *ifname)
+{
+  uint8_t ssid[WAPI_ESSID_MAX_SIZE];
+  const struct ether_addr bssid =
+  {
+  };
+
+  struct iwreq iwr;
+  int i;
+
+  /* Only force-disconnect when the card is in infrastructure mode,
+   * otherwise the driver might interpret the cleared BSSID and random
+   * SSID as an attempt to create a new ad-hoc network.
+   */
+
+  memset(&iwr, 0, sizeof(iwr));
+  strncpy(iwr.ifr_name, ifname, IFNAMSIZ);
+
+  if (ioctl(sockfd, SIOCGIWMODE, (unsigned long)&iwr) < 0)
+    {
+      nerr("ioctl[SIOCGIWMODE]: %s\n", strerror(errno));
+      iwr.u.mode = IW_MODE_INFRA;
+    }
+
+  if (iwr.u.mode == IW_MODE_INFRA)
+    {
+      /* Clear the BSSID selection */
+
+      if (wapi_set_ap(sockfd, ifname, &bssid) < 0)
+        {
+          nerr("WEXT: Failed to clear BSSID " "selection on disconnect\n");
+        }
+
+      /* Set a random SSID to make sure the driver will not be trying
+       * to associate with something even if it does not understand
+       * SIOCSIWMLME commands (or tries to associate automatically
+       * after deauth/disassoc).
+       */
+
+      for (i = 0; i < WAPI_ESSID_MAX_SIZE; i++)
+        {
+          ssid[i] = rand() & 0xff;
+        }
+
+      if (wapi_set_essid(sockfd, ifname,
+                         (FAR const char *)ssid, WAPI_ESSID_OFF) < 0)
+        {
+          nerr("WEXT: Failed to set bogus " "SSID to disconnect\n");
+        }
+    }
 }

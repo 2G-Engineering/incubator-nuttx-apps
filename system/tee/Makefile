@@ -35,13 +35,13 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 # tee command
 
 PROGNAME  = tee
 PRIORITY  = $(CONFIG_SYSTEM_TEE_PRIORITY)
-STACKSIZE = $(CONFIG_SYSTEM_TEE_PRIORITY)
+STACKSIZE = $(CONFIG_SYSTEM_TEE_STACKSIZE)
 MODULE    = $(CONFIG_SYSTEM_TEE)
 
 MAINSRC = tee.c

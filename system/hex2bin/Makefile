@@ -33,7 +33,7 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 # Hex2bin utility
 
@@ -46,7 +46,7 @@ endif
 
 ifeq ($(CONFIG_SYSTEM_HEX2MEM_BUILTIN),y)
   MAINSRC += hex2mem_main.c
-  PROGNAME = hex2mem
+  PROGNAME += hex2mem
   STACKSIZE += $(CONFIG_SYSTEM_HEX2MEM_STACKSIZE)
   PRIORITY += $(CONFIG_SYSTEM_HEX2MEM_PRIORITY)
 endif

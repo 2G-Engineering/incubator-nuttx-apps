@@ -49,8 +49,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <nuttx/nx/nx.h>
-#include <nuttx/nx/nxglib.h>
 #include <nuttx/video/fb.h>
 #include <nuttx/video/rgbcolors.h>
 
@@ -171,8 +169,8 @@ int fbdev_init(void)
    * address mapping to make the memory accessible to the application.
    */
 
-  state.fbmem = mmap(NULL, state.pinfo.fblen, PROT_READ|PROT_WRITE,
-                     MAP_SHARED|MAP_FILE, state.fd, 0);
+  state.fbmem = mmap(NULL, state.pinfo.fblen, PROT_READ | PROT_WRITE,
+                     MAP_SHARED | MAP_FILE, state.fd, 0);
   if (state.fbmem == MAP_FAILED)
     {
       int errcode = errno;
@@ -205,12 +203,16 @@ int fbdev_init(void)
  *
  ****************************************************************************/
 
-void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
-                 FAR const lv_color_t *color_p)
+void fbdev_flush(struct _disp_drv_t *disp_drv, const lv_area_t *area,
+                 lv_color_t *color_p)
 {
-#ifdef CONFIG_LCD_UPDATE
-  struct nxgl_rect_s rect;
+#ifdef CONFIG_FB_UPDATE
+  struct fb_area_s area;
 #endif
+  int32_t x1 = area->x1;
+  int32_t y1 = area->y1;
+  int32_t x2 = area->x2;
+  int32_t y2 = area->y2;
   int32_t act_x1;
   int32_t act_y1;
   int32_t act_x2;
@@ -253,7 +255,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 8)
     {
-      uint8_t *fbp8 = (uint8_t*)state.fbmem;
+      uint8_t *fbp8 = (uint8_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -272,7 +274,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 16)
     {
-      uint16_t *fbp16 = (uint16_t*)state.fbmem;
+      uint16_t *fbp16 = (uint16_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -291,7 +293,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 24 || state.pinfo.bpp == 32)
     {
-      uint32_t *fbp32 = (uint32_t*)state.fbmem;
+      uint32_t *fbp32 = (uint32_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -308,17 +310,17 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
         }
     }
 
-#ifdef CONFIG_LCD_UPDATE
-  rect.pt1.x = act_x1;
-  rect.pt1.y = act_y1;
-  rect.pt2.x = act_x2;
-  rect.pt2.y = act_y2;
-  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&rect));
+#ifdef CONFIG_FB_UPDATE
+  area.x = act_x1;
+  area.y = act_y1;
+  area.w = act_x2 - act_x1 + 1;
+  area.h = act_y2 - cat_y1 + 1;
+  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&area));
 #endif
 
   /* Tell the flushing is ready */
 
-  lv_flush_ready();
+  lv_disp_flush_ready(disp_drv);
 }
 
 /****************************************************************************
@@ -342,8 +344,8 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
                 lv_color_t color)
 {
-#ifdef CONFIG_LCD_UPDATE
-  struct nxgl_rect_s rect;
+#ifdef CONFIG_FB_UPDATE
+  struct fb_area_s area;
 #endif
   int32_t act_x1;
   int32_t act_y1;
@@ -387,7 +389,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 8)
     {
-      uint8_t *fbp8 = (uint8_t*)state.fbmem;
+      uint8_t *fbp8 = (uint8_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -403,7 +405,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 16)
     {
-      uint16_t *fbp16 = (uint16_t*)state.fbmem;
+      uint16_t *fbp16 = (uint16_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -419,7 +421,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 24 || state.pinfo.bpp == 32)
     {
-      uint32_t *fbp32 = (uint32_t*)state.fbmem;
+      uint32_t *fbp32 = (uint32_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
@@ -433,12 +435,12 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
         }
     }
 
-#ifdef CONFIG_LCD_UPDATE
-  rect.pt1.x = act_x1;
-  rect.pt1.y = act_y1;
-  rect.pt2.x = act_x2;
-  rect.pt2.y = act_y2;
-  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&rect));
+#ifdef CONFIG_FB_UPDATE
+  area.x = act_x1;
+  area.y = act_y1;
+  area.w = act_x2 - act_x1 + 1;
+  area.h = act_y2 - act_y1 + 1;
+  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&area));
 #endif
 }
 
@@ -463,8 +465,8 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
                FAR const lv_color_t *color_p)
 {
-#ifdef CONFIG_LCD_UPDATE
-  struct nxgl_rect_s rect;
+#ifdef CONFIG_FB_UPDATE
+  struct fb_area_s area;
 #endif
   int32_t act_x1;
   int32_t act_y1;
@@ -508,66 +510,66 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2,
 
   if (state.pinfo.bpp == 8)
     {
-      uint8_t *fbp8 = (uint8_t*)state.fbmem;
+      uint8_t *fbp8 = (uint8_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
       for (y = act_y1; y <= act_y2; y++)
         {
-            for (x = act_x1; x <= act_x2; x++)
-              {
-                location = x + (y * state.vinfo.xres);
-                fbp8[location] = color_p->full;
-                color_p++;
-              }
+          for (x = act_x1; x <= act_x2; x++)
+            {
+              location = x + (y * state.vinfo.xres);
+              fbp8[location] = color_p->full;
+              color_p++;
+            }
 
-            color_p += x2 - act_x2;
+          color_p += x2 - act_x2;
         }
     }
 
   if (state.pinfo.bpp == 16)
     {
-      uint16_t *fbp16 = (uint16_t*)state.fbmem;
+      uint16_t *fbp16 = (uint16_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
       for (y = act_y1; y <= act_y2; y++)
         {
-            for (x = act_x1; x <= act_x2; x++)
-              {
-                location = x + (y * state.vinfo.xres);
-                fbp16[location] = color_p->full;
-                color_p++;
-              }
+          for (x = act_x1; x <= act_x2; x++)
+            {
+              location = x + (y * state.vinfo.xres);
+              fbp16[location] = color_p->full;
+              color_p++;
+            }
 
-            color_p += x2 - act_x2;
+          color_p += x2 - act_x2;
         }
     }
 
   if (state.pinfo.bpp == 24 || state.pinfo.bpp == 32)
     {
-      uint32_t *fbp32 = (uint32_t*)state.fbmem;
+      uint32_t *fbp32 = (uint32_t *)state.fbmem;
       uint32_t x;
       uint32_t y;
 
       for (y = act_y1; y <= act_y2; y++)
         {
-            for (x = act_x1; x <= act_x2; x++)
-              {
-                location = x + (y * state.vinfo.xres);
-                fbp32[location] = color_p->full;
-                color_p++;
-              }
+          for (x = act_x1; x <= act_x2; x++)
+            {
+              location = x + (y * state.vinfo.xres);
+              fbp32[location] = color_p->full;
+              color_p++;
+            }
 
-            color_p += x2 - act_x2;
+          color_p += x2 - act_x2;
         }
     }
 
-#ifdef CONFIG_LCD_UPDATE
-  rect.pt1.x = act_x1;
-  rect.pt1.y = act_y1;
-  rect.pt2.x = act_x2;
-  rect.pt2.y = act_y2;
-  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&rect));
+#ifdef CONFIG_FB_UPDATE
+  area.x = act_x1;
+  area.y = act_y1;
+  area.w = act_x2 - act_x1 + 1;
+  area.h = act_y2 - act_y1 + 1;
+  ioctl(state.fd, FBIO_UPDATE, (unsigned long)((uintptr_t)&area));
 #endif
 }

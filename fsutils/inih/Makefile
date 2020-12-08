@@ -33,7 +33,7 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 WGET = wget
 CP = cp -R
@@ -83,7 +83,6 @@ $(INIH_TARBALL):
 	@echo "Downloading: $@"
 	$(Q) $(WGET) -O $@ $(INIH_URL)/$@
 	${Q} $(NXTOOLSDIR)/check-hash.sh sha256 $(INIH_SRC_SHA256) $@
-	$(Q) touch $@
 
 $(INIH_SOURCES): $(INIH_TARBALL)
 	@echo "Unpacking $< -> $@"

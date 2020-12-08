@@ -59,6 +59,8 @@
 #include "nsh.h"
 #include "nsh_console.h"
 
+#include "netutils/netinit.h"
+
 #ifdef HAVE_USB_CONSOLE
 
 /****************************************************************************
@@ -73,32 +75,28 @@
  *
  ****************************************************************************/
 
-static void nsh_configstdio(int fd)
+static void nsh_configstdio(int fd, FAR struct console_stdio_s *pstate)
 {
-  /* Make sure the stdin, stdout, and stderr are closed */
+  /* Make sure the stdout, and stderr are flushed */
 
-  (void)fclose(stdin);
-  (void)fclose(stdout);
-  (void)fclose(stderr);
+  fflush(stdout);
+  fflush(stderr);
 
   /* Dup the fd to create standard fd 0-2 */
 
-  (void)dup2(fd, 0);
-  (void)dup2(fd, 1);
-  (void)dup2(fd, 2);
+  dup2(fd, 0);
+  dup2(fd, 1);
+  dup2(fd, 2);
 
-  /* fdopen to get the stdin, stdout and stderr streams. The following logic depends
-   * on the fact that the library layer will allocate FILEs in order.  And since
-   * we closed stdin, stdout, and stderr above, that is what we should get.
-   *
-   * fd = 0 is stdin  (read-only)
-   * fd = 1 is stdout (write-only, append)
-   * fd = 2 is stderr (write-only, append)
-   */
+  /* Setup the stdout */
 
-  (void)fdopen(0, "r");
-  (void)fdopen(1, "a");
-  (void)fdopen(2, "a");
+  pstate->cn_outfd     = 1;
+  pstate->cn_outstream = fdopen(1, "a");
+
+  /* Setup the stderr */
+
+  pstate->cn_errfd     = 2;
+  pstate->cn_errstream = fdopen(2, "a");
 }
 
 /****************************************************************************
@@ -109,7 +107,7 @@ static void nsh_configstdio(int fd)
  *
  ****************************************************************************/
 
-static int nsh_nullstdio(void)
+static int nsh_nullstdio(FAR struct console_stdio_s *pstate)
 {
   int fd;
 
@@ -120,16 +118,16 @@ static int nsh_nullstdio(void)
     {
       /* Configure standard I/O to use /dev/null */
 
-      nsh_configstdio(fd);
+      nsh_configstdio(fd, pstate);
 
       /* We can close the original file descriptor now (unless it was one of
        * 0-2)
        */
 
       if (fd > 2)
-       {
+        {
           close(fd);
-       }
+        }
 
       return OK;
     }
@@ -145,7 +143,7 @@ static int nsh_nullstdio(void)
  *
  ****************************************************************************/
 
-static int nsh_waitusbready(void)
+static int nsh_waitusbready(FAR struct console_stdio_s *pstate)
 {
   char inch;
   ssize_t nbytes;
@@ -169,8 +167,8 @@ restart:
       fd = open(CONFIG_NSH_USBCONDEV, O_RDWR);
       if (fd < 0)
         {
-          /* ENOTCONN means that the USB device is not yet connected. Anything
-           * else is bad.
+          /* ENOTCONN means that the USB device is not yet connected.
+           * Anything else is bad.
            */
 
           DEBUGASSERT(errno == ENOTCONN);
@@ -217,7 +215,7 @@ restart:
 
           if (nbytes <= 0)
             {
-              (void)close(fd);
+              close(fd);
               goto restart;
             }
         }
@@ -226,9 +224,9 @@ restart:
 
   /* Configure standard I/O */
 
-  nsh_configstdio(fd);
+  nsh_configstdio(fd, pstate);
 
-  /* We can close the original file descriptor now (unless it was one of 0-2) */
+  /* We can close the original file descriptor (unless it was one of 0-2) */
 
   if (fd > 2)
     {
@@ -255,7 +253,7 @@ restart:
  *   operations to handle the cases where the session is lost when the
  *   USB device is unplugged and restarted when the USB device is plugged
  *   in again.
-  *
+ *
  * Input Parameters:
  *   Standard task start-up arguments.  These are not used.  argc may be
  *   zero and argv may be NULL.
@@ -266,7 +264,7 @@ restart:
  *
  ****************************************************************************/
 
-int nsh_consolemain(int argc, char *argv[])
+int nsh_consolemain(int argc, FAR char *argv[])
 {
   FAR struct console_stdio_s *pstate = nsh_newconsole();
   struct boardioc_usbdev_ctrl_s ctrl;
@@ -308,43 +306,48 @@ int nsh_consolemain(int argc, char *argv[])
   /* Configure to use /dev/null if we do not have a valid console. */
 
 #ifndef CONFIG_DEV_CONSOLE
-  (void)nsh_nullstdio();
+  nsh_nullstdio(pstate);
 #endif
 
   /* Execute the one-time start-up script (output may go to /dev/null) */
 
 #ifdef CONFIG_NSH_ROMFSETC
-  (void)nsh_initscript(&pstate->cn_vtbl);
+  nsh_initscript(&pstate->cn_vtbl);
+#endif
+
+#ifdef CONFIG_NSH_NETINIT
+  /* Bring up the network */
+
+  netinit_bringup();
 #endif
 
 #if defined(CONFIG_NSH_ARCHINIT) && defined(CONFIG_BOARDCTL_FINALINIT)
   /* Perform architecture-specific final-initialization (if configured) */
 
-  (void)boardctl(BOARDIOC_FINALINIT, 0);
+  boardctl(BOARDIOC_FINALINIT, 0);
 #endif
 
   /* Now loop, executing creating a session for each USB connection */
 
-  for (;;)
+  for (; ; )
     {
       /* Wait for the USB to be connected to the host and switch
        * standard I/O to the USB serial device.
        */
 
-      ret = nsh_waitusbready();
-
-      (void)ret; /* Eliminate warning if not used */
+      ret = nsh_waitusbready(pstate);
+      UNUSED(ret); /* Eliminate warning if not used */
       DEBUGASSERT(ret == OK);
 
       /* Execute the session */
 
-      (void)nsh_session(pstate);
+      nsh_session(pstate, true, argc, argv);
 
       /* Switch to /dev/null because we probably no longer have a
        * valid console device.
        */
 
-      (void)nsh_nullstdio();
+      nsh_nullstdio(pstate);
     }
 }
 

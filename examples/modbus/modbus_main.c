@@ -34,7 +34,7 @@
  ****************************************************************************
  * Leveraged from:
  *
- *   FreeModbus Libary: Linux Demo Application
+ *   FreeModbus Library: Linux Demo Application
  *   Copyright (C) 2006 Christian Walter <wolti@sil.at>
  *
  * This library is free software; you can redistribute it and/or
@@ -232,13 +232,13 @@ static inline int modbus_initialize(void)
 errout_with_modbus:
   /* Release hardware resources. */
 
-  (void)eMBClose();
+  eMBClose();
 
 errout_with_mutex:
 
   /* Free/uninitialize data structures */
 
-  (void)pthread_mutex_destroy(&g_modbus.lock);
+  pthread_mutex_destroy(&g_modbus.lock);
 
   g_modbus.threadstate = STOPPED;
   return status;
@@ -289,15 +289,15 @@ static void *modbus_pollthread(void *pvarg)
 
   /* Disable */
 
-  (void)eMBDisable();
+  eMBDisable();
 
   /* Release hardware resources. */
 
-  (void)eMBClose();
+  eMBClose();
 
   /* Free/uninitialize data structures */
 
-  (void)pthread_mutex_destroy(&g_modbus.lock);
+  pthread_mutex_destroy(&g_modbus.lock);
   g_modbus.threadstate = STOPPED;
   return NULL;
 }
@@ -373,9 +373,9 @@ int main(int argc, FAR char *argv[])
       switch (option)
         {
           case 'd': /* Disable protocol stack */
-            (void)pthread_mutex_lock(&g_modbus.lock);
+            pthread_mutex_lock(&g_modbus.lock);
             g_modbus.threadstate = SHUTDOWN;
-            (void)pthread_mutex_unlock(&g_modbus.lock);
+            pthread_mutex_unlock(&g_modbus.lock);
             break;
 
           case 'e': /* Enable the protocol stack */

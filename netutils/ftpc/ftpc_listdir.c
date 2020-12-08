@@ -262,9 +262,9 @@ static int ftpc_recvdir(FAR struct ftpc_session_s *session,
  *   but the parsing is a bitch. See http://cr.yp.to/ftpparse.html
  *
  *   NOTE:  We expect to receive only well structured directory paths. Tilde
- *   expansion "~/xyz" and relative pathes (abc/def) because we do have
+ *   expansion "~/xyz" and relative paths (abc/def) because we do have
  *   special knowledge about the home and current directories.  But otherwise
- *   the pathes are expected to be pre-sanitized:  No . or .. in paths,
+ *   the paths are expected to be pre-sanitized:  No . or .. in paths,
  *   no '//' in paths, etc.
  *
  ****************************************************************************/
@@ -409,4 +409,3 @@ void ftpc_dirfree(FAR struct ftpc_dirlist_s *dirlist)
       free(dirlist);
     }
 }
-

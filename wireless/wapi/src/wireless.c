@@ -4,16 +4,17 @@
  *   Copyright (C) 2011, 2017, 2019 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
- * Adapted for Nuttx from WAPI:
+ * Adapted for NuttX from WAPI:
  *
  *   Copyright (c) 2010, Volkan YAZICI <volkan.yazici@gmail.com>
  *   All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * modification, are permitted provided that the following conditions are
+ * met:
  *
- *  - Redistributions of  source code must  retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
+ *  - Redistributions of  source code must  retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
  *
  *  - Redistributions in binary form must reproduce the above copyright
  *    notice, this list of  conditions and the  following disclaimer in the
@@ -119,6 +120,17 @@ FAR const char *g_wapi_txpower_flags[] =
   NULL
 };
 
+/* Passphrase Algorithm */
+
+FAR const char *g_wapi_alg_flags[] =
+{
+  "WPA_ALG_NONE",
+  "WPA_ALG_WEP",
+  "WPA_ALG_TKIP",
+  "WPA_ALG_CCMP",
+  NULL
+};
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -140,7 +152,8 @@ static inline double wapi_freq2float(const struct iw_freq *freq)
  * Name: wapi_float2freq
  *
  * Description:
- *   Converts a floating point the our internal representation of frequencies.
+ *   Converts a floating point the our internal representation of
+ *   frequencies.
  *
  ****************************************************************************/
 
@@ -331,9 +344,35 @@ static int wapi_scan_event(FAR struct iw_event *event,
       }
 
     case SIOCGIWFREQ:
-      info->has_freq = 1;
-      info->freq = wapi_freq2float(&(event->u.freq));
-      break;
+      {
+        info->has_freq = 1;
+
+        if (event->u.freq.e == 0)
+          {
+            /* Some drivers do not report frequency, but a channel.
+             * Try to map this to frequency by assuming they are using
+             * IEEE 802.11b/g.  But don't overwrite a previously parsed
+             * frequency if the driver sends both frequency and channel,
+             * since the driver may be sending an A-band channel that we
+             * don't handle here.
+             */
+
+            if (event->u.freq.m >= 1 && event->u.freq.m <= 13)
+              {
+                info->freq = 2407 + 5 * event->u.freq.m;
+              }
+            else if (event->u.freq.m == 14)
+              {
+                info->freq = 2484;
+              }
+          }
+        else
+          {
+            info->freq = wapi_freq2float(&(event->u.freq));
+          }
+
+        break;
+      }
 
     case SIOCGIWMODE:
       {
@@ -350,16 +389,19 @@ static int wapi_scan_event(FAR struct iw_event *event,
       }
 
     case SIOCGIWESSID:
-      info->has_essid = 1;
-      info->essid_flag = (event->u.data.flags) ? WAPI_ESSID_ON
-                                               : WAPI_ESSID_OFF;
-      memset(info->essid, 0, (WAPI_ESSID_MAX_SIZE + 1));
-      if ((event->u.essid.pointer) && (event->u.essid.length))
-        {
-          memcpy(info->essid, event->u.essid.pointer, event->u.essid.length);
-        }
+      {
+        info->has_essid = 1;
+        info->essid_flag = (event->u.data.flags) ? WAPI_ESSID_ON
+                                                 : WAPI_ESSID_OFF;
+        memset(info->essid, 0, (WAPI_ESSID_MAX_SIZE + 1));
+        if ((event->u.essid.pointer) && (event->u.essid.length))
+          {
+            memcpy(info->essid, event->u.essid.pointer,
+                   event->u.essid.length);
+          }
 
-      break;
+        break;
+      }
 
     case SIOCGIWRATE:
 
@@ -372,7 +414,26 @@ static int wapi_scan_event(FAR struct iw_event *event,
           info->has_bitrate = 1;
           info->bitrate = event->u.bitrate.value;
         }
+
       break;
+
+    case IWEVQUAL:
+      {
+        if (event->u.qual.updated & IW_QUAL_DBM)
+          {
+            info->has_rssi = 1;
+            info->rssi = event->u.qual.level;
+
+            /* Report signal levels in dBm */
+
+            if (info->rssi >= 0x40)
+              {
+                info->rssi -= 0x100;
+              }
+          }
+
+        break;
+      }
     }
 
   return 0;
@@ -1002,7 +1063,8 @@ int wapi_get_txpower(int sock, FAR const char *ifname, FAR int *power,
         {
           *flag = WAPI_TXPOWER_MWATT;
         }
-      else if (IW_TXPOW_RELATIVE == (wrq.u.txpower.flags & IW_TXPOW_RELATIVE))
+      else if (IW_TXPOW_RELATIVE ==
+               (wrq.u.txpower.flags & IW_TXPOW_RELATIVE))
         {
           *flag = WAPI_TXPOWER_RELATIVE;
         }
@@ -1076,21 +1138,47 @@ int wapi_set_txpower(int sock, FAR const char *ifname, int power,
 }
 
 /****************************************************************************
- * Name: wapi_scan_init
+ * Name: wapi_scan_channel_init
  *
  * Description:
  *   Starts a scan on the given interface. Root privileges are required to
- *   start a scan.
+ *   start a scan with specified channels.
  *
  ****************************************************************************/
 
-int wapi_scan_init(int sock, const char *ifname)
+int wapi_scan_channel_init(int sock, FAR const char *ifname,
+                           FAR const char *essid,
+                           uint8_t *channels, int num_channels)
 {
+  struct iw_scan_req req;
   struct iwreq wrq =
   {
   };
 
+  size_t essid_len;
   int ret;
+  int i;
+
+  if (essid && (essid_len = strlen(essid)) > 0)
+    {
+      memset(&req, 0, sizeof(req));
+      req.essid_len       = essid_len;
+      req.bssid.sa_family = ARPHRD_ETHER;
+      memset(req.bssid.sa_data, 0xff, IFHWADDRLEN);
+      memcpy(req.essid, essid, essid_len);
+      wrq.u.data.pointer  = (caddr_t)&req;
+      wrq.u.data.length   = sizeof(req);
+      wrq.u.data.flags    = IW_SCAN_THIS_ESSID;
+    }
+
+  if (channels && num_channels > 0)
+    {
+      req.num_channels = num_channels;
+      for (i = 0; i < num_channels; i++)
+        {
+          req.channel_list[i].m = channels[i];
+        }
+    }
 
   strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWSCAN, (unsigned long)((uintptr_t)&wrq));
@@ -1102,6 +1190,20 @@ int wapi_scan_init(int sock, const char *ifname)
     }
 
   return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_scan_init
+ *
+ * Description:
+ *   Starts a scan on the given interface. Root privileges are required to
+ *   start a scan.
+ *
+ ****************************************************************************/
+
+int wapi_scan_init(int sock, FAR const char *ifname, FAR const char *essid)
+{
+  return wapi_scan_channel_init(sock, ifname, essid, NULL, 0);
 }
 
 /****************************************************************************
@@ -1226,8 +1328,6 @@ alloc:
       return -errcode;
     }
 
-  printf("got %d bytes\n", wrq.u.data.length);
-
   /* We have the results, process them. */
 
   if (wrq.u.data.length)
@@ -1262,3 +1362,66 @@ alloc:
   free(buf);
   return ret;
 }
+
+/****************************************************************************
+ * Name: wapi_scan_coll_free
+ *
+ * Description:
+ *   Free the scan results.
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+void wapi_scan_coll_free(FAR struct wapi_list_s *list)
+{
+  FAR struct wapi_scan_info_s *temp;
+  FAR struct wapi_scan_info_s *info;
+
+  if (list == NULL)
+    {
+      return;
+    }
+
+  info = list->head.scan;
+  while (info)
+    {
+      temp = info->next;
+      free(info);
+      info = temp;
+    }
+}
+
+/****************************************************************************
+ * Name: wapi_get_sensitivity
+ *
+ * Description:
+ *    Get the wlan Sensitivity
+ *
+ ****************************************************************************/
+
+int wapi_get_sensitivity(int sock, FAR const char *ifname, FAR int *sense)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  ret = ioctl(sock, SIOCGIWSENS, (unsigned long)((uintptr_t)&wrq));
+  if (ret < 0)
+    {
+      int errcode = errno;
+      WAPI_IOCTL_STRERROR(SIOCGIWSENS, errcode);
+      ret = -errcode;
+    }
+  else
+    {
+      *sense = -wrq.u.sens.value;
+    }
+
+  return ret;
+}
+

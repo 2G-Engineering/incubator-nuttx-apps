@@ -33,7 +33,7 @@
 #
 ############################################################################
 
--include $(TOPDIR)/Make.defs
+include $(APPDIR)/Make.defs
 
 WGET = wget
 CP = cp -R
@@ -48,7 +48,7 @@ EMBEDLOG_EXT = tar.gz
 EMBEDLOG_SOURCES = embedlog-$(EMBEDLOG_VERSION)
 EMBEDLOG_TARBALL = $(EMBEDLOG_SOURCES).$(EMBEDLOG_EXT)
 
-CFLAGS += -I$(APPDIR)/include/system
+CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPDIR)$(DELIM)include$(DELIM)system}
 
 CSRCS = embedlog/src/el-options.c \
 	embedlog/src/el-perror.c \
@@ -146,7 +146,7 @@ CFLAGS += -DEL_MEM_LINE_SIZE=$(CONFIG_EMBEDLOG_MEM_LINE_SIZE)
 # config.h is available only when building with autotools
 CFLAGS += -DHAVE_CONFIG_H=0
 
-# embedlog uses access(path, F_OK) to determin if file exists or not and since
+# embedlog uses access(path, F_OK) to determine if file exists or not and since
 # nuttx always returns OK here, we mark access as not working and make embedlog
 # to use stat() for that purpose
 CFLAGS += -DHAVE_ACCESS=0
@@ -178,7 +178,6 @@ $(EMBEDLOG_TARBALL):
 	@echo "Downloading: $@"
 	$(Q) $(WGET) -O $@ $(EMBEDLOG_URL)/$@
 	${Q} $(NXTOOLSDIR)/check-hash.sh sha256 $(EMBEDLOG_SRC_SHA256) $@
-	$(Q) touch $@
 
 $(EMBEDLOG_SOURCES): $(EMBEDLOG_TARBALL)
 	@echo "Unpacking $< -> $@"
@@ -189,7 +188,6 @@ $(EMBEDLOG_SOURCES): $(EMBEDLOG_TARBALL)
 embedlog: $(EMBEDLOG_SOURCES)
 	$(call DELDIR, $@)
 	$(Q) $(CP) $< $@
-	$(Q) touch $@
 
 create_includes:
 	$(Q) $(CP) $(EMBEDLOG_SOURCES)/include/embedlog.h $(APPDIR)/include/system
@@ -207,4 +205,3 @@ distclean::
 	$(Q) $(call DELDIR, $(EMBEDLOG_TARBALL))
 
 include $(APPDIR)/Application.mk
-

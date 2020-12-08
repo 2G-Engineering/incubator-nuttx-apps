@@ -115,7 +115,7 @@ static void serial_in(struct term_pair_s *tp)
 
   /* Run forever */
 
-  for (;;)
+  while (true)
     {
 #ifdef CONFIG_EXAMPLES_PTYTEST_POLL
       ret = poll((struct pollfd *)&fdp, 1, POLL_TIMEOUT);
@@ -194,7 +194,7 @@ static void serial_out(struct term_pair_s *tp)
 
   /* Run forever */
 
-  for (;;)
+  while (true)
     {
 #ifdef CONFIG_EXAMPLES_PTYTEST_POLL
       ret = poll((struct pollfd *)&fdp, 1, POLL_TIMEOUT);
@@ -315,9 +315,36 @@ int main(int argc, FAR char *argv[])
                           O_RDWR | O_NONBLOCK);
   if (termpair.fd_uart < 0)
     {
-      fprintf(stderr, "Failed to open %s: %\n",
+#ifdef CONFIG_EXAMPLES_PTYTEST_WAIT_CONNECTED
+      /* if ENOTCONN is received, re-attempt to open periodically */
+
+      if (errno == ENOTCONN)
+        {
+          fprintf(stderr, "ERROR: device not connected, will continue"
+                          " trying\n");
+        }
+
+      while (termpair.fd_uart < 0 && errno == ENOTCONN)
+        {
+          sleep(1);
+
+          termpair.fd_uart = open(CONFIG_EXAMPLES_PTYTEST_SERIALDEV,
+                                  O_RDWR | O_NONBLOCK);
+        }
+
+      /* if we exited due to an error different than ENOTCONN */
+
+      if (termpair.fd_uart < 0)
+        {
+          fprintf(stderr, "Failed to open %s: %i\n",
+                 CONFIG_EXAMPLES_PTYTEST_SERIALDEV, errno);
+          goto error_serial;
+        }
+#else
+      fprintf(stderr, "Failed to open %s: %i\n",
              CONFIG_EXAMPLES_PTYTEST_SERIALDEV, errno);
       goto error_serial;
+#endif
     }
 
 #ifdef CONFIG_SERIAL_TERMIOS
@@ -349,14 +376,15 @@ int main(int argc, FAR char *argv[])
 
   /* Use this pts file as stdin, stdout, and stderr */
 
-  (void)dup2(fd_pts, 0);
-  (void)dup2(fd_pts, 1);
-  (void)dup2(fd_pts, 2);
+  dup2(fd_pts, 0);
+  dup2(fd_pts, 1);
+  dup2(fd_pts, 2);
 
   /* Create a new console using this /dev/pts/N */
 
   pid = task_create("NSH Console", CONFIG_EXAMPLES_PTYTEST_DAEMONPRIO,
-                    CONFIG_EXAMPLES_PTYTEST_STACKSIZE, nsh_consolemain, NULL);
+                    CONFIG_EXAMPLES_PTYTEST_STACKSIZE, nsh_consolemain,
+                    argv);
   if (pid < 0)
     {
       /* Can't do output because stdout and stderr are redirected */
@@ -390,11 +418,11 @@ int main(int argc, FAR char *argv[])
 
   /* Stay here to keep the threads running */
 
-  for (;;)
+  while (true)
     {
       /* Nothing to do, then sleep to avoid eating all cpu time */
 
-      usleep(10000);
+      pause();
     }
 
   return EXIT_SUCCESS;

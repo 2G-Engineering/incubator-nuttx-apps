@@ -51,40 +51,20 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#ifndef HTONS
-#  ifdef CONFIG_ENDIAN_BIG
-#    define HTONS(ns) (ns)
-#  else
-#   define HTONS(ns) \
-     (unsigned short) \
-       (((((unsigned short)(ns)) & 0x00ff) << 8) | \
-        ((((unsigned short)(ns)) >> 8) & 0x00ff))
-#  endif
-#endif
-
-#ifndef HTONL
-#  ifdef CONFIG_ENDIAN_BIG
-#    define HTONL(nl) (nl)
-#  else
-#    define HTONL(nl) \
-       (unsigned long) \
-         (((((unsigned long)(nl)) & 0x000000ffUL) << 24) | \
-          ((((unsigned long)(nl)) & 0x0000ff00UL) <<  8) | \
-          ((((unsigned long)(nl)) & 0x00ff0000UL) >>  8) | \
-          ((((unsigned long)(nl)) & 0xff000000UL) >> 24))
-#  endif
-#endif
-
-#ifndef NTOHS
-#  define NTOHS(hs) HTONS(hs)
-#endif
-
-#ifndef NTOHL
-#  define NTOHL(hl) HTONL(hl)
-#endif
-
 #ifdef TCPBLASTER_HOST
-   /* Have SO_LINGER */
+/* HTONS/L macros are unique to NuttX */
+
+#  undef HTONS
+#  undef HTONL
+#  define HTONS(ns) htons(ns)
+#  define HTONL(nl) htonl(nl)
+
+#  undef NTOHS
+#  undef NTOHL
+#  define NTOHS(hs) ntohs(hs)
+#  define NTOHL(hl) ntohl(hl)
+
+/* Have SO_LINGER */
 
 #  define FAR
 #  define TCPBLASTER_HAVE_SOLINGER 1
@@ -113,6 +93,12 @@
 #  define SENDSIZE CONFIG_EXAMPLES_TCPBLASTER_SENDSIZE
 #else
 #  define SENDSIZE 4096
+#endif
+
+#ifdef CONFIG_EXAMPLES_TCPBLASTER_GROUPSIZE
+#  define GROUPSIZE CONFIG_EXAMPLES_TCPBLASTER_GROUPSIZE
+#else
+#  define GROUPSIZE 50
 #endif
 
 /****************************************************************************

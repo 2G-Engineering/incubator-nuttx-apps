@@ -49,6 +49,7 @@
 
 #include <stdint.h>
 #include <debug.h>
+#include <syslog.h>
 
 #include <nuttx/compiler.h>
 #include <nuttx/ascii.h>
@@ -58,8 +59,10 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
 /* ZModem *******************************************************************/
-/* Zmodem ZRINIT flags.  These bits describe the cababilities of the receiver.
+
+/* Zmodem ZRINIT flags. These bits describe the cababilities of the receiver.
  * Reference: Paragraph 11.2:
  */
 
@@ -78,6 +81,7 @@
 #define TESC8         (1 << 7)       /* Sender needs 8th bit escaped. */
 
 /* ZFILE transfer flags */
+
 /* F0 */
 
 #define ZCBIN         1              /* Binary transfer */
@@ -161,6 +165,7 @@
 #define ZRUB1         'm'           /* Translate to 0xff */
 
 /* Implementation ***********************************************************/
+
 /* Zmodem Events (same as frame type + data received and error events) */
 
 #define ZME_RQINIT    ZRQINIT        /* Request receive init */
@@ -184,7 +189,7 @@
 #define ZME_COMMAND   ZCOMMAND       /* Command, from sending program */
 #define ZME_STDERR    ZSTDERR        /* Output this message to stderr */
 
-#define ZME_CANCEL    251            /* Received the cancelation sequence */
+#define ZME_CANCEL    251            /* Received the cancellation sequence */
 #define ZME_OO        252            /* Received OO, terminating the receiver */
 #define ZME_DATARCVD  253            /* Data received */
 #define ZME_TIMEOUT   254            /* Timeout */
@@ -233,18 +238,14 @@
 #  define zmdbg(format, ...)    syslog(LOG_INFO, EXTRA_FMT format EXTRA_ARG, ##__VA_ARGS__)
 #else
 #  undef CONFIG_SYSTEM_ZMODEM_DUMPBUFFER
-#  ifdef CONFIG_CPP_HAVE_VARARGS
-#     define zmprintf(x...)
-#     define zmdbg(x...)
-#  else
-#     define zmprintf           (void)
-#     define zmdbg              (void)
-#  endif
+#  define zmprintf(x...)
+#  define zmdbg(x...)
 #endif
 
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
 /* The state of the parser */
 
 enum parser_state_e
@@ -287,9 +288,9 @@ enum pdata_substate_e
 struct zm_state_s;
 typedef int (*action_t)(FAR struct zm_state_s *pzm);
 
-/* State transition table entry.  There is one row of the table per possible state.
- * Each row is a row of all reasonable events for this state and long the
- * appropriate state transition and transition action.
+/* State transition table entry.  There is one row of the table per possible
+ * state. Each row is a row of all reasonable events for this state and long
+ * the appropriate state transition and transition action.
  */
 
 struct zm_transition_s
@@ -317,7 +318,7 @@ struct zm_state_s
 
   /* evtable[] is the state transition table that controls the state for this
    * current action.  Different state transitions tables are used for Zmodem
-   * vs. XY modem and for receive and for tansmit.
+   * vs. XY modem and for receive and for transmit.
    */
 
   FAR const struct zm_transition_s * const * evtable;
@@ -357,6 +358,9 @@ struct zm_state_s
   uint8_t  rcvbuf[CONFIG_SYSTEM_ZMODEM_RCVBUFSIZE];
   uint8_t  pktbuf[ZM_PKTBUFSIZE];
   uint8_t  scratch[CONFIG_SYSTEM_ZMODEM_SNDBUFSIZE];
+#ifdef CONFIG_SYSTEM_ZMODEM_SNDFILEBUF
+  uint8_t  filebuf[CONFIG_SYSTEM_ZMODEM_SNDBUFSIZE];
+#endif
 };
 
 /* Receive state information */
@@ -563,7 +567,8 @@ ssize_t zm_remwrite(int fd, FAR const uint8_t *buffer, size_t buflen);
  *
  ****************************************************************************/
 
-int zm_writefile(int fd, FAR const uint8_t *buffer, size_t buflen, bool zcnl);
+int zm_writefile(int fd, FAR const uint8_t *buffer,
+                 size_t buflen, bool zcnl);
 
 /****************************************************************************
  * Name: zm_filecrc

@@ -33,7 +33,7 @@
  *
  ****************************************************************************/
 
-/* Mount the ROMFS image, Verifty that it contains the
+/* Mount the ROMFS image, Verify that it contains the
  * following:
  *
  * testdir
@@ -60,7 +60,9 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -244,6 +246,7 @@ static struct node_s *findindirectory(struct node_s *entry, const char *name)
           return entry;
         }
     }
+
   return NULL;
 }
 
@@ -266,13 +269,15 @@ static void checkattributes(const char *path, mode_t mode, size_t size)
 
   if (mode != buf.st_mode)
     {
-      printf("  -- ERROR: Expected mode %08x, got %08x\n", mode, buf.st_mode);
+      printf("  -- ERROR: Expected mode %08x, got %08x\n", mode,
+             buf.st_mode);
       g_nerrors++;
     }
 
   if (size != buf.st_size)
     {
-      printf("  -- ERROR: Expected size %d, got %d\n", mode, buf.st_size);
+      printf("  -- ERROR: Expected size %zu, got %ju\n", size,
+             (uintmax_t)buf.st_size);
       g_nerrors++;
     }
 }
@@ -322,8 +327,9 @@ static void checkfile(const char *path, struct node_s *node)
 
   /* Memory map and verify the file contents */
 
-  filedata = (char*)mmap(NULL, node->size, PROT_READ, MAP_SHARED|MAP_FILE, fd, 0);
-  if (!filedata || filedata == (char*)MAP_FAILED)
+  filedata = (char *)mmap(NULL, node->size, PROT_READ, MAP_SHARED | MAP_FILE,
+                          fd, 0);
+  if (!filedata || filedata == (char *)MAP_FAILED)
     {
       printf("  -- ERROR: mmap of %s failed: %d\n", path, errno);
       g_nerrors++;
@@ -334,11 +340,13 @@ static void checkfile(const char *path, struct node_s *node)
         {
           memcpy(g_scratchbuffer, filedata, node->size);
           g_scratchbuffer[node->size] = '\0';
-          printf("  -- ERROR: Mapped file content read does not match expectation:\n");
+          printf("  -- ERROR: Mapped file content read does not match "
+                 "expectation:\n");
           printf("  --        Memory:   [%s]\n", filedata);
           printf("  --        Expected: [%s]\n", node->u.filecontent);
           g_nerrors++;
         }
+
       munmap(filedata, node->size);
     }
 
@@ -373,7 +381,8 @@ static void readdirectories(const char *path, struct node_s *entry)
 
   for (direntry = readdir(dirp); direntry; direntry = readdir(dirp))
     {
-      if (strcmp(direntry->d_name, ".") == 0 || strcmp(direntry->d_name, "..") == 0)
+      if (strcmp(direntry->d_name, ".") == 0 ||
+          strcmp(direntry->d_name, "..") == 0)
         {
            printf("  Skipping %s\n", direntry->d_name);
            continue;
@@ -421,6 +430,7 @@ static void readdirectories(const char *path, struct node_s *entry)
               checkfile(fullpath, node);
             }
         }
+
       free(fullpath);
     }
 
@@ -435,7 +445,7 @@ static void checkdirectories(struct node_s *entry)
 {
   for (; entry; entry = entry->peer)
     {
-      if (!entry->found )
+      if (!entry->found)
         {
           printf("ERROR: %s never found\n", entry->name);
           g_nerrors++;
@@ -458,12 +468,13 @@ static void checkdirectories(struct node_s *entry)
 
 int main(int argc, FAR char *argv[])
 {
-   int  ret;
+  int ret;
 
   /* Create a RAM disk for the test */
 
   ret = romdisk_register(CONFIG_EXAMPLES_ROMFS_RAMDEVNO, testdir_img,
-                         NSECTORS(testdir_img_len), CONFIG_EXAMPLES_ROMFS_SECTORSIZE);
+                         NSECTORS(testdir_img_len),
+                         CONFIG_EXAMPLES_ROMFS_SECTORSIZE);
   if (ret < 0)
     {
       printf("ERROR: Failed to create RAM disk\n");
@@ -475,7 +486,8 @@ int main(int argc, FAR char *argv[])
   printf("Mounting ROMFS filesystem at target=%s with source=%s\n",
          CONFIG_EXAMPLES_ROMFS_MOUNTPOINT, MOUNT_DEVNAME);
 
-  ret = mount(MOUNT_DEVNAME, CONFIG_EXAMPLES_ROMFS_MOUNTPOINT, "romfs", MS_RDONLY, NULL);
+  ret = mount(MOUNT_DEVNAME, CONFIG_EXAMPLES_ROMFS_MOUNTPOINT, "romfs",
+              MS_RDONLY, NULL);
   if (ret < 0)
     {
       printf("ERROR: Mount failed: %d\n", errno);
