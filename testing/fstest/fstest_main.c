@@ -1,5 +1,5 @@
 /****************************************************************************
- * testing/fstest/fstest_main.c
+ * apps/testing/fstest/fstest_main.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <crc32.h>
 #include <debug.h>
+#include <assert.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -90,6 +91,7 @@ struct fstest_filedesc_s
   bool failed;
   size_t len;
   uint32_t crc;
+  uint32_t hash;
 };
 
 /****************************************************************************
@@ -188,6 +190,29 @@ static inline char fstest_randchar(void)
 }
 
 /****************************************************************************
+ * Name: fstest_checkexit
+ ****************************************************************************/
+
+static bool fstest_checkexit(FAR struct fstest_filedesc_s *file)
+{
+  int i;
+  bool ret = false;
+
+  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+    {
+      if (!g_files[i].deleted &&
+          &g_files[i] != file &&
+          g_files[i].hash == file->hash)
+        {
+          ret = true;
+          break;
+        }
+    }
+
+  return ret;
+}
+
+/****************************************************************************
  * Name: fstest_randname
  ****************************************************************************/
 
@@ -200,8 +225,11 @@ static inline void fstest_randname(FAR struct fstest_filedesc_s *file)
   int i;
 
   dirlen   = strlen(g_mountdir);
-  maxname  = CONFIG_TESTING_FSTEST_MAXNAME - dirlen;
-  namelen  = (rand() % maxname) + 1;
+
+  /* Force the max filename lengh and also the min name len = 4 */
+
+  maxname  = CONFIG_TESTING_FSTEST_MAXNAME - dirlen - 3;
+  namelen  = (rand() % maxname) + 4;
   alloclen = namelen + dirlen;
 
   file->name = (FAR char *)malloc(alloclen + 1);
@@ -213,12 +241,19 @@ static inline void fstest_randname(FAR struct fstest_filedesc_s *file)
     }
 
   memcpy(file->name, g_mountdir, dirlen);
-  for (i = dirlen; i < alloclen; i++)
-    {
-      file->name[i] = fstest_randchar();
-    }
 
-  file->name[alloclen] = '\0';
+  do
+    {
+      for (i = dirlen; i < alloclen; i++)
+        {
+          file->name[i] = fstest_randchar();
+        }
+
+      file->name[alloclen] = '\0';
+      file->hash = crc32((const uint8_t *)file->name + dirlen,
+                         alloclen - dirlen);
+    }
+  while (fstest_checkexit(file));
 }
 
 /****************************************************************************
@@ -247,6 +282,7 @@ static void fstest_freefile(FAR struct fstest_filedesc_s *file)
   if (file->name)
     {
       free(file->name);
+      file->name = NULL;
     }
 
   memset(file, 0, sizeof(struct fstest_filedesc_s));
@@ -620,7 +656,7 @@ static inline int fstest_rdfile(FAR struct fstest_filedesc_s *file)
   crc = crc32(g_fileimage, file->len);
   if (crc != file->crc)
     {
-      printf("ERROR: Bad CRC: %d vs %d\n", crc, file->crc);
+      printf("ERROR: Bad CRC: %" PRId32 " vs %" PRId32 "\n", crc, file->crc);
       printf("  File name: %s\n", file->name);
       printf("  File size: %zd\n", file->len);
       close(fd);

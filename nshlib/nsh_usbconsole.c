@@ -75,7 +75,7 @@
  *
  ****************************************************************************/
 
-static void nsh_configstdio(int fd, FAR struct console_stdio_s *pstate)
+static void nsh_configstdio(int fd)
 {
   /* Make sure the stdout, and stderr are flushed */
 
@@ -87,16 +87,6 @@ static void nsh_configstdio(int fd, FAR struct console_stdio_s *pstate)
   dup2(fd, 0);
   dup2(fd, 1);
   dup2(fd, 2);
-
-  /* Setup the stdout */
-
-  pstate->cn_outfd     = 1;
-  pstate->cn_outstream = fdopen(1, "a");
-
-  /* Setup the stderr */
-
-  pstate->cn_errfd     = 2;
-  pstate->cn_errstream = fdopen(2, "a");
 }
 
 /****************************************************************************
@@ -107,7 +97,7 @@ static void nsh_configstdio(int fd, FAR struct console_stdio_s *pstate)
  *
  ****************************************************************************/
 
-static int nsh_nullstdio(FAR struct console_stdio_s *pstate)
+static int nsh_nullstdio(void)
 {
   int fd;
 
@@ -118,7 +108,7 @@ static int nsh_nullstdio(FAR struct console_stdio_s *pstate)
     {
       /* Configure standard I/O to use /dev/null */
 
-      nsh_configstdio(fd, pstate);
+      nsh_configstdio(fd);
 
       /* We can close the original file descriptor now (unless it was one of
        * 0-2)
@@ -224,7 +214,7 @@ restart:
 
   /* Configure standard I/O */
 
-  nsh_configstdio(fd, pstate);
+  nsh_configstdio(fd);
 
   /* We can close the original file descriptor (unless it was one of 0-2) */
 
@@ -306,7 +296,7 @@ int nsh_consolemain(int argc, FAR char *argv[])
   /* Configure to use /dev/null if we do not have a valid console. */
 
 #ifndef CONFIG_DEV_CONSOLE
-  nsh_nullstdio(pstate);
+  nsh_nullstdio();
 #endif
 
   /* Execute the one-time start-up script (output may go to /dev/null) */
@@ -347,7 +337,7 @@ int nsh_consolemain(int argc, FAR char *argv[])
        * valid console device.
        */
 
-      nsh_nullstdio(pstate);
+      nsh_nullstdio();
     }
 }
 

@@ -1,5 +1,5 @@
 /****************************************************************************
- * examples/romfs/romfs_main.c
+ * apps/examples/romfs/romfs_main.c
  *
  *   Copyright (C) 2008-2009, 2011 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
@@ -97,10 +97,6 @@
 #  error "Mountpoint support is disabled"
 #endif
 
-#if CONFIG_NFILE_DESCRIPTORS < 4
-#  error "Not enough file descriptors"
-#endif
-
 #ifndef CONFIG_FS_ROMFS
 #  error "ROMFS support not enabled"
 #endif
@@ -153,6 +149,7 @@ static const char g_subdirfilecontent[]  = "File in subdirectory\n";
 
 static struct node_s g_adir;
 static struct node_s g_afile;
+static struct node_s g_ldir;
 static struct node_s g_hfile;
 
 static struct node_s g_anotherfile;
@@ -183,13 +180,21 @@ static void connectem(void)
   g_adir.size                  = 0;
   g_adir.u.child               = &g_anotherfile;
 
-  g_afile.peer                 = &g_hfile;
+  g_afile.peer                 = &g_ldir;
   g_afile.directory            = false;
   g_afile.found                = false;
   g_afile.name                 = "afile.txt";
   g_afile.mode                 = FILE_MODE;
   g_afile.size                 = strlen(g_afilecontent);
   g_afile.u.filecontent        = g_afilecontent;
+
+  g_ldir.peer                  = &g_hfile;
+  g_ldir.directory             = true;
+  g_ldir.found                 = false;
+  g_ldir.name                  = "ldir";
+  g_ldir.mode                  = DIRECTORY_MODE;
+  g_ldir.size                  = 0;
+  g_ldir.u.child               = &g_subdirfile;
 
   g_hfile.peer                 = NULL;
   g_hfile.directory            = false; /* Actually a hard link */
@@ -416,7 +421,7 @@ static void readdirectories(const char *path, struct node_s *entry)
               printf("Continuing directory: %s\n", path);
             }
         }
-      else
+      else if (!DIRENT_ISLINK(direntry->d_type))
         {
           printf("  FILE: %s/\n", fullpath);
           if (node->directory)
