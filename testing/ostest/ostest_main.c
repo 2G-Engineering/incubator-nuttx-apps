@@ -246,6 +246,14 @@ static int user_main(int argc, char *argv[])
 
   check_test_memory_usage();
 
+  /* Test additional getopt(), getopt_long(), and getopt_long_only()
+   * features.
+   */
+
+  printf("\nuser_main: getopt() test\n");
+  getopt_test();
+  check_test_memory_usage();
+
   /* If retention of child status is enable, then suppress it for this task.
    * This task may produce many, many children (especially if
    * CONFIG_TESTING_OSTEST_LOOPS) and it does not harvest their exit status.
@@ -509,6 +517,10 @@ static int user_main(int argc, char *argv[])
 
       printf("\nuser_main: sporadic scheduler test\n");
       sporadic_test();
+      check_test_memory_usage();
+
+      printf("\nuser_main: Dual sporadic thread test\n");
+      sporadic2_test();
       check_test_memory_usage();
 #endif
 
