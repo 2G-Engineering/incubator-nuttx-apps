@@ -225,7 +225,7 @@ static int user_main(int argc, char *argv[])
 
   if (argc != NARGS + 1)
     {
-      printf("user_main: Error expected argc=%d got argc=%d\n",
+      printf("user_main: ERROR expected argc=%d got argc=%d\n",
              NARGS + 1, argc);
     }
 
@@ -529,6 +529,14 @@ static int user_main(int argc, char *argv[])
 
       printf("\nuser_main: barrier test\n");
       barrier_test();
+      check_test_memory_usage();
+#endif
+
+#ifdef CONFIG_ARCH_SETJMP_H
+      /* Verify setjmp/longjmp */
+
+      printf("\nuser_main: setjmp test\n");
+      setjmp_test();
       check_test_memory_usage();
 #endif
 

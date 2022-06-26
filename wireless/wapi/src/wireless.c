@@ -263,6 +263,7 @@ static int wapi_event_stream_extract(FAR struct wapi_event_stream_s *stream,
   switch (iwe_stream->cmd)
     {
       case SIOCGIWESSID:
+      case SIOCGIWENCODE:
       case IWEVGENIE:
         iwe->cmd = iwe_stream->cmd;
         iwe->len = offsetof(struct iw_event, u) + sizeof(struct iw_point);
@@ -329,6 +330,7 @@ static int wapi_scan_event(FAR struct iw_event *event,
         /* Reset it. */
 
         bzero(temp, sizeof(struct wapi_scan_info_s));
+        temp->encode = 0xffff;
 
         /* Save cell identifier. */
 
@@ -364,6 +366,10 @@ static int wapi_scan_event(FAR struct iw_event *event,
             else if (event->u.freq.m == 14)
               {
                 info->freq = 2484;
+              }
+            else if (event->u.freq.m >= 36 && event->u.freq.m <= 165)
+              {
+                info->freq = 5000 + 5 * event->u.freq.m;
               }
           }
         else
@@ -434,6 +440,13 @@ static int wapi_scan_event(FAR struct iw_event *event,
 
         break;
       }
+
+    case SIOCGIWENCODE:
+      {
+        info->has_encode = 1;
+        info->encode = event->u.data.flags;
+        break;
+      }
     }
 
   return 0;
@@ -463,7 +476,7 @@ int wapi_get_freq(int sock, FAR const char *ifname, FAR double *freq,
   WAPI_VALIDATE_PTR(freq);
   WAPI_VALIDATE_PTR(flag);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWFREQ, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -531,7 +544,7 @@ int wapi_set_freq(int sock, FAR const char *ifname, double freq,
       break;
     }
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWFREQ, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -575,7 +588,7 @@ int wapi_freq2chan(int sock, FAR const char *ifname, double freq,
 
   /* Get range. */
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWRANGE, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -641,7 +654,7 @@ int wapi_chan2freq(int sock, FAR const char *ifname, int chan,
 
   /* Get range. */
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWRANGE, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -699,7 +712,7 @@ int wapi_get_essid(int sock, FAR const char *ifname, FAR char *essid,
   wrq.u.essid.length = WAPI_ESSID_MAX_SIZE + 1;
   wrq.u.essid.flags = 0;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWESSID, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -742,7 +755,7 @@ int wapi_set_essid(int sock, FAR const char *ifname, FAR const char *essid,
     snprintf(buf, ((WAPI_ESSID_MAX_SIZE + 1) * sizeof(char)), "%s", essid);
   wrq.u.essid.flags = flag;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWESSID, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -773,7 +786,7 @@ int wapi_get_mode(int sock, FAR const char *ifname,
 
   WAPI_VALIDATE_PTR(mode);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWMODE, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -807,7 +820,7 @@ int wapi_set_mode(int sock, FAR const char *ifname, enum wapi_mode_e mode)
 
   wrq.u.mode = mode;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWMODE, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -867,7 +880,7 @@ int wapi_get_ap(int sock, FAR const char *ifname, FAR struct ether_addr *ap)
 
   WAPI_VALIDATE_PTR(ap);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWAP, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -904,7 +917,7 @@ int wapi_set_ap(int sock, FAR const char *ifname,
 
   wrq.u.ap_addr.sa_family = ARPHRD_ETHER;
   memcpy(wrq.u.ap_addr.sa_data, ap, sizeof(struct ether_addr));
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
 
   ret = ioctl(sock, SIOCSIWAP, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
@@ -937,7 +950,7 @@ int wapi_get_bitrate(int sock, FAR const char *ifname,
   WAPI_VALIDATE_PTR(bitrate);
   WAPI_VALIDATE_PTR(flag);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWRATE, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -984,7 +997,7 @@ int wapi_set_bitrate(int sock, FAR const char *ifname, int bitrate,
   wrq.u.bitrate.value = bitrate;
   wrq.u.bitrate.fixed = (flag == WAPI_BITRATE_FIXED);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWRATE, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -1042,7 +1055,7 @@ int wapi_get_txpower(int sock, FAR const char *ifname, FAR int *power,
   WAPI_VALIDATE_PTR(power);
   WAPI_VALIDATE_PTR(flag);
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWTXPOW, (unsigned long)((uintptr_t)&wrq));
   if (ret >= 0)
     {
@@ -1125,7 +1138,7 @@ int wapi_set_txpower(int sock, FAR const char *ifname, int power,
 
   /* Issue the set command. */
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWTXPOW, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -1180,7 +1193,7 @@ int wapi_scan_channel_init(int sock, FAR const char *ifname,
         }
     }
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWSCAN, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -1228,7 +1241,7 @@ int wapi_scan_stat(int sock, FAR const char *ifname)
 
   wrq.u.data.pointer = &buf;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWSCAN, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
@@ -1296,7 +1309,7 @@ alloc:
   wrq.u.data.pointer = buf;
   wrq.u.data.length  = buflen;
   wrq.u.data.flags   = 0;
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
 
   ret = ioctl(sock, SIOCGIWSCAN, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0 && errno == E2BIG)
@@ -1415,12 +1428,45 @@ int wapi_set_country(int sock, FAR const char *ifname,
   wrq.u.data.pointer = (FAR void *)country;
   wrq.u.data.length = 2;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCSIWCOUNTRY, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
       int errcode = errno;
       WAPI_IOCTL_STRERROR(SIOCSIWCOUNTRY, errcode);
+      ret = -errcode;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: wapi_get_country
+ *
+ * Description:
+ *    Get the country code
+ *
+ ****************************************************************************/
+
+int wapi_get_country(int sock, FAR const char *ifname,
+                     FAR char *country)
+{
+  struct iwreq wrq =
+  {
+  };
+
+  int ret;
+
+  /* Prepare request. */
+
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  wrq.u.data.pointer = (FAR void *)country;
+  wrq.u.data.length = 2;
+  ret = ioctl(sock, SIOCGIWCOUNTRY, (unsigned long)((uintptr_t)&wrq));
+  if (ret < 0)
+    {
+      int errcode = errno;
+      WAPI_IOCTL_STRERROR(SIOCGIWSENS, errcode);
       ret = -errcode;
     }
 
@@ -1443,7 +1489,7 @@ int wapi_get_sensitivity(int sock, FAR const char *ifname, FAR int *sense)
 
   int ret;
 
-  strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+  strlcpy(wrq.ifr_name, ifname, IFNAMSIZ);
   ret = ioctl(sock, SIOCGIWSENS, (unsigned long)((uintptr_t)&wrq));
   if (ret < 0)
     {
