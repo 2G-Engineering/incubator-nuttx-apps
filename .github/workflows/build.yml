@@ -20,6 +20,10 @@ on:
       - 'releases/*'
     tags:
 
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Fetch-Source:
     runs-on: ubuntu-latest
@@ -77,7 +81,7 @@ jobs:
           echo ::set-output name=apps_ref::$APPS_REF
 
       - name: Checkout nuttx repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: apache/incubator-nuttx
           ref: ${{ steps.gittargets.outputs.os_ref }}
@@ -87,7 +91,7 @@ jobs:
         run: git -C sources/nuttx fetch --tags
 
       - name: Checkout apps repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: apache/incubator-nuttx-apps
           ref: ${{ steps.gittargets.outputs.apps_ref }}
@@ -97,7 +101,7 @@ jobs:
       - name: Tar sources
         run: tar zcf sources.tar.gz sources
       - name: Archive Source Bundle
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: source-bundle
           path: sources.tar.gz
@@ -110,11 +114,11 @@ jobs:
 
     strategy:
       matrix:
-        boards: [arm-01, arm-02, arm-03, arm-04, arm-05, arm-06, arm-07, arm-08, arm-09, arm-10, arm-11, arm-12, arm-13, other, risc-v, sim01, sim02, xtensa]
+        boards: [arm-01, arm-02, arm-03, arm-04, arm-05, arm-06, arm-07, arm-08, arm-09, arm-10, arm-11, arm-12, arm-13, other, risc-v, sim-01, sim-02, xtensa]
 
     steps:
       - name: Download Source Artifact
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: source-bundle
           path: .
@@ -123,12 +127,12 @@ jobs:
       - name: Docker Login
         uses: azure/docker-login@v1
         with:
-          login-server: docker.pkg.github.com
+          login-server: ghcr.io
           username: ${GITHUB_ACTOR}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Pull
-        run: docker pull docker.pkg.github.com/apache/incubator-nuttx/apache-nuttx-ci-linux
+        run: docker pull ghcr.io/apache/incubator-nuttx/apache-nuttx-ci-linux
       - name: Export NuttX Repo SHA
         run: echo "nuttx_sha=`git -C sources/nuttx rev-parse HEAD`" >> $GITHUB_ENV
       - name: Run builds
@@ -141,24 +145,28 @@ jobs:
             export CCACHE_DIR=`pwd`/ccache
             mkdir $CCACHE_DIR
             export ARTIFACTDIR=`pwd`/buildartifacts
+            git config --global --add safe.directory /github/workspace/sources/nuttx
+            git config --global --add safe.directory /github/workspace/sources/apps
             cd sources/nuttx/tools/ci
             ./cibuild.sh -A -c testlist/${{matrix.boards}}.dat
             ccache -s
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: linux-builds
           path: buildartifacts/
         continue-on-error: true
 
   macOS:
+    permissions:
+      contents: none
     runs-on: macos-10.15
     needs: Fetch-Source
     strategy:
       matrix:
-        boards: [macos, sim01, sim02]
+        boards: [macos, sim-01, sim-02]
     steps:
       - name: Download Source Artifact
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: source-bundle
           path: .
@@ -166,7 +174,7 @@ jobs:
         run: tar zxf sources.tar.gz
       - name: Restore Tools Cache
         id: cache-tools
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: ${{ runner.os }}-cache-tools
         with:
@@ -184,7 +192,7 @@ jobs:
           cd sources/nuttx/tools/ci
           ./cibuild.sh -i -A -c testlist/${{matrix.boards}}.dat
           ccache -s
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: macos-builds
           path: buildartifacts/

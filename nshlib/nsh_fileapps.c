@@ -30,6 +30,7 @@
 #endif
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <spawn.h>
 #include <errno.h>
 #include <string.h>
@@ -126,7 +127,7 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
    * failure.
    */
 
-  ret = posix_spawnp(&pid, cmd, &file_actions, &attr, &argv[1], NULL);
+  ret = posix_spawnp(&pid, cmd, &file_actions, &attr, argv, environ);
   if (ret == OK)
     {
       /* The application was successfully started with pre-emption disabled.
@@ -155,12 +156,14 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
       if (vtbl->np.np_bg == false)
 #  endif /* CONFIG_NSH_DISABLEBG */
         {
-          /* Setup up to receive SIGINT if control-C entered.  The return
-           * value is ignored because this console device may not support
-           * SIGINT.
-           */
+          int tc = 0;
 
-          ioctl(stdout->fs_fd, TIOCSCTTY, pid);
+          if (vtbl->isctty)
+            {
+              /* Setup up to receive SIGINT if control-C entered. */
+
+              tc = ioctl(stdout->fs_fd, TIOCSCTTY, pid);
+            }
 
           /* Wait for the application to exit.  We did lock the scheduler
            * above, but that does not guarantee that the application did not
@@ -213,7 +216,10 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
                */
             }
 
-          ioctl(stdout->fs_fd, TIOCSCTTY, -1);
+          if (vtbl->isctty && tc == 0)
+            {
+              ioctl(stdout->fs_fd, TIOCNOTTY);
+            }
         }
 #  ifndef CONFIG_NSH_DISABLEBG
       else

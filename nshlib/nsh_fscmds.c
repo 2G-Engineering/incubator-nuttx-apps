@@ -85,30 +85,6 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Name: nsh_getdirpath
- ****************************************************************************/
-
-#if !defined(CONFIG_NSH_DISABLE_LS) || !defined(CONFIG_NSH_DISABLE_CP)
-static char *nsh_getdirpath(FAR struct nsh_vtbl_s *vtbl,
-                            FAR const char *path, FAR const char *file)
-{
-  /* Handle the case where all that is left is '/' */
-
-  if (strcmp(path, "/") == 0)
-    {
-      snprintf(vtbl->iobuffer, IOBUFFERSIZE, "/%s", file);
-    }
-  else
-    {
-      snprintf(vtbl->iobuffer, IOBUFFERSIZE, "%s/%s", path, file);
-    }
-
-  vtbl->iobuffer[PATH_MAX] = '\0';
-  return strdup(vtbl->iobuffer);
-}
-#endif
-
-/****************************************************************************
  * Name: ls_specialdir
  ****************************************************************************/
 
@@ -361,8 +337,9 @@ static int ls_recursive(FAR struct nsh_vtbl_s *vtbl, const char *dirpath,
 
           ret = nsh_foreach_direntry(vtbl, "ls", newpath, ls_recursive,
                                      pvarg);
-          free(newpath);
         }
+
+      free(newpath);
     }
 
   return ret;
@@ -587,10 +564,11 @@ int cmd_cp(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
     {
       int nbytesread;
       int nbyteswritten;
+      char *iobuffer = vtbl->iobuffer;
 
       do
         {
-          nbytesread = read(rdfd, vtbl->iobuffer, IOBUFFERSIZE);
+          nbytesread = read(rdfd, iobuffer, IOBUFFERSIZE);
           if (nbytesread == 0)
             {
               /* End of file */
@@ -621,10 +599,11 @@ int cmd_cp(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
       do
         {
-          nbyteswritten = write(wrfd, vtbl->iobuffer, nbytesread);
+          nbyteswritten = write(wrfd, iobuffer, nbytesread);
           if (nbyteswritten >= 0)
             {
               nbytesread -= nbyteswritten;
+              iobuffer += nbyteswritten;
             }
           else
             {
@@ -691,6 +670,7 @@ int cmd_losetup(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
   bool teardown = false;
   bool readonly = false;
   off_t offset = 0;
+  int sectsize = 512;
   bool badarg = false;
   int ret = ERROR;
   int option;
@@ -699,13 +679,13 @@ int cmd_losetup(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
   /* Get the losetup options:  Two forms are supported:
    *
    *   losetup -d <loop-device>
-   *   losetup [-o <offset>] [-r] <loop-device> <filename>
+   *   losetup [-o <offset>] [-r] [-s <sectsize> ] <loop-device> <filename>
    *
    * NOTE that the -o and -r options are accepted with the -d option, but
    * will be ignored.
    */
 
-  while ((option = getopt(argc, argv, "d:o:r")) != ERROR)
+  while ((option = getopt(argc, argv, "d:o:rs:")) != ERROR)
     {
       switch (option)
         {
@@ -720,6 +700,10 @@ int cmd_losetup(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
         case 'r':
           readonly = true;
+          break;
+
+        case 's':
+          sectsize = atoi(optarg);
           break;
 
         case '?':
@@ -798,7 +782,7 @@ int cmd_losetup(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
       setup.devname  = loopdev;   /* The loop block device to be created */
       setup.filename = filepath;  /* The file or character device to use */
-      setup.sectsize = 512;       /* The sector size to use with the block device */
+      setup.sectsize = sectsize;  /* The sector size to use with the block device */
       setup.offset   = offset;    /* An offset that may be applied to the device */
       setup.readonly = readonly;  /* True: Read access will be supported only */
 
@@ -1213,16 +1197,56 @@ int cmd_ls(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifndef CONFIG_NSH_DISABLE_MKDIR
 int cmd_mkdir(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 {
-  FAR char *fullpath = nsh_getfullpath(vtbl, argv[1]);
+  FAR char *fullpath = NULL;
+  bool parent = false;
   int ret = ERROR;
+  int option;
+
+  while ((option = getopt(argc, argv, "p")) != ERROR)
+    {
+      switch (option)
+        {
+          case 'p':
+            parent = true;
+            break;
+        }
+    }
+
+  if (optind < argc)
+    {
+      fullpath = nsh_getfullpath(vtbl, argv[optind]);
+    }
 
   if (fullpath != NULL)
     {
-      ret = mkdir(fullpath, 0777);
-      if (ret < 0)
+      char *slash = parent ? fullpath : "";
+
+      for (; ; )
         {
-          nsh_error(vtbl, g_fmtcmdfailed, argv[0], "mkdir", NSH_ERRNO);
-        }
+          slash = strchr(slash, '/');
+          if (slash != NULL)
+            {
+              *slash = '\0';
+            }
+
+          ret = mkdir(fullpath, 0777);
+
+          if (ret < 0 && (errno != EEXIST || !parent))
+            {
+              nsh_error(vtbl, g_fmtcmdfailed,
+                        fullpath, "mkdir", NSH_ERRNO);
+              break;
+            }
+
+          if (slash != NULL)
+            {
+              *slash++ = '/';
+            }
+          else
+            {
+              break;
+            }
+         }
 
       nsh_freefullpath(fullpath);
     }
@@ -1305,7 +1329,7 @@ int cmd_mkfatfs(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
           return ERROR;
         }
     }
-  else if (optind >= argc)
+  else if (optind < argc)
     {
       nsh_error(vtbl, g_fmttoomanyargs, argv[0]);
       return ERROR;
@@ -1424,7 +1448,7 @@ int cmd_mkrd(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
     {
       nsectors = (uint32_t)atoi(argv[optind]);
     }
-  else if (optind >= argc)
+  else if (optind < argc)
     {
       fmt = g_fmttoomanyargs;
       goto errout_with_fmt;
@@ -1445,7 +1469,7 @@ int cmd_mkrd(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
   ret = boardctl(BOARDIOC_MKRD, (uintptr_t)&desc);
   if (ret < 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boarctl(BOARDIOC_MKRD)",
+      nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boardctl(BOARDIOC_MKRD)",
                 NSH_ERRNO_OF(-ret));
       return ERROR;
     }
@@ -1640,14 +1664,83 @@ int cmd_readlink(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
 #ifdef NSH_HAVE_DIROPTS
 #ifndef CONFIG_NSH_DISABLE_RM
+
+static int unlink_recursive(FAR char *path)
+{
+  struct dirent *d;
+  struct stat stat;
+  size_t len;
+  int ret;
+  DIR *dp;
+
+  ret = lstat(path, &stat);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  if (!S_ISDIR(stat.st_mode))
+    {
+      return unlink(path);
+    }
+
+  dp = opendir(path);
+  if (dp == NULL)
+    {
+      return -1;
+    }
+
+  len = strlen(path);
+  if (len > 0 && path[len - 1] == '/')
+    {
+      path[--len] = '\0';
+    }
+
+  while ((d = readdir(dp)) != NULL)
+    {
+      if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)
+        {
+          continue;
+        }
+
+      snprintf(&path[len], PATH_MAX - len, "/%s", d->d_name);
+      ret = unlink_recursive(path);
+      if (ret < 0)
+        {
+          closedir(dp);
+          return ret;
+        }
+    }
+
+  ret = closedir(dp);
+  if (ret >= 0)
+    {
+      path[len] = '\0';
+      ret = rmdir(path);
+    }
+
+  return ret;
+}
+
 int cmd_rm(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 {
-  FAR char *fullpath = nsh_getfullpath(vtbl, argv[1]);
+  bool recursive = (strcmp(argv[1], "-r") == 0);
+  FAR char *fullpath = nsh_getfullpath(vtbl, recursive ? argv[2] : argv[1]);
+  char buf[PATH_MAX];
   int ret = ERROR;
 
   if (fullpath != NULL)
     {
-      ret = unlink(fullpath);
+      if (recursive)
+        {
+          strlcpy(buf, fullpath, PATH_MAX);
+          ret = unlink_recursive(buf);
+        }
+      else
+        {
+          ret = unlink(fullpath);
+        }
+
       if (ret < 0)
         {
           nsh_error(vtbl, g_fmtcmdfailed, argv[0], "unlink", NSH_ERRNO);

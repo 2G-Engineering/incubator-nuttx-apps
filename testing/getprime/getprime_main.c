@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/testing/getprime_main.c
+ * apps/testing/getprime/getprime_main.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
+#include <assert.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -130,25 +131,28 @@ static void get_prime_in_parallel(int n)
   status = pthread_attr_setschedpolicy(&attr, SCHED_RR);
   ASSERT(status == OK);
 
-  printf("Set thread policy to SCHED_RR \n");
+  printf("Set thread policy to SCHED_RR\n");
 #else
   status = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
   ASSERT(status == OK);
 
-  printf("Set thread policy to SCHED_FIFO \n");
+  printf("Set thread policy to SCHED_FIFO\n");
 #endif
 
   for (i = 0; i < n; i++)
     {
-      printf("Start thread #%d \n", i);
+      printf("Start thread #%d\n", i);
       status = pthread_create(&thread[i], &attr,
                               thread_func, (FAR void *)&i);
       ASSERT(status == OK);
     }
 
-  /* Wait for finishing the last thread */
+  /* Wait for all the threads to finish */
 
-  pthread_join(thread[n - 1], &result);
+  for (i = 0; i < n; i++)
+    {
+      pthread_join(thread[i], &result);
+    }
 
   printf("Done\n");
 }
@@ -177,14 +181,14 @@ int main(int argc, FAR char *argv[])
       ASSERT(0 < n && n <= MAX_THREADS);
     }
 
-  (void)clock_gettime(CLOCK_REALTIME, &ts0);
+  clock_gettime(CLOCK_REALTIME, &ts0);
   get_prime_in_parallel(n);
-  (void)clock_gettime(CLOCK_REALTIME, &ts1);
+  clock_gettime(CLOCK_REALTIME, &ts1);
 
   elapsed  = (((uint64_t)ts1.tv_sec * NSEC_PER_SEC) + ts1.tv_nsec);
   elapsed -= (((uint64_t)ts0.tv_sec * NSEC_PER_SEC) + ts0.tv_nsec);
   elapsed /= NSEC_PER_MSEC; /* msec */
 
-  printf("%s took %" PRIu64 " msec \n", argv[0], elapsed);
+  printf("%s took %" PRIu64 " msec\n", argv[0], elapsed);
   return 0;
 }

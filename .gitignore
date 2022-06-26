@@ -4,6 +4,8 @@
 *.d
 *.dSYM
 *.exe
+*.gcno
+*.gcda
 *.hobj
 *.i
 *.lib
@@ -15,6 +17,7 @@
 *.swp
 *.sym
 *~
+.context
 .depend
 .kconfig
 /bin
@@ -25,3 +28,6 @@
 /symtab_apps.c
 cscope.out
 Make.dep
+.context
+# nuttx/$(TOPDIR)/Makefile.[unix|win]::$(DIRLINKS_EXTERNAL_DIRS)
+.dirlinks
