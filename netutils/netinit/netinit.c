@@ -646,7 +646,9 @@ static void netinit_net_bringup(void)
 
           if (ds.dnsaddr.s_addr != 0)
             {
+#if defined(CONFIG_NETDB_DNSCLIENT)
               netlib_set_ipv4dnsaddr(&ds.dnsaddr);
+#endif
             }
         }
 
