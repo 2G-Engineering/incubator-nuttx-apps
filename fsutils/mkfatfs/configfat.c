@@ -74,7 +74,7 @@ struct fat_config_s
  * offset 3.
  */
 
-static uint8_t g_bootcodeblob[] =
+static const uint8_t g_bootcodeblob[] =
 {
   0x0e, 0x1f, 0xbe, 0x00, 0x7c, 0xac, 0x22, 0xc0, 0x74, 0x0b, 0x56,
   0xb4, 0x0e, 0xbb, 0x07, 0x00, 0xcd, 0x10, 0x5e, 0xeb, 0xf0, 0x32,
@@ -341,6 +341,8 @@ static inline uint8_t
 mkfatfs_clustersearchlimits(FAR struct fat_format_s *fmt,
                             FAR struct fat_var_s *var)
 {
+  UNUSED(var);
+
   uint8_t mxclustshift;
 
   /* Did the caller already pick the cluster size?  If not, the clustshift
@@ -721,7 +723,7 @@ mkfatfs_clustersearch(FAR struct fat_format_s *fmt,
 
   if (var->fv_fattype != 32)
     {
-      /* Calculate the number of sectors reqired to contain the selected
+      /* Calculate the number of sectors required to contain the selected
        * number of root directory entries.  This value is save in the var
        * structure but will be overwritten if FAT32 is selected.  FAT32 uses
        * a cluster chain for the root directory, so the concept of the number
@@ -794,7 +796,7 @@ mkfatfs_clustersearch(FAR struct fat_format_s *fmt,
         {
           if ((!var->fv_fattype &&
                fatconfig16.fc_nclusters > fatconfig12.fc_nclusters) ||
-              (var ->fv_fattype == 16))
+              (var->fv_fattype == 16))
             {
               /* The caller has selected FAT16 -OR- no FAT type has been
                * selected, but the FAT16 selection has more clusters.
@@ -923,7 +925,7 @@ int mkfatfs_configfatfs(FAR struct fat_format_s *fmt,
 
   var->fv_jump[0]      = OPCODE_JMP_REL8;
   var->fv_jump[2]      = OPCODE_NOP;
-  var->fv_bootcode     = g_bootcodeblob;
+  var->fv_bootcodeblob = g_bootcodeblob;
   var->fv_bootcodesize = sizeof(g_bootcodeblob);
 
   if (var->fv_fattype != 32)
@@ -932,15 +934,15 @@ int mkfatfs_configfatfs(FAR struct fat_format_s *fmt,
 
       /* Patch in the correct offset to the boot code */
 
-      var->fv_jump[1]   = MBR16_BOOTCODE - 2;
-      g_bootcodeblob[3] = MBR16_BOOTCODE + BOOTCODE_MSGOFFSET;
+      var->fv_jump[1]       = MBR16_BOOTCODE - 2;
+      var->fv_bootcodepatch = MBR16_BOOTCODE + BOOTCODE_MSGOFFSET;
     }
   else
     {
       /* Patch in the correct offset to the boot code */
 
-      var->fv_jump[1]   = MBR32_BOOTCODE - 2;
-      g_bootcodeblob[3] = MBR32_BOOTCODE + BOOTCODE_MSGOFFSET;
+      var->fv_jump[1]       = MBR32_BOOTCODE - 2;
+      var->fv_bootcodepatch = MBR32_BOOTCODE + BOOTCODE_MSGOFFSET;
 
       /* The root directory is a cluster chain... its is initialize size is
        * one cluster

@@ -37,12 +37,17 @@ $(MQTTC_TARBALL):
 $(MQTTC_UNPACK): $(MQTTC_TARBALL)
 	$(Q) tar zxf $(MQTTC_TARBALL)
 	$(Q) mv MQTT-C-$(MQTTC_VERSION) $(MQTTC_UNPACK)
+	$(Q) echo "Patching $(MQTTC_UNPACK)"
+	$(Q) cat 0001_add_connection_status.patch | patch -s -N -d $(MQTTC_UNPACK) -p1
 	$(Q) touch $(MQTTC_UNPACK)
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(MQTTC_UNPACK)/.git),)
 context:: $(MQTTC_UNPACK)
 
 distclean::
 	$(call DELFILE, $(MQTTC_TARBALL))
 	$(call DELDIR, $(MQTTC_UNPACK))
+endif
 
 include $(APPDIR)/Application.mk

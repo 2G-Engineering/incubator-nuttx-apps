@@ -2,7 +2,7 @@
 # For a description of the syntax of this configuration file,
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
-		
+
 config NETUTILS_IPERF
 	bool "iperf example"
 	default n
@@ -14,7 +14,7 @@ config NETUTILS_IPERF
 		Enable the \"iperf example\"
 
 if NETUTILS_IPERF
-		
+
 config NETUTILS_IPERF_PROGNAME
 	string "Program name"
 	default "iperf"
@@ -31,7 +31,13 @@ config NETUTILS_IPERF_STACKSIZE
 	default DEFAULT_TASK_STACKSIZE
 
 config NETUTILS_IPERFTEST_DEVNAME
-	string "Wi-Fi Network device"
-	default "wlan0"
+	string "iperf Network device"
+	default "wlan0" if DRIVERS_IEEE80211
+	default "wpan0" if NET_6LOWPAN
+	default "sl0"   if NET_SLIP
+	default "tun0"  if NET_TUN
+	default "can0"  if NET_CAN
+	default "eth0"  if NET_ETHERNET
+	default "lo" # if NET_LOOPBACK
 
 endif

@@ -67,7 +67,8 @@ struct Xref
       {
         struct Pc line;
         struct LineNumber *next;
-      } *lines;
+      }
+    *lines;
     struct Xref *l;
     struct Xref *r;
   };
@@ -162,7 +163,8 @@ static void Xref_print(struct Xref *root,
               FS_putChars(chn, "\n        ");
             }
 
-          sprintf(buf, " %ld", Program_lineNumber(p, &cur->line));
+          snprintf(buf, sizeof(buf), " %ld",
+                   Program_lineNumber(p, &cur->line));
           FS_putChars(chn, buf);
         }
       while (cur != tail);
@@ -174,8 +176,8 @@ static void Xref_print(struct Xref *root,
 
 static int cmpLine(const void *a, const void *b)
 {
-  const register struct Pc *pcA = (const struct Pc *)a, *pcB =
-    (const struct Pc *)b;
+  const register struct Pc *pcA = (const struct Pc *)a;
+  const register struct Pc *pcB = (const struct Pc *)b;
 
   return pcA->line - pcB->line;
 }
@@ -184,13 +186,15 @@ static void printLine(const void *k, struct Program *p, int chn)
 {
   char buf[80];
 
-  sprintf(buf, "%8ld", Program_lineNumber(p, (const struct Pc *)k));
+  snprintf(buf, sizeof(buf), "%8ld",
+           Program_lineNumber(p, (const struct Pc *)k));
   FS_putChars(chn, buf);
 }
 
 static int cmpName(const void *a, const void *b)
 {
-  const register char *funcA = (const char *)a, *funcB = (const char *)b;
+  const register char *funcA = (const char *)a;
+  const register char *funcB = (const char *)b;
 
   return strcmp(funcA, funcB);
 }
@@ -315,7 +319,9 @@ void Program_store(struct Program *this, struct Token *line, long int where)
 void Program_delete(struct Program *this, const struct Pc *from,
                     const struct Pc *to)
 {
-  int i, first, last;
+  int i;
+  int first;
+  int last;
 
   this->runnable = 0;
   this->unsaved = 1;
@@ -603,7 +609,8 @@ void Program_trace(struct Program *this, struct Pc *pc, int dev, int tr)
     {
       char buf[40];
 
-      sprintf(buf, "<%ld>\n", this->code[pc->line]->u.integer);
+      snprintf(buf, sizeof(buf), "<%ld>\n",
+               this->code[pc->line]->u.integer);
       FS_putChars(dev, buf);
     }
 }
@@ -693,13 +700,16 @@ struct Value *Program_merge(struct Program *this, int dev,
 
 int Program_lineNumberWidth(struct Program *this)
 {
-  int i, w = 0;
+  int i;
+  int w = 0;
 
   for (i = 0; i < this->size; ++i)
     {
       if (this->code[i]->type == T_INTEGER)
         {
-          int nw, ln;
+          int nw;
+          int ln;
+
           for (ln = this->code[i]->u.integer, nw = 1; ln /= 10; ++nw);
           if (nw > w)
             {
@@ -715,7 +725,8 @@ struct Value *Program_list(struct Program *this, int dev, int watchIntr,
                            struct Pc *from, struct Pc *to,
                            struct Value *value)
 {
-  int i, w;
+  int i;
+  int w;
   int indent = 0;
   struct String s;
 
@@ -937,7 +948,10 @@ int Program_setname(struct Program *this, const char *filename)
 void Program_xref(struct Program *this, int chn)
 {
   struct Pc pc;
-  struct Xref *func, *var, *gosub, *goto_;
+  struct Xref *func;
+  struct Xref *var;
+  struct Xref *gosub;
+  struct Xref *goto_;
   int nl = 0;
 
   assert(this->runnable);

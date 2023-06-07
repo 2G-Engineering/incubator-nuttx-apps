@@ -27,6 +27,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "industry/foc/foc_log.h"
 #include "industry/foc/foc_common.h"
@@ -298,7 +300,6 @@ errout:
   /* Set duty to zeros */
 
   memset(out->duty, 0, sizeof(b16_t) * CONFIG_MOTOR_FOC_PHASES);
-
   return ret;
 }
 

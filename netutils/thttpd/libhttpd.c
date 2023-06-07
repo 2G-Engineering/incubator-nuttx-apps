@@ -2,7 +2,7 @@
  * apps/netutils/thttpd/libhttpd.c
  * HTTP Protocol Library
  *
- *   Copyright (C) 2009, 2011, 2013, 2015-2016 Gregory Nutt. All rights reserved.
+ *   Copyright (C) 2011, 2013, 2015-2016 Gregory Nutt. All rights reserved.
  *   Author: Gregory Nutt <gnutt@nuttx.org>
  *
  * Derived from the file of the same name in the original THTTPD package:
@@ -74,6 +74,10 @@
 
 #ifdef CONFIG_THTTPD
 
+/* Include MIME encodings and types */
+
+#include "mime_types.h"
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -88,17 +92,7 @@
 #  define STDERR_FILENO 2
 #endif
 
-#define NAMLEN(dirent) strlen((dirent)->d_name)
-
 extern CODE char *crypt(const char *key, const char *setting);
-
-#ifndef MAX
-#  define MAX(a,b) ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef MIN
-#  define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
 
 /* Conditional macro to allow two alternate forms for use in the built-in
  * error pages.  If EXPLICIT_ERROR_PAGES is defined, the second and more
@@ -112,6 +106,8 @@ extern CODE char *crypt(const char *key, const char *setting);
 #  define ERROR_FORM(a,b) a
 #endif
 
+#define rfc1123fmtstring ("%a, %d %b %Y %H:%M:%S GMT")
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -121,12 +117,14 @@ extern CODE char *crypt(const char *key, const char *setting);
  ****************************************************************************/
 
 static void free_httpd_server(httpd_server *hs);
-static int  initialize_listen_socket(httpd_sockaddr *saP);
+static int  initialize_listen_socket(httpd_sockaddr *sap);
 static void add_response(httpd_conn *hc, const char *str);
-static void send_mime(httpd_conn *hc, int status, const char *title, const char *encodings,
-                      const char *extraheads, const char *type, off_t length, time_t mod);
+static void send_mime(httpd_conn *hc, int status, const char *title,
+                      const char *encodings, const char *extraheads,
+                      const char *type, off_t length, time_t mod);
 static void send_response(httpd_conn *hc, int status, const char *title,
-                          const char *extraheads, const char *form, const char *arg);
+                          const char *extraheads, const char *form,
+                          const char *arg);
 static void send_response_tail(httpd_conn *hc);
 static void defang(const char *str, char *dfstr, int dfsize);
 #ifdef CONFIG_THTTPD_ERROR_DIRECTORY
@@ -149,7 +147,7 @@ static int httpd_tilde_map2(httpd_conn *hc);
 #ifdef CONFIG_THTTPD_VHOST
 static int  vhost_map(httpd_conn *hc);
 #endif
-static char *expand_filename(char *path, char **restP, bool tildemapped);
+static char *expand_filename(char *path, char **restp, bool tildemapped);
 static char *bufgets(httpd_conn *hc);
 static void de_dotdot(char *file);
 static void init_mime(void);
@@ -167,11 +165,11 @@ static int  check_referer(httpd_conn *hc);
 static int  really_check_referer(httpd_conn *hc);
 #endif
 #ifdef CONFIG_DEBUG_FEATURES_FEATURES
-static int  sockaddr_check(httpd_sockaddr *saP);
+static int  sockaddr_check(httpd_sockaddr *sap);
 #else
-#  define sockaddr_check(saP) (1)
+#  define sockaddr_check(sap) (1)
 #endif
-static size_t sockaddr_len(httpd_sockaddr *saP);
+static size_t sockaddr_len(httpd_sockaddr *sap);
 
 /****************************************************************************
  * Private Data
@@ -188,13 +186,12 @@ static size_t sockaddr_len(httpd_sockaddr *saP);
 
 static pid_t main_thread;
 
-/* Include MIME encodings and types */
-
-#include "mime_types.h"
-
 /* Names for index file */
 
-static const char *index_names[]   = { CONFIG_THTTPD_INDEX_NAMES };
+static const char *index_names[] =
+{
+  CONFIG_THTTPD_INDEX_NAMES
+};
 
 /****************************************************************************
  * Private Functions
@@ -213,7 +210,7 @@ static void free_httpd_server(httpd_server * hs)
     }
 }
 
-static int initialize_listen_socket(httpd_sockaddr *saP)
+static int initialize_listen_socket(httpd_sockaddr *sap)
 {
   int listen_fd;
   int on;
@@ -222,7 +219,7 @@ static int initialize_listen_socket(httpd_sockaddr *saP)
   /* Check sockaddr. */
 
 #ifdef CONFIG_DEBUG_FEATURES_FEATURES
-  if (!sockaddr_check(saP))
+  if (!sockaddr_check(sap))
     {
       nerr("ERROR: unknown sockaddr family on listen socket\n");
       return -1;
@@ -232,7 +229,7 @@ static int initialize_listen_socket(httpd_sockaddr *saP)
   /* Create socket. */
 
   ninfo("Create listen socket\n");
-  listen_fd = socket(saP->sin_family, SOCK_STREAM, 0);
+  listen_fd = socket(sap->sin_family, SOCK_STREAM, 0);
   if (listen_fd < 0)
     {
       nerr("ERROR: socket failed: %d\n", errno);
@@ -242,16 +239,16 @@ static int initialize_listen_socket(httpd_sockaddr *saP)
   /* Allow reuse of local addresses. */
 
   on = 1;
-  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on)) < 0)
+  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)
     {
       nerr("ERROR: setsockopt(SO_REUSEADDR) failed: %d\n", errno);
     }
 
   /* Bind to it. */
 
-  if (bind(listen_fd, (struct sockaddr*)saP, sockaddr_len(saP)) < 0)
+  if (bind(listen_fd, (struct sockaddr *)sap, sockaddr_len(sap)) < 0)
     {
-      nerr("ERROR: bind to %s failed: %d\n", httpd_ntoa(saP), errno);
+      nerr("ERROR: bind to %s failed: %d\n", httpd_ntoa(sap), errno);
       close(listen_fd);
       return -1;
     }
@@ -307,11 +304,12 @@ static void add_response(httpd_conn *hc, const char *str)
   hc->buflen = resplen;
 }
 
-static void send_mime(httpd_conn *hc, int status, const char *title, const char *encodings,
-                      const char *extraheads, const char *type, off_t length, time_t mod)
+static void send_mime(httpd_conn *hc, int status, const char *title,
+                      const char *encodings, const char *extraheads,
+                      const char *type, off_t length, time_t mod)
 {
   struct timeval now;
-  const char *rfc1123fmt = "%a, %d %b %Y %H:%M:%S GMT";
+  const char *rfc1123fmt = rfc1123fmtstring;
   char tmbuf[72];
 #ifdef CONFIG_THTTPD_MAXAGE
   time_t expires;
@@ -348,7 +346,8 @@ static void send_mime(httpd_conn *hc, int status, const char *title, const char 
         }
 
       snprintf(fixed_type, sizeof(fixed_type), type, CONFIG_THTTPD_CHARSET);
-      snprintf(buf, sizeof(buf), "%.20s %d %s\r\n", hc->protocol, status, title);
+      snprintf(buf, sizeof(buf), "%.20s %d %s\r\n",
+               hc->protocol, status, title);
       add_response(hc, buf);
       snprintf(buf, sizeof(buf), "Server: %s\r\n", "thttpd");
       add_response(hc, buf);
@@ -378,16 +377,17 @@ static void send_mime(httpd_conn *hc, int status, const char *title, const char 
 
       if (partial_content)
         {
-          snprintf(buf, sizeof(buf),"Content-Range: bytes %ld-%ld/%ld\r\n",
+          snprintf(buf, sizeof(buf), "Content-Range: bytes %ld-%ld/%ld\r\n",
                    (long)hc->range_start, (long)hc->range_end, (long)length);
           add_response(hc, buf);
-          snprintf(buf, sizeof(buf),"Content-Length: %ld\r\n",
+          snprintf(buf, sizeof(buf), "Content-Length: %ld\r\n",
                    (long)(hc->range_end - hc->range_start + 1));
           add_response(hc, buf);
         }
       else if (length >= 0)
         {
-          snprintf(buf, sizeof(buf), "Content-Length: %ld\r\n", (long)length);
+          snprintf(buf, sizeof(buf), "Content-Length: %ld\r\n",
+                   (long)length);
           add_response(hc, buf);
         }
 
@@ -409,19 +409,22 @@ static void send_mime(httpd_conn *hc, int status, const char *title, const char 
         {
           add_response(hc, extraheads);
         }
+
       add_response(hc, "\r\n");
     }
 }
 
-static void send_response(httpd_conn *hc, int status, const char *title, const char *extraheads,
-                          const char *form, const char *arg)
+static void send_response(httpd_conn *hc, int status, const char *title,
+                          const char *extraheads, const char *form,
+                          const char *arg)
 {
   char defanged[72];
   char buf[128];
 
   ninfo("title: \"%s\" form: \"%s\"\n", title, form);
 
-  send_mime(hc, status, title, "", extraheads, "text/html; charset=%s", (off_t)-1, (time_t)0);
+  send_mime(hc, status, title, "", extraheads,
+            "text/html; charset=%s", -1, 0);
   add_response(hc, html_html);
   add_response(hc, html_hdtitle);
   snprintf(buf, sizeof(buf), "%d %s", status, title);
@@ -442,7 +445,8 @@ static void send_response(httpd_conn *hc, int status, const char *title, const c
       add_response(hc, "<!--\n");
       for (n = 0; n < 6; ++n)
         add_response(hc,
-                     "Padding so that MSIE deigns to show this error instead of its own canned one.\n");
+                     "Padding so that MSIE deigns to show this error "
+                     "instead of its own canned one.\n");
       add_response(hc, "-->\n");
     }
 
@@ -487,12 +491,13 @@ static void defang(const char *str, char *dfstr, int dfsize)
           break;
         }
     }
+
   *cp2 = '\0';
 }
 
 #ifdef CONFIG_THTTPD_ERROR_DIRECTORY
-static int send_err_file(httpd_conn *hc, int status, char *title, char *extraheads,
-                          char *filename)
+static int send_err_file(httpd_conn *hc, int status, char *title,
+                         char *extraheads, char *filename)
 {
   FILE *fp;
   char buf[1000];
@@ -506,7 +511,7 @@ static int send_err_file(httpd_conn *hc, int status, char *title, char *extrahea
 
   send_mime(hc, status, title, "", extraheads, "text/html; charset=%s",
             (off_t)-1, (time_t)0);
-  for (;;)
+  for (; ; )
     {
       nread = fread(buf, 1, sizeof(buf) - 1, fp);
       if (nread == 0)
@@ -514,6 +519,7 @@ static int send_err_file(httpd_conn *hc, int status, char *title, char *extrahea
       buf[nread] = '\0';
       add_response(hc, buf);
     }
+
   fclose(fp);
 
 #ifdef ERR_APPEND_SERVER_INFO
@@ -531,7 +537,8 @@ static void send_authenticate(httpd_conn *hc, char *realm)
   static size_t maxheader = 0;
   static char headstr[] = "WWW-Authenticate: Basic realm=\"";
 
-  httpd_realloc_str(&header, &maxheader, sizeof(headstr) + strlen(realm) + 3);
+  httpd_realloc_str(&header, &maxheader,
+                    sizeof(headstr) + strlen(realm) + 3);
   snprintf(header, maxheader, "%s%s\"\r\n", headstr, realm);
   httpd_send_err(hc, 401, err401title, header, err401form, hc->encodedurl);
 
@@ -558,37 +565,36 @@ static inline b64_charmap(char *ch)
 {
   char bin6;
 
-       bin6 = -1;
-       if (c == 0x20)                         /* ' ' */
-         {
-           bin6 = 62;                          /* ' '  maps to 62 */
-         }
-       elseif (c == 0x2f)                      /* '/' */
-         {
-           bin6 = 63;                          /* '/'  maps to 63 */
-         }
-       else if (c >=  0x30)                    /* '0' */
-         {
-           else if (c <= 0x39)                 /* '9' */
-             {
-               bin6 = (c - 0x39 + 52);         /* '0'-'9' maps to 52-61 */
-             }
-           else if (c >= 0x41)                 /* 'A' */
-             {
-               if (c <= 0x5a)                  /* 'Z' */
-                 {
-                   bin6 = c - 0x41;            /* 'A'-'Z' map to 0 - 25 */
-                 }
-               else if (c >= 0x61)             /* 'a' */
-                 {
-                   if (c <= 0x7a)              /* 'z' */
-                     {
-                       bin6 = c - 0x61 + 26;   /* 'a'-'z' map to 0 - 25 */
-                     }
-                 }
-             }
-         }
-
+  bin6 = -1;
+  if (c == 0x20)                         /* ' ' */
+    {
+      bin6 = 62;                          /* ' '  maps to 62 */
+    }
+  elseif (c == 0x2f)                      /* '/' */
+    {
+      bin6 = 63;                          /* '/'  maps to 63 */
+    }
+  else if (c >=  0x30)                    /* '0' */
+    {
+      else if (c <= 0x39)                 /* '9' */
+        {
+          bin6 = (c - 0x39 + 52);         /* '0'-'9' maps to 52-61 */
+        }
+      else if (c >= 0x41)                 /* 'A' */
+        {
+          if (c <= 0x5a)                  /* 'Z' */
+            {
+              bin6 = c - 0x41;            /* 'A'-'Z' map to 0 - 25 */
+            }
+          else if (c >= 0x61)             /* 'a' */
+            {
+              if (c <= 0x7a)              /* 'z' */
+                {
+                  bin6 = c - 0x61 + 26;   /* 'a'-'z' map to 0 - 25 */
+                }
+            }
+        }
+    }
 }
 
 /* Do base-64 decoding on a string.  Ignore any non-base64 bytes.
@@ -610,7 +616,7 @@ static int b64_decode(const char *str, unsigned char *space, int size)
   phase = 0;
   for (cp = str; *cp != '\0', ndx < size; cp++)
     {
-       /* Decode base-64 */
+      /* Decode base-64 */
 
       decoded = b64_charmap(*cp);  /* Decode ASCII representations to 6-bit binary */
       if (decoded != -1)
@@ -627,18 +633,21 @@ static int b64_decode(const char *str, unsigned char *space, int size)
               break;
 
             case 2:
-              space[ndx++] =(((prev_decoded & 0xf) << 4) | ((decoded & 0x3packed) >> 2));
+              space[ndx++] = (((prev_decoded & 0xf) << 4) |
+                              ((decoded & 0x3packed) >> 2));
               phase = 3;
               break;
 
             case 3:
-              space[ndx++] =(((prev_decoded & 0x03) << 6) | decoded);
+              space[ndx++] = (((prev_decoded & 0x03) << 6) | decoded);
               phase = 0;
               break;
             }
+
           prev_decoded = decoded;
         }
     }
+
   return ndx;
 }
 
@@ -711,7 +720,8 @@ static int auth_check2(httpd_conn *hc, char *dirname)
 
   /* Does this request contain basic authorization info? */
 
-  if (hc->authorization[0] == '\0' ||  strncmp(hc->authorization, "Basic ", 6) != 0)
+  if (hc->authorization[0] == '\0' ||
+      strncmp(hc->authorization, "Basic ", 6) != 0)
     {
       /* Nope, return a 401 Unauthorized. */
 
@@ -721,7 +731,8 @@ static int auth_check2(httpd_conn *hc, char *dirname)
 
   /* Decode it. */
 
-  l = b64_decode(&(hc->authorization[6]), (unsigned char *)authinfo, sizeof(authinfo) - 1);
+  l = b64_decode(&(hc->authorization[6]),
+                 (unsigned char *)authinfo, sizeof(authinfo) - 1);
   authinfo[l] = '\0';
 
   /* Split into user and password. */
@@ -759,7 +770,7 @@ static int auth_check2(httpd_conn *hc, char *dirname)
 
           httpd_realloc_str(&hc->remoteuser, &hc->maxremoteuser,
                             strlen(authinfo));
-          strcpy(hc->remoteuser, authinfo);
+          strlcpy(hc->remoteuser, authinfo, hc->maxremoteuser + 1);
           return 1;
         }
       else
@@ -783,8 +794,9 @@ static int auth_check2(httpd_conn *hc, char *dirname)
 
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' is protected by an authentication file, "
-                                "but the authentication file cannot be opened.\n"),
+                                "The requested URL '%s' is protected by an "
+                                "authentication file, but the "
+                                "authentication file cannot be opened.\n"),
                      hc->encodedurl);
       return -1;
     }
@@ -808,6 +820,7 @@ static int auth_check2(httpd_conn *hc, char *dirname)
         {
           continue;
         }
+
       *cryp++ = '\0';
 
       /* Is this the right user? */
@@ -824,18 +837,20 @@ static int auth_check2(httpd_conn *hc, char *dirname)
             {
               /* Ok! */
 
-              httpd_realloc_str(&hc->remoteuser, &hc->maxremoteuser, strlen(line));
-              strcpy(hc->remoteuser, line);
+              httpd_realloc_str(&hc->remoteuser, &hc->maxremoteuser,
+                                strlen(line));
+              strlcpy(hc->remoteuser, line, hc->maxremoteuser + 1);
 
               /* And cache this user's info for next time. */
 
-              httpd_realloc_str(&prevauthpath, &maxprevauthpath, strlen(authpath));
-              strcpy(prevauthpath, authpath);
+              httpd_realloc_str(&prevauthpath, &maxprevauthpath,
+                                strlen(authpath));
+              strlcpy(prevauthpath, authpath, maxprevauthpath + 1);
               prevmtime = sb.st_mtime;
               httpd_realloc_str(&prevuser, &maxprevuser, strlen(authinfo));
-              strcpy(prevuser, authinfo);
+              strlcpy(prevuser, authinfo, maxprevuser + 1);
               httpd_realloc_str(&prevcryp, &maxprevcryp, strlen(cryp));
-              strcpy(prevcryp, cryp);
+              strlcpy(prevcryp, cryp, maxprevcryp + 1);
               return 1;
             }
           else
@@ -872,7 +887,8 @@ static void send_dirredirect(httpd_conn *hc)
           *cp = '\0';
         }
 
-      httpd_realloc_str(&location, &maxlocation, strlen(hc->encodedurl) + 2 + strlen(hc->query));
+      httpd_realloc_str(&location, &maxlocation,
+                        strlen(hc->encodedurl) + 2 + strlen(hc->query));
       snprintf(location, maxlocation, "%s/?%s", hc->encodedurl, hc->query);
     }
   else
@@ -898,17 +914,18 @@ static int httpd_tilde_map1(httpd_conn *hc)
 
   len = strlen(hc->expnfilename) - 1;
   httpd_realloc_str(&temp, &maxtemp, len);
-  strcpy(temp, &hc->expnfilename[1]);
+  strlcpy(temp, &hc->expnfilename[1], maxtemp + 1);
 
-  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename, strlen(prefix) + 1 + len);
-  strcpy(hc->expnfilename, prefix);
+  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename,
+                    strlen(prefix) + 1 + len);
+  strlcpy(hc->expnfilename, prefix, hc->maxexpnfilename + 1);
 
   if (prefix[0] != '\0')
     {
-      strcat(hc->expnfilename, "/");
+      strlcat(hc->expnfilename, "/", hc->maxexpnfilename + 1);
     }
 
-  strcat(hc->expnfilename, temp);
+  strlcat(hc->expnfilename, temp, hc->maxexpnfilename + 1);
   return 1;
 }
 #endif /* CONFIG_THTTPD_TILDE_MAP1 */
@@ -929,7 +946,7 @@ static int httpd_tilde_map2(httpd_conn *hc)
   /* Get the username. */
 
   httpd_realloc_str(&temp, &maxtemp, strlen(hc->expnfilename) - 1);
-  strcpy(temp, &hc->expnfilename[1]);
+  strlcpy(temp, &hc->expnfilename[1], maxtemp + 1);
 
   cp = strchr(temp, '/');
   if (cp)
@@ -951,26 +968,28 @@ static int httpd_tilde_map2(httpd_conn *hc)
 
   /* Set up altdir. */
 
-  httpd_realloc_str(&hc->altdir, &hc->maxaltdir, strlen(pw->pw_dir) + 1 + strlen(postfix));
-  strcpy(hc->altdir, pw->pw_dir);
+  httpd_realloc_str(&hc->altdir, &hc->maxaltdir,
+                    strlen(pw->pw_dir) + 1 + strlen(postfix));
+  strlcpy(hc->altdir, pw->pw_dir, hc->maxaltdir + 1);
   if (postfix[0] != '\0')
     {
-      strcat(hc->altdir, "/");
-      strcat(hc->altdir, postfix);
+      strlcat(hc->altdir, "/", hc->maxaltdir + 1);
+      strlcat(hc->altdir, postfix, hc->maxaltdir + 1);
     }
 
   alt = expand_filename(hc->altdir, &rest, true);
   if (rest[0] != '\0')
     {
-     return 0;
+      return 0;
     }
 
   httpd_realloc_str(&hc->altdir, &hc->maxaltdir, strlen(alt));
-  strcpy(hc->altdir, alt);
+  strlcpy(hc->altdir, alt, hc->maxaltdir + 1);
 
   /* And the filename becomes altdir plus the post-~ part of the original. */
 
-  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename, strlen(hc->altdir) + 1 + strlen(cp));
+  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename,
+                    strlen(hc->altdir) + 1 + strlen(cp));
   snprintf(hc->expnfilename, hc->maxexpnfilename, "%s/%s", hc->altdir, cp);
 
   /* For this type of tilde mapping, we want to defeat vhost mapping. */
@@ -1014,6 +1033,7 @@ static int vhost_map(httpd_conn *hc)
           nerr("ERROR: getsockname: %d\n", errno);
           return 0;
         }
+
       hc->vhostname = httpd_ntoa(&sa);
     }
 
@@ -1036,7 +1056,8 @@ static int vhost_map(httpd_conn *hc)
 
 #ifdef VHOST_DIRLEVELS
 
-  httpd_realloc_str(&hc->hostdir, &hc->maxhostdir, strlen(hc->vhostname) + 2 * VHOST_DIRLEVELS);
+  httpd_realloc_str(&hc->hostdir, &hc->maxhostdir,
+                    strlen(hc->vhostname) + 2 * VHOST_DIRLEVELS);
   if (strncmp(hc->vhostname, "www.", 4) == 0)
     {
       cp1 = &hc->vhostname[4];
@@ -1075,12 +1096,13 @@ static int vhost_map(httpd_conn *hc)
 
       *cp2++ = '/';
     }
-  strcpy(cp2, hc->vhostname);
+
+  strlcpy(cp2, hc->vhostname, hc->maxhostdir + 1 - (cp2 - hc->hostdir));
 
 #else /* VHOST_DIRLEVELS */
 
   httpd_realloc_str(&hc->hostdir, &hc->maxhostdir, strlen(hc->vhostname));
-  strcpy(hc->hostdir, hc->vhostname);
+  strlcpy(hc->hostdir, hc->vhostname, hc->maxhostdir + 1);
 
 #endif /* VHOST_DIRLEVELS */
 
@@ -1088,26 +1110,28 @@ static int vhost_map(httpd_conn *hc)
 
   len = strlen(hc->expnfilename);
   httpd_realloc_str(&tempfilename, &maxtempfilename, len);
-  strcpy(tempfilename, hc->expnfilename);
-  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename, strlen(hc->hostdir) + 1 + len);
-  strcpy(hc->expnfilename, hc->hostdir);
-  strcat(hc->expnfilename, "/");
-  strcat(hc->expnfilename, tempfilename);
+  strlcpy(tempfilename, hc->expnfilename, maxtempfilename + 1);
+  httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename,
+                    strlen(hc->hostdir) + 1 + len);
+  strlcpy(hc->expnfilename, hc->hostdir, hc->maxexpnfilename + 1);
+  strlcat(hc->expnfilename, "/", hc->maxexpnfilename + 1);
+  strlcat(hc->expnfilename, tempfilename, hc->maxexpnfilename + 1);
   return 1;
 }
 #endif
 
 /* Expands filename, deleting ..'s and leading /'s.
  * Returns the expanded path (pointer to static string), or NULL on
- * errors.  Also returns, in the string pointed to by restP, any trailing
+ * errors.  Also returns, in the string pointed to by restp, any trailing
  * parts of the path that don't exist.
  */
 
-static char *expand_filename(char *path, char **restP, bool tildemapped)
+static char *expand_filename(char *path, char **restp, bool tildemapped)
 {
   static char *checked;
   static char *rest;
-  static size_t maxchecked = 0, maxrest = 0;
+  static size_t maxchecked = 0;
+  static size_t maxrest = 0;
   size_t checkedlen;
   size_t restlen;
 #if 0 // REVISIT
@@ -1121,7 +1145,7 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
   ninfo("path: \"%s\"\n", path);
 #if 0 // REVISIT
   /* We need to do the pathinfo check.  we do a single stat() of the whole
-   * filename - if it exists, then we return it as is with nothing in restP.
+   * filename - if it exists, then we return it as is with nothing in restp.
    * If it doesn't exist, we fall through to the existing code.
    */
 
@@ -1129,7 +1153,7 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
     {
       checkedlen = strlen(path);
       httpd_realloc_str(&checked, &maxchecked, checkedlen);
-      strcpy(checked, path);
+      strlcpy(checked, path, maxchecked + 1);
 
       /* Trim trailing slashes. */
 
@@ -1141,22 +1165,24 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
 
       httpd_realloc_str(&rest, &maxrest, 0);
       rest[0] = '\0';
-      *restP = rest;
+      *restp = rest;
       return checked;
     }
 #endif /* 0 */
 
-  /* Handle leading / or . and relative paths by copying the default directory into checked */
+  /* Handle leading / or . and relative paths by copying the default
+   * directory into checked
+   */
 
-  if ((path[0] == '/' && strncmp(path, httpd_root, strlen(httpd_root)) != 0) || path[0] != '/')
+  if (path[0] != '/' || strncmp(path, httpd_root, strlen(httpd_root)) != 0)
     {
-      /* Start out with httpd_root in checked.  Allow space in the reallocation
-       * include NULL terminator and possibly a '/'
+      /* Start out with httpd_root in checked.  Allow space in the
+       * reallocation include NULL terminator and possibly a '/'
        */
 
       checkedlen = strlen(httpd_root);
-      httpd_realloc_str(&checked, &maxchecked, checkedlen+2);
-      strcpy(checked, httpd_root);
+      httpd_realloc_str(&checked, &maxchecked, checkedlen + 2);
+      strlcpy(checked, httpd_root, maxchecked + 1);
 
       /* Skip over leading '.' */
 
@@ -1170,7 +1196,7 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
       else if (path[0] != '/')
         {
           checked[checkedlen]   = '/';
-          checked[checkedlen+1] = '\0';
+          checked[checkedlen + 1] = '\0';
         }
     }
   else
@@ -1185,8 +1211,8 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
   /* Copy the whole filename (minus the leading '.') into rest. */
 
   restlen = strlen(path);
-  httpd_realloc_str(&rest, &maxrest, restlen+1);
-  strcpy(rest, path);
+  httpd_realloc_str(&rest, &maxrest, restlen + 1);
+  strlcpy(rest, path, maxrest + 1);
 
   /* trim trailing slash */
 
@@ -1212,7 +1238,7 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
               /* Special case for absolute paths. */
 
               httpd_realloc_str(&checked, &maxchecked, checkedlen + 1);
-              strncpy(&checked[checkedlen], r, 1);
+              checked[checkedlen] = '/';
               checkedlen += 1;
             }
           else if (strncmp(r, "..", MAX(i, 2)) == 0)
@@ -1281,13 +1307,14 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
             }
           else
             {
-              httpd_realloc_str(&checked, &maxchecked, checkedlen + 1 + restlen);
+              httpd_realloc_str(&checked, &maxchecked,
+                                checkedlen + 1 + restlen);
               if (checkedlen > 0 && checked[checkedlen - 1] != '/')
                 {
                   checked[checkedlen++] = '/';
                 }
 
-              strcpy(&checked[checkedlen], r);
+              strlcpy(&checked[checkedlen], r, maxchecked + 1 - checkedlen);
               checkedlen += restlen;
             }
 
@@ -1298,10 +1325,10 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
 
   /* Ok. */
 
-  *restP = r;
+  *restp = r;
   if (checked[0] == '\0')
     {
-      strcpy(checked, httpd_root);
+      strlcpy(checked, httpd_root, maxchecked + 1);
     }
 
   ninfo("checked: \"%s\"\n", checked);
@@ -1310,10 +1337,10 @@ static char *expand_filename(char *path, char **restP, bool tildemapped)
 
 static char *bufgets(httpd_conn *hc)
 {
-  int i;
+  int i = hc->checked_idx;
   char c;
 
-  for (i = hc->checked_idx; hc->checked_idx < hc->read_idx; ++hc->checked_idx)
+  for (; hc->checked_idx < hc->read_idx; ++hc->checked_idx)
     {
       c = hc->read_buf[hc->checked_idx];
       if (c == '\012' || c == '\015')
@@ -1326,9 +1353,11 @@ static char *bufgets(httpd_conn *hc)
               hc->read_buf[hc->checked_idx] = '\0';
               ++hc->checked_idx;
             }
+
           return &(hc->read_buf[i]);
         }
     }
+
   return NULL;
 }
 
@@ -1359,12 +1388,12 @@ static void de_dotdot(char *file)
 
   while ((cp = strstr(file, "/./")) != NULL)
     {
-    strcpy(cp, cp + 2);
+      strcpy(cp, cp + 2);
     }
 
   /* Alternate between removing leading ../ and removing xxx/../ */
 
-  for (;;)
+  for (; ; )
     {
       while (strncmp(file, "../", 3) == 0)
         {
@@ -1432,16 +1461,22 @@ static void figure_mime(httpd_conn *hc)
   char *prev_dot;
   char *dot;
   char *ext;
-  int me_indexes[100], n_me_indexes;
-  size_t ext_len, encodings_len;
-  int i, top, bot, mid;
+  int me_indexes[100];
+  int n_me_indexes;
+  size_t ext_len;
+  int encodings_len;
+  int i;
+  int top;
+  int bot;
+  int mid;
   int r;
   char *default_type = "text/plain; charset=%s";
 
   /* Peel off encoding extensions until there aren't any more. */
 
   n_me_indexes = 0;
-  for (prev_dot = &hc->expnfilename[strlen(hc->expnfilename)];; prev_dot = dot)
+  prev_dot = &hc->expnfilename[strlen(hc->expnfilename)];
+  for (; ; prev_dot = dot)
     {
       for (dot = prev_dot - 1; dot >= hc->expnfilename && *dot != '.'; --dot)
         ;
@@ -1473,6 +1508,7 @@ static void figure_mime(httpd_conn *hc)
                   me_indexes[n_me_indexes] = i;
                   ++n_me_indexes;
                 }
+
               goto next;
             }
         }
@@ -1514,6 +1550,7 @@ static void figure_mime(httpd_conn *hc)
           goto done;
         }
     }
+
   hc->type = default_type;
 
 done:
@@ -1528,11 +1565,13 @@ done:
                         encodings_len + enc_tab[me_indexes[i]].val_len + 1);
       if (hc->encodings[0] != '\0')
         {
-          strcpy(&hc->encodings[encodings_len], ",");
+          strlcpy(&hc->encodings[encodings_len], ",",
+                  hc->maxencodings + 1 - encodings_len);
           ++encodings_len;
         }
 
-      strcpy(&hc->encodings[encodings_len], enc_tab[me_indexes[i]].val);
+      strlcpy(&hc->encodings[encodings_len], enc_tab[me_indexes[i]].val,
+              hc->maxencodings + 1 - encodings_len);
       encodings_len += enc_tab[me_indexes[i]].val_len;
     }
 }
@@ -1547,7 +1586,7 @@ static int name_compare(FAR const void *a, FAR const void *b)
 
 static void ls_child(int argc, char **argv)
 {
-  FAR httpd_conn *hc = (FAR httpd_conn*)strtoul(argv[1], NULL, 16);
+  FAR httpd_conn *hc = (FAR httpd_conn *)strtoul(argv[1], NULL, 16);
   DIR *dirp;
   struct dirent *de;
   int namlen;
@@ -1619,15 +1658,16 @@ static void ls_child(int argc, char **argv)
           if (maxnames == 0)
             {
               maxnames = 100;
-              names    = NEW(char, maxnames * (PATH_MAX + 1));
-              nameptrs = NEW(char*, maxnames);
+              names    = NEW(char, maxnames * PATH_MAX);
+              nameptrs = NEW(char *, maxnames);
             }
           else
             {
               oldmax    = maxnames;
               maxnames *= 2;
-              names     = RENEW(names, char, oldmax*(PATH_MAX+1), maxnames*(PATH_MAX + 1));
-              nameptrs  = RENEW(nameptrs, char*, oldmax, maxnames);
+              names     = RENEW(names, char, oldmax * PATH_MAX,
+                                maxnames * PATH_MAX);
+              nameptrs  = RENEW(nameptrs, char *, oldmax, maxnames);
             }
 
           if (!names || !nameptrs)
@@ -1638,13 +1678,11 @@ static void ls_child(int argc, char **argv)
 
           for (i = 0; i < maxnames; ++i)
             {
-              nameptrs[i] = &names[i * (PATH_MAX + 1)];
+              nameptrs[i] = &names[i * PATH_MAX];
             }
         }
 
-      namlen = NAMLEN(de);
-      strncpy(nameptrs[nnames], de->d_name, namlen);
-      nameptrs[nnames][namlen] = '\0';
+      strlcpy(nameptrs[nnames], de->d_name, PATH_MAX);
       ++nnames;
     }
 
@@ -1667,8 +1705,8 @@ static void ls_child(int argc, char **argv)
 
       if (hc->expnfilename[0] == '\0' || strcmp(hc->expnfilename, ".") == 0)
         {
-          strcpy(name, nameptrs[i]);
-          strcpy(rname, nameptrs[i]);
+          strlcpy(name, nameptrs[i], maxname + 1);
+          strlcpy(rname, nameptrs[i], maxrname + 1);
         }
       else
         {
@@ -1679,7 +1717,8 @@ static void ls_child(int argc, char **argv)
             }
           else
             {
-              snprintf(rname, maxrname, "%s%s", hc->origfilename, nameptrs[i]);
+              snprintf(rname, maxrname, "%s%s",
+                       hc->origfilename, nameptrs[i]);
             }
         }
 
@@ -1767,6 +1806,7 @@ static void ls_child(int argc, char **argv)
           timestr[10] = timestr[14];
           timestr[11] = timestr[15];
         }
+
       timestr[12] = '\0';
 
       /* The ls -F file class. */
@@ -1840,6 +1880,7 @@ static int ls(httpd_conn *hc)
                          hc->encodedurl);
           return -1;
         }
+
 #endif
       ++hc->hs->cgi_count;
 
@@ -1849,14 +1890,14 @@ static int ls(httpd_conn *hc)
       argv[0] = arg;
 
       child = task_create("CGI child", CONFIG_THTTPD_CGI_PRIORITY,
-                          CONFIG_THTTPD_CGI_STACKSIZE,
-                          (main_t)ls_child, (FAR char * const *)argv);
+                          CONFIG_THTTPD_CGI_STACKSIZE, ls_child, argv);
       if (child < 0)
         {
           nerr("ERROR: task_create: %d\n", errno);
           closedir(dirp);
           INTERNALERROR("task_create");
-          httpd_send_err(hc, 500, err500title, "", err500form, hc->encodedurl);
+          httpd_send_err(hc, 500, err500title, "",
+                         err500form, hc->encodedurl);
           return -1;
         }
 
@@ -1868,7 +1909,8 @@ static int ls(httpd_conn *hc)
 
 #if CONFIG_THTTPD_CGI_TIMELIMIT > 0
       client_data.i = child;
-      if (tmr_create(NULL, cgi_kill, client_data, CONFIG_THTTPD_CGI_TIMELIMIT * 1000L, 0) == NULL)
+      if (tmr_create(NULL, cgi_kill, client_data,
+                     CONFIG_THTTPD_CGI_TIMELIMIT * 1000L, 0) == NULL)
         {
           nerr("ERROR: tmr_create(cgi_kill ls) failed\n");
           exit(1);
@@ -1882,7 +1924,8 @@ static int ls(httpd_conn *hc)
     {
       closedir(dirp);
       NOTIMPLEMENTED(httpd_method_str(hc->method));
-      httpd_send_err(hc, 501, err501title, "", err501form, httpd_method_str(hc->method));
+      httpd_send_err(hc, 501, err501title, "",
+                     err501form, httpd_method_str(hc->method));
       return -1;
     }
 
@@ -1925,7 +1968,8 @@ static int check_referer(httpd_conn *hc)
             httpd_ntoa(&hc->client_addr), cp, hc->encodedurl, hc->referer);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "You must supply a local referer to get URL '%s' from this server.\n"),
+                                "You must supply a local referer to get URL "
+                                "'%s' from this server.\n"),
                      hc->encodedurl);
     }
 
@@ -1980,14 +2024,17 @@ static int really_check_referer(httpd_conn *hc)
 
   httpd_realloc_str(&refhost, &refhost_size, cp2 - cp1);
   for (cp3 = refhost; cp1 < cp2; ++cp1, ++cp3)
-    if (isupper(*cp1))
-      {
-        *cp3 = tolower(*cp1);
-      }
-    else
-      {
-        *cp3 = *cp1;
-      }
+    {
+      if (isupper(*cp1))
+        {
+          *cp3 = tolower(*cp1);
+        }
+      else
+        {
+          *cp3 = *cp1;
+        }
+    }
+
   *cp3 = '\0';
 
   /* Local pattern? */
@@ -2006,7 +2053,7 @@ static int really_check_referer(httpd_conn *hc)
     {
       /* Couldn't figure out local hostname - give up. */
 
-     return 1;
+      return 1;
     }
 
 #else
@@ -2030,7 +2077,8 @@ static int really_check_referer(httpd_conn *hc)
    * filename does match the url pattern, it's an illegal reference.
    */
 
-  if (fnmatch(lp, refhost, 0) && !fnmatch(CONFIG_THTTPD_URLPATTERN, hc->origfilename, 0))
+  if (fnmatch(lp, refhost, 0) &&
+      !fnmatch(CONFIG_THTTPD_URLPATTERN, hc->origfilename, 0))
     {
       return 0;
     }
@@ -2042,9 +2090,9 @@ static int really_check_referer(httpd_conn *hc)
 #endif /* CONFIG_THTTPD_URLPATTERN */
 
 #ifdef CONFIG_DEBUG_FEATURES_FEATURES
-static int sockaddr_check(httpd_sockaddr *saP)
+static int sockaddr_check(httpd_sockaddr *sap)
 {
-  switch (saP->sin_family)
+  switch (sap->sin_family)
     {
     case AF_INET:
       return 1;
@@ -2060,9 +2108,9 @@ static int sockaddr_check(httpd_sockaddr *saP)
 }
 #endif /* CONFIG_DEBUG_FEATURES_FEATURES */
 
-static size_t sockaddr_len(httpd_sockaddr *saP)
+static size_t sockaddr_len(httpd_sockaddr *sap)
 {
-  switch (saP->sin_family)
+  switch (sap->sin_family)
     {
     case AF_INET:
       return sizeof(struct sockaddr_in);
@@ -2075,6 +2123,7 @@ static size_t sockaddr_len(httpd_sockaddr *saP)
     default:
       break;
     }
+
   return 0;
 }
 
@@ -2086,9 +2135,9 @@ FAR httpd_server *httpd_initialize(FAR httpd_sockaddr *sa)
 {
   FAR httpd_server *hs;
 
-  /* Save the PID of the main thread */
+  /* Save the TID of the main thread */
 
-  main_thread = getpid();
+  main_thread = gettid();
 
   /* Allocate the server structure */
 
@@ -2128,7 +2177,8 @@ FAR httpd_server *httpd_initialize(FAR httpd_sockaddr *sa)
 
   /* Done initializing. */
 
-  ninfo("%s starting on port %d\n", CONFIG_THTTPD_SERVER_SOFTWARE, (int)CONFIG_THTTPD_PORT);
+  ninfo("%s starting on port %d\n",
+        CONFIG_THTTPD_SERVER_SOFTWARE, CONFIG_THTTPD_PORT);
   return hs;
 }
 
@@ -2153,7 +2203,7 @@ void httpd_write_response(httpd_conn *hc)
 {
   /* If we are in a sub-task, turn off no-delay mode. */
 
-  if (main_thread != getpid())
+  if (main_thread != gettid())
     {
        httpd_clear_ndelay(hc->conn_fd);
     }
@@ -2171,7 +2221,8 @@ void httpd_write_response(httpd_conn *hc)
 
 void httpd_set_ndelay(int fd)
 {
-  int flags, newflags;
+  int flags;
+  int newflags;
 
   flags = fcntl(fd, F_GETFL, 0);
   if (flags != -1)
@@ -2186,7 +2237,8 @@ void httpd_set_ndelay(int fd)
 
 void httpd_clear_ndelay(int fd)
 {
-  int flags, newflags;
+  int flags;
+  int newflags;
 
   flags = fcntl(fd, F_GETFL, 0);
   if (flags != -1)
@@ -2199,8 +2251,9 @@ void httpd_clear_ndelay(int fd)
     }
 }
 
-void httpd_send_err(httpd_conn *hc, int status, const char *title, const char *extraheads,
-                    const char *form, const char *arg)
+void httpd_send_err(httpd_conn *hc, int status, const char *title,
+                    const char *extraheads, const char *form,
+                    const char *arg)
 {
 #ifdef CONFIG_THTTPD_ERROR_DIRECTORY
   char filename[1000];
@@ -2213,7 +2266,8 @@ void httpd_send_err(httpd_conn *hc, int status, const char *title, const char *e
   if (hc->hostdir[0] != '\0')
     {
       snprintf(filename, sizeof(filename),
-               "%s/%s/err%d.html", hc->hostdir, CONFIG_THTTPD_ERROR_DIRECTORY, status);
+               "%s/%s/err%d.html", hc->hostdir,
+               CONFIG_THTTPD_ERROR_DIRECTORY, status);
       if (send_err_file(hc, status, title, extraheads, filename))
         {
           ninfo("Sent VHOST error file\n");
@@ -2224,7 +2278,8 @@ void httpd_send_err(httpd_conn *hc, int status, const char *title, const char *e
 
   /* Try server-wide error page. */
 
-  snprintf(filename, sizeof(filename), "%s/err%d.html", CONFIG_THTTPD_ERROR_DIRECTORY, status);
+  snprintf(filename, sizeof(filename), "%s/err%d.html",
+           CONFIG_THTTPD_ERROR_DIRECTORY, status);
   if (send_err_file(hc, status, title, extraheads, filename))
     {
       ninfo("Sent server-wide error page\n");
@@ -2268,7 +2323,8 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
   if (!hc->initialized)
     {
       hc->read_size = 0;
-      httpd_realloc_str(&hc->read_buf, &hc->read_size, CONFIG_THTTPD_IOBUFFERSIZE);
+      httpd_realloc_str(&hc->read_buf, &hc->read_size,
+                        CONFIG_THTTPD_IOBUFFERSIZE);
       hc->maxdecodedurl =
         hc->maxorigfilename = hc->maxexpnfilename = hc->maxencodings =
         hc->maxpathinfo = hc->maxquery = hc->maxaccept =
@@ -2298,7 +2354,7 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
 
   ninfo("accept() new connection on listen_fd %d\n", listen_fd);
   sz = sizeof(sa);
-  hc->conn_fd = accept(listen_fd, (struct sockaddr*)&sa, &sz);
+  hc->conn_fd = accept(listen_fd, (struct sockaddr *)&sa, &sz);
   if (hc->conn_fd < 0)
     {
       if (errno == EWOULDBLOCK)
@@ -2375,13 +2431,13 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
   return GC_OK;
 }
 
-/* Checks hc->read_buf to see whether a complete request has been read so far;
- * either the first line has two words (an HTTP/0.9 request), or the first
- * line has three words and there's a blank line present.
+/* Checks hc->read_buf to see whether a complete request has been read so
+ * far; either the first line has two words (an HTTP/0.9 request), or the
+ * first line has three words and there's a blank line present.
  *
- * hc->read_idx is how much has been read in; hc->checked_idx is how much we
- * have checked so far; and hc->checked_state is the current state of the
- * finite state machine.
+ * hc->read_idx is how much has been read in; hc->checked_idx is how much
+ * we have checked so far; and hc->checked_state is the current state of
+ * the finite state machine.
  */
 
 int httpd_got_request(httpd_conn *hc)
@@ -2436,7 +2492,9 @@ int httpd_got_request(httpd_conn *hc)
 
             case '\012':
             case '\015':
+
               /* The first line has only two words - an HTTP/0.9 request. */
+
               return GR_GOT_REQUEST;
             }
           break;
@@ -2515,6 +2573,7 @@ int httpd_got_request(httpd_conn *hc)
           switch (c)
             {
             case '\012':
+
               /* Two newlines in a row - a blank line - end of request. */
 
               return GR_GOT_REQUEST;
@@ -2537,6 +2596,7 @@ int httpd_got_request(httpd_conn *hc)
               break;
 
             case '\015':
+
               /* Two returns in a row - end of request. */
 
               return GR_GOT_REQUEST;
@@ -2551,6 +2611,7 @@ int httpd_got_request(httpd_conn *hc)
           switch (c)
             {
             case '\012':
+
               /* Two newlines in a row - end of request. */
 
               return GR_GOT_REQUEST;
@@ -2570,6 +2631,7 @@ int httpd_got_request(httpd_conn *hc)
             {
             case '\012':
             case '\015':
+
               /* Two CRLFs or two CRs in a row - end of request. */
 
               return GR_GOT_REQUEST;
@@ -2584,6 +2646,7 @@ int httpd_got_request(httpd_conn *hc)
           return GR_BAD_REQUEST;
         }
     }
+
   return GR_NO_REQUEST;
 }
 
@@ -2640,6 +2703,7 @@ int httpd_parse_request(httpd_conn *hc)
             }
         }
     }
+
   hc->protocol = protocol;
 
   /* Check for HTTP/1.1 absolute URL. */
@@ -2649,7 +2713,8 @@ int httpd_parse_request(httpd_conn *hc)
       if (!hc->one_one)
         {
           BADREQUEST("one_one");
-          httpd_send_err(hc, 400, httpd_err400title, "", httpd_err400form, "");
+          httpd_send_err(hc, 400, httpd_err400title, "",
+                         httpd_err400form, "");
           return -1;
         }
 
@@ -2658,20 +2723,23 @@ int httpd_parse_request(httpd_conn *hc)
       if (!url)
         {
           BADREQUEST("reqhost-1");
-          httpd_send_err(hc, 400, httpd_err400title, "", httpd_err400form, "");
+          httpd_send_err(hc, 400, httpd_err400title, "",
+                         httpd_err400form, "");
           return -1;
         }
+
       *url = '\0';
 
       if (strchr(reqhost, '/') != NULL || reqhost[0] == '.')
         {
           BADREQUEST("reqhost-2");
-          httpd_send_err(hc, 400, httpd_err400title, "", httpd_err400form, "");
+          httpd_send_err(hc, 400, httpd_err400title, "",
+                         httpd_err400form, "");
           return -1;
         }
 
       httpd_realloc_str(&hc->reqhost, &hc->maxreqhost, strlen(reqhost));
-      strcpy(hc->reqhost, reqhost);
+      strlcpy(hc->reqhost, reqhost, hc->maxreqhost + 1);
       *url = '/';
     }
 
@@ -2702,17 +2770,19 @@ int httpd_parse_request(httpd_conn *hc)
     }
 
   hc->encodedurl = url;
-  httpd_realloc_str(&hc->decodedurl, &hc->maxdecodedurl, strlen(hc->encodedurl));
+  httpd_realloc_str(&hc->decodedurl, &hc->maxdecodedurl,
+                    strlen(hc->encodedurl));
   httpd_strdecode(hc->decodedurl, hc->encodedurl);
 
-  httpd_realloc_str(&hc->origfilename, &hc->maxorigfilename, strlen(hc->decodedurl));
-  strcpy(hc->origfilename, &hc->decodedurl[1]);
+  httpd_realloc_str(&hc->origfilename, &hc->maxorigfilename,
+                    strlen(hc->decodedurl));
+  strlcpy(hc->origfilename, &hc->decodedurl[1], hc->maxorigfilename + 1);
 
   /* Special case for top-level URL. */
 
   if (hc->origfilename[0] == '\0')
     {
-      strcpy(hc->origfilename, ".");
+      strlcpy(hc->origfilename, ".", hc->maxorigfilename + 1);
     }
 
   /* Extract query string from encoded URL. */
@@ -2722,7 +2792,7 @@ int httpd_parse_request(httpd_conn *hc)
     {
       ++cp;
       httpd_realloc_str(&hc->query, &hc->maxquery, strlen(cp));
-      strcpy(hc->query, cp);
+      strlcpy(hc->query, cp, hc->maxquery + 1);
 
       /* Remove query from (decoded) origfilename. */
 
@@ -2746,6 +2816,7 @@ int httpd_parse_request(httpd_conn *hc)
   if (hc->mime_flag)
     {
       /* Read the MIME headers. */
+
       while ((buf = bufgets(hc)) != NULL)
         {
           if (buf[0] == '\0')
@@ -2776,10 +2847,12 @@ int httpd_parse_request(httpd_conn *hc)
                   *cp = '\0';
                 }
 
-              if (strchr(hc->hdrhost, '/') != NULL || hc->hdrhost[0] == '.')
+              if (hc->hdrhost[0] == '.' ||
+                  strchr(hc->hdrhost, '/') != NULL)
                 {
                   BADREQUEST("hdrhost");
-                  httpd_send_err(hc, 400, httpd_err400title, "", httpd_err400form, "");
+                  httpd_send_err(hc, 400, httpd_err400title, "",
+                                 httpd_err400form, "");
                   return -1;
                 }
             }
@@ -2795,14 +2868,17 @@ int httpd_parse_request(httpd_conn *hc)
                            httpd_ntoa(&hc->client_addr));
                       continue;
                     }
-                  httpd_realloc_str(&hc->accept, &hc->maxaccept, strlen(hc->accept) + 2 + strlen(cp));
-                  strcat(hc->accept, ", ");
+
+                  httpd_realloc_str(&hc->accept, &hc->maxaccept,
+                                    strlen(hc->accept) + 2 + strlen(cp));
+                  strlcat(hc->accept, ", ", hc->maxaccepte + 1);
                 }
               else
                 {
                   httpd_realloc_str(&hc->accept, &hc->maxaccept, strlen(cp));
                 }
-              strcat(hc->accept, cp);
+
+              strlcat(hc->accept, cp, hc->maxaccepte + 1);
             }
           else if (strncasecmp(buf, "Accept-Encoding:", 16) == 0)
             {
@@ -2816,14 +2892,18 @@ int httpd_parse_request(httpd_conn *hc)
                             httpd_ntoa(&hc->client_addr));
                       continue;
                     }
-                  httpd_realloc_str(&hc->accepte, &hc->maxaccepte, strlen(hc->accepte) + 2 + strlen(cp));
-                  strcat(hc->accepte, ", ");
+
+                  httpd_realloc_str(&hc->accepte, &hc->maxaccepte,
+                                    strlen(hc->accepte) + 2 + strlen(cp));
+                  strlcat(hc->accepte, ", ", hc->maxaccepte + 1);
                 }
               else
                 {
-                  httpd_realloc_str(&hc->accepte, &hc->maxaccepte, strlen(cp));
+                  httpd_realloc_str(&hc->accepte, &hc->maxaccepte,
+                                    strlen(cp));
                 }
-             strcpy(hc->accepte, cp);
+
+             strlcpy(hc->accepte, cp, hc->maxaccepte + 1);
             }
           else if (strncasecmp(buf, "Accept-Language:", 16) == 0)
             {
@@ -2849,6 +2929,7 @@ int httpd_parse_request(httpd_conn *hc)
           else if (strncasecmp(buf, "Range:", 6) == 0)
             {
               /* Only support %d- and %d-%d, not %d-%d,%d-%d or -%d. */
+
               if (strchr(buf, ',') == NULL)
                 {
                   char *cp_dash;
@@ -2908,10 +2989,10 @@ int httpd_parse_request(httpd_conn *hc)
               cp = &buf[11];
               cp += strspn(cp, " \t");
               if (strcasecmp(cp, "keep-alive") == 0)
-               {
-                 hc->keep_alive = true;
-               }
-           }
+                {
+                  hc->keep_alive = true;
+                }
+            }
 #ifdef LOG_UNKNOWN_HEADERS
           else if (strncasecmp(buf, "Accept-Charset:", 15) == 0 ||
                    strncasecmp(buf, "Accept-Language:", 16) == 0 ||
@@ -2958,7 +3039,8 @@ int httpd_parse_request(httpd_conn *hc)
       if (hc->reqhost[0] == '\0' && hc->hdrhost[0] == '\0')
         {
           BADREQUEST("reqhost-3");
-          httpd_send_err(hc, 400, httpd_err400title, "", httpd_err400form, "");
+          httpd_send_err(hc, 400, httpd_err400title, "",
+                         httpd_err400form, "");
           return -1;
         }
 
@@ -2983,7 +3065,7 @@ int httpd_parse_request(httpd_conn *hc)
 
   httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename,
                     strlen(hc->origfilename));
-  strcpy(hc->expnfilename, hc->origfilename);
+  strlcpy(hc->expnfilename, hc->origfilename, hc->maxexpnfilename + 1);
 
   /* Tilde mapping. */
 
@@ -2992,28 +3074,32 @@ int httpd_parse_request(httpd_conn *hc)
 #ifdef CONFIG_THTTPD_TILDE_MAP1
       if (!httpd_tilde_map1(hc))
         {
-          httpd_send_err(hc, 404, err404title, "", err404form, hc->encodedurl);
+          httpd_send_err(hc, 404, err404title, "",
+                         err404form, hc->encodedurl);
           return -1;
         }
+
 #endif
 #ifdef CONFIG_THTTPD_TILDE_MAP2
       if (!httpd_tilde_map2(hc))
         {
-          httpd_send_err(hc, 404, err404title, "", err404form, hc->encodedurl);
+          httpd_send_err(hc, 404, err404title, "",
+                         err404form, hc->encodedurl);
           return -1;
         }
+
 #endif
     }
 
   /* Virtual host mapping. */
 
 #ifdef CONFIG_THTTPD_VHOST
-    if (!vhost_map(hc))
-      {
-        INTERNALERROR("VHOST");
-        httpd_send_err(hc, 500, err500title, "", err500form, hc->encodedurl);
-        return -1;
-      }
+  if (!vhost_map(hc))
+    {
+      INTERNALERROR("VHOST");
+      httpd_send_err(hc, 500, err500title, "", err500form, hc->encodedurl);
+      return -1;
+    }
 #endif
 
   /* Expand the filename */
@@ -3027,10 +3113,11 @@ int httpd_parse_request(httpd_conn *hc)
     }
 
   httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename, strlen(cp));
-  strcpy(hc->expnfilename, cp);
+  strlcpy(hc->expnfilename, cp, hc->maxexpnfilename + 1);
   httpd_realloc_str(&hc->pathinfo, &hc->maxpathinfo, strlen(pi));
-  strcpy(hc->pathinfo, pi);
-  ninfo("expnfilename: \"%s\" pathinfo: \"%s\"\n", hc->expnfilename, hc->pathinfo);
+  strlcpy(hc->pathinfo, pi, hc->maxpathinfo + 1);
+  ninfo("expnfilename: \"%s\" pathinfo: \"%s\"\n",
+         hc->expnfilename, hc->pathinfo);
 
   /* Remove pathinfo stuff from the original filename too. */
 
@@ -3055,7 +3142,7 @@ int httpd_parse_request(httpd_conn *hc)
         }
 #ifdef CONFIG_THTTPD_TILDE_MAP2
       else if (hc->altdir[0] != '\0' &&
-               (strncmp(hc->expnfilename, hc->altdir, strlen(hc->altdir)) == 0 &&
+               (!strncmp(hc->expnfilename, hc->altdir, strlen(hc->altdir)) &&
                 (hc->expnfilename[strlen(hc->altdir)] == '\0' ||
                  hc->expnfilename[strlen(hc->altdir)] == '/')))
         {
@@ -3067,7 +3154,9 @@ int httpd_parse_request(httpd_conn *hc)
                  httpd_ntoa(&hc->client_addr), hc->encodedurl);
           httpd_send_err(hc, 403, err403title, "",
                          ERROR_FORM(err403form,
-                                    "The requested URL '%s' resolves to a file outside the permitted web server directory tree.\n"),
+                                    "The requested URL '%s' resolves to a "
+                                    "file outside the permitted web server "
+                                    "directory tree.\n"),
                          hc->encodedurl);
           return -1;
         }
@@ -3095,27 +3184,26 @@ void httpd_destroy_conn(httpd_conn *hc)
 {
   if (hc->initialized)
     {
-      httpd_free((void *)hc->read_buf);
-      httpd_free((void *)hc->decodedurl);
-      httpd_free((void *)hc->origfilename);
-      httpd_free((void *)hc->expnfilename);
-      httpd_free((void *)hc->encodings);
-      httpd_free((void *)hc->pathinfo);
-      httpd_free((void *)hc->query);
-      httpd_free((void *)hc->accept);
-      httpd_free((void *)hc->accepte);
-      httpd_free((void *)hc->reqhost);
-      httpd_free((void *)hc->hostdir);
-      httpd_free((void *)hc->remoteuser);
-      httpd_free((void *)hc->buffer);
+      httpd_free(hc->read_buf);
+      httpd_free(hc->decodedurl);
+      httpd_free(hc->origfilename);
+      httpd_free(hc->expnfilename);
+      httpd_free(hc->encodings);
+      httpd_free(hc->pathinfo);
+      httpd_free(hc->query);
+      httpd_free(hc->accept);
+      httpd_free(hc->accepte);
+      httpd_free(hc->reqhost);
+      httpd_free(hc->hostdir);
+      httpd_free(hc->remoteuser);
 #ifdef CONFIG_THTTPD_TILDE_MAP2
-      httpd_free((void *)hc->altdir);
-#endif /*CONFIG_THTTPD_TILDE_MAP2 */
+      httpd_free(hc->altdir);
+#endif /* CONFIG_THTTPD_TILDE_MAP2 */
       hc->initialized = 0;
     }
 }
 
-int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
+int httpd_start_request(httpd_conn *hc, struct timeval *nowp)
 {
   static char *indexname;
   static size_t maxindexname = 0;
@@ -3123,7 +3211,8 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
   static char *dirname;
   static size_t maxdirname = 0;
 #endif /* CONFIG_THTTPD_AUTH_FILE */
-  size_t expnlen, indxlen;
+  size_t expnlen;
+  size_t indxlen;
   char *cp;
   char *pi;
   int i;
@@ -3161,7 +3250,8 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
             httpd_ntoa(&hc->client_addr), hc->encodedurl);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' resolves to a file that is not world-readable.\n"),
+                                "The requested URL '%s' resolves to a file "
+                                "that is not world-readable.\n"),
                      hc->encodedurl);
       return -1;
     }
@@ -3174,7 +3264,8 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
 
       if (hc->pathinfo[0] != '\0')
         {
-          httpd_send_err(hc, 404, err404title, "", err404form, hc->encodedurl);
+          httpd_send_err(hc, 404, err404title, "",
+                         err404form, hc->encodedurl);
           return -1;
         }
 
@@ -3197,11 +3288,11 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
         {
           httpd_realloc_str(&indexname, &maxindexname,
                             expnlen + 1 + strlen(index_names[i]));
-          strcpy(indexname, hc->expnfilename);
+          strlcpy(indexname, hc->expnfilename, maxindexname + 1);
           indxlen = strlen(indexname);
           if (indxlen == 0 || indexname[indxlen - 1] != '/')
             {
-              strcat(indexname, "/");
+              strlcat(indexname, "/", maxindexname + 1);
             }
 
           if (strcmp(indexname, "./") == 0)
@@ -3209,7 +3300,7 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
               indexname[0] = '\0';
             }
 
-          strcat(indexname, index_names[i]);
+          strlcat(indexname, index_names[i], maxindexname + 1);
           if (stat(indexname, &hc->sb) >= 0)
             {
               goto got_one;
@@ -3223,14 +3314,16 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
 
       if (!(hc->sb.st_mode & S_IROTH))
         {
-          nwarn("WARNING: %s URL \"%s\" tried to index a non-readable directory\n",
-                httpd_ntoa(&hc->client_addr), hc->encodedurl);
+          nwarn("WARNING: %s URL \"%s\" tried to index a non-readable "
+                "directory\n", httpd_ntoa(&hc->client_addr), hc->encodedurl);
           httpd_send_err(hc, 403, err403title, "",
                          ERROR_FORM(err403form,
-                                    "The requested URL '%s' resolves to a directory that has indexing disabled.\n"),
+                                  "The requested URL '%s' resolves to a "
+                                  "directory that has indexing disabled.\n"),
                          hc->encodedurl);
           return -1;
         }
+
 #  ifdef CONFIG_THTTPD_AUTH_FILE
       /* Check authorization for this directory. */
 
@@ -3253,11 +3346,14 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
 #else /* CONFIG_THTTPD_GENERATE_INDICES */
       /* Indexing is disabled */
 
-      nwarn("WARNING: %s URL \"%s\" tried to index a directory with indexing disabled\n",
+      nwarn("WARNING: %s URL \"%s\" tried to index a directory with "
+            "indexing disabled\n",
             httpd_ntoa(&hc->client_addr), hc->encodedurl);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' is a directory, and directory indexing is disabled on this server.\n"),
+                                "The requested URL '%s' is a directory, and "
+                                "directory indexing is disabled on this "
+                                "server.\n"),
                      hc->encodedurl);
       return -1;
 #endif /* CONFIG_THTTPD_GENERATE_INDICES */
@@ -3272,23 +3368,26 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
       if (cp == NULL || pi[0] != '\0')
         {
           INTERNALERROR(indexname);
-          httpd_send_err(hc, 500, err500title, "", err500form, hc->encodedurl);
+          httpd_send_err(hc, 500, err500title, "",
+                         err500form, hc->encodedurl);
           return -1;
         }
 
       expnlen = strlen(cp);
       httpd_realloc_str(&hc->expnfilename, &hc->maxexpnfilename, expnlen);
-      strcpy(hc->expnfilename, cp);
+      strlcpy(hc->expnfilename, cp, hc->maxexpnfilename + 1);
 
       /* Now, is the index version world-readable or world-executable? */
 
       if (!(hc->sb.st_mode & (S_IROTH | S_IXOTH)))
         {
-          nwarn("WARNING: %s URL \"%s\" resolves to a non-world-readable index file\n",
+          nwarn("WARNING: %s URL \"%s\" resolves to a non-world-readable "
+                "index file\n",
                 httpd_ntoa(&hc->client_addr), hc->encodedurl);
           httpd_send_err(hc, 403, err403title, "",
                          ERROR_FORM(err403form,
-                                    "The requested URL '%s' resolves to an index file that is not world-readable.\n"),
+                                 "The requested URL '%s' resolves to an "
+                                 "index file that is not world-readable.\n"),
                          hc->encodedurl);
           return -1;
         }
@@ -3298,11 +3397,11 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
 
 #ifdef CONFIG_THTTPD_AUTH_FILE
   httpd_realloc_str(&dirname, &maxdirname, expnlen);
-  strcpy(dirname, hc->expnfilename);
+  strlcpy(dirname, hc->expnfilename, maxdirname + 1);
   cp = strrchr(dirname, '/');
   if (!cp)
     {
-      strcpy(dirname, httpd_root);
+      strlcpy(dirname, httpd_root, maxdirname + 1);
     }
   else
     {
@@ -3314,7 +3413,9 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
       return -1;
     }
 
-  /* Check if the filename is the CONFIG_THTTPD_AUTH_FILE itself - that's verboten. */
+  /* Check if the filename is the CONFIG_THTTPD_AUTH_FILE itself -
+   * that's verboten.
+   */
 
   if (expnlen == sizeof(CONFIG_THTTPD_AUTH_FILE) - 1)
     {
@@ -3324,21 +3425,24 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
                 httpd_ntoa(&hc->client_addr), hc->encodedurl);
           httpd_send_err(hc, 403, err403title, "",
                          ERROR_FORM(err403form,
-                                    "The requested URL '%s' is an authorization file, retrieving it is not permitted.\n"),
+                                    "The requested URL '%s' is an "
+                                    "authorization file, retrieving it is "
+                                    "not permitted.\n"),
                          hc->encodedurl);
           return -1;
         }
     }
   else if (expnlen >= sizeof(CONFIG_THTTPD_AUTH_FILE) &&
-           strcmp(&(hc->expnfilename[expnlen - sizeof(CONFIG_THTTPD_AUTH_FILE) + 1]),
-                  CONFIG_THTTPD_AUTH_FILE) == 0 &&
-           hc->expnfilename[expnlen - sizeof(CONFIG_THTTPD_AUTH_FILE)] == '/')
+           strcmp(&hc->expnfilename[expnlen - sizeof(CONFIG_THTTPD_AUTH_FILE)
+                  + 1], CONFIG_THTTPD_AUTH_FILE) == 0 &&
+          hc->expnfilename[expnlen - sizeof(CONFIG_THTTPD_AUTH_FILE)] == '/')
     {
       nwarn("WARNING: %s URL \"%s\" tried to retrieve an auth file\n",
             httpd_ntoa(&hc->client_addr), hc->encodedurl);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' is an authorization file, retrieving it is not permitted.\n"),
+                                "The requested URL '%s' is an authorization "
+                                "file, retrieving it is not permitted.\n"),
                      hc->encodedurl);
       return -1;
     }
@@ -3347,7 +3451,9 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
   /* Referer check. */
 
   if (!check_referer(hc))
-    return -1;
+    {
+      return -1;
+    }
 
   /* Is it in the CGI area? */
 
@@ -3369,7 +3475,9 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
             httpd_ntoa(&hc->client_addr), hc->encodedurl);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' resolves to a file which is marked executable but is not a CGI file; retrieving it is forbidden.\n"),
+                                "The requested URL '%s' resolves to a file "
+                                "which is marked executable but is not a "
+                                "CGI file; retrieving it is forbidden.\n"),
                      hc->encodedurl);
       return -1;
     }
@@ -3380,7 +3488,9 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
             httpd_ntoa(&hc->client_addr), hc->encodedurl);
       httpd_send_err(hc, 403, err403title, "",
                      ERROR_FORM(err403form,
-                                "The requested URL '%s' resolves to a file plus CGI-style pathinfo, but the file is not a valid CGI file.\n"),
+                                "The requested URL '%s' resolves to a file "
+                                "plus CGI-style pathinfo, but the file is "
+                                "not a valid CGI file.\n"),
                      hc->encodedurl);
       return -1;
     }
@@ -3403,8 +3513,8 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
   else if (hc->if_modified_since != (time_t) - 1 &&
            hc->if_modified_since >= hc->sb.st_mtime)
     {
-      send_mime(hc, 304, err304title, hc->encodings, "", hc->type, (off_t) - 1,
-                hc->sb.st_mtime);
+      send_mime(hc, 304, err304title, hc->encodings, "",
+                hc->type, (off_t) - 1, hc->sb.st_mtime);
     }
   else
     {
@@ -3412,9 +3522,11 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
       if (hc->file_fd < 0)
         {
           INTERNALERROR(hc->expnfilename);
-          httpd_send_err(hc, 500, err500title, "", err500form, hc->encodedurl);
+          httpd_send_err(hc, 500, err500title, "", err500form,
+                         hc->encodedurl);
           return -1;
         }
+
       send_mime(hc, 200, ok200title, hc->encodings, "", hc->type,
                 hc->sb.st_size, hc->sb.st_mtime);
     }
@@ -3422,19 +3534,23 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowP)
   return 0;
 }
 
-char *httpd_ntoa(httpd_sockaddr *saP)
+char *httpd_ntoa(httpd_sockaddr *sap)
 {
 #ifdef CONFIG_NET_IPv6
   static char str[200];
+#else
+  static char str[INET_ADDRSTRLEN];
+#endif
 
+#ifdef CONFIG_NET_IPv6
   if (getnameinfo
-      (&saP->sa, sockaddr_len(saP), str, sizeof(str), 0, 0,
+      (&sap->sa, sockaddr_len(sap), str, sizeof(str), 0, 0,
        NI_NUMERICHOST) != 0)
     {
       str[0] = '?';
       str[1] = '\0';
     }
-  else if (IN6_IS_ADDR_V4MAPPED(&saP->sa_in6.sin6_addr) &&
+  else if (IN6_IS_ADDR_V4MAPPED(&sap->sa_in6.sin6_addr) &&
            strncmp(str, "::ffff:", 7) == 0)
     {
       /* Elide IPv6ish prefix for IPv4 addresses. */
@@ -3446,7 +3562,7 @@ char *httpd_ntoa(httpd_sockaddr *saP)
 
 #else /* CONFIG_NET_IPv6 */
 
-  return inet_ntoa(saP->sin_addr);
+  return inet_ntoa_r(sap->sin_addr, str, sizeof(str));
 
 #endif /* CONFIG_NET_IPv6 */
 }
@@ -3461,7 +3577,7 @@ int httpd_read(int fd, const void *buf, size_t nbytes)
   ntotal = 0;
   do
     {
-      nread = read(fd, (char*)buf + ntotal, nbytes - ntotal);
+      nread = read(fd, (char *)buf + ntotal, nbytes - ntotal);
       if (nread < 0)
         {
           if (errno == EAGAIN)
@@ -3493,7 +3609,7 @@ int httpd_write(int fd, const void *buf, size_t nbytes)
   ntotal = 0;
   do
     {
-      nwritten = write(fd, (char*)buf + ntotal, nbytes - ntotal);
+      nwritten = write(fd, (char *)buf + ntotal, nbytes - ntotal);
       if (nwritten < 0)
         {
           if (errno == EAGAIN)

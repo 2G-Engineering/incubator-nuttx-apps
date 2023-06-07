@@ -70,6 +70,12 @@ config NSH_PROMPT_STRING
 	---help---
 		Provide the shell prompt string, default is "nsh> ".
 
+config NSH_DISABLE_ECHOBACK
+	bool "Disable echoback"
+	default n
+	---help---
+		If this option is selected, the NSH disables echoback.
+
 choice
 	prompt "Command Line Editor"
 	default NSH_READLINE if DEFAULT_SMALL
@@ -125,8 +131,9 @@ config NSH_QUOTE
 
 config NSH_CMDPARMS
 	bool "Enable commands as parameters"
-	default !DEFAULT_SMALL
+	default !DEFAULT_SMALL && NSH_QUOTE
 	depends on !DISABLE_MOUNTPOINT
+	depends on FS_TMPFS
 	---help---
 		If selected, then the output from commands, from file applications, and
 		from NSH built-in commands can be used as arguments to other
@@ -141,6 +148,8 @@ config NSH_CMDPARMS
 
 		Because this feature commits significant resources, it is disabled by
 		default.
+
+		This features requires TMPFS mounted at /tmp and NSH_QUOTE enabled.
 
 config NSH_MAXARGUMENTS
 	int "Maximum number of command arguments"
@@ -182,6 +191,24 @@ config NSH_DISABLEBG
 		where a minimal footprint is a necessity and background command
 		execution is not.
 
+config NSH_ALIAS
+	bool "Enable alias support"
+	default !DEFAULT_SMALL
+	---help---
+		Enable alias support for nsh. This enables command substitution from
+		a table of alias strings for individual commands. The maximum amount
+		of alias strings is configurable with NSH_ALIAS_MAX_AMOUNT.
+
+if NSH_ALIAS
+
+config NSH_ALIAS_MAX_AMOUNT
+	int "Maximum amount of aliases"
+	default 1
+	---help---
+		Set the maximum amount of alias entries.
+
+endif # NSH_ALIAS
+
 endmenu # Command Line Configuration
 
 config NSH_BUILTIN_APPS
@@ -202,6 +229,54 @@ config NSH_FILE_APPS
 		Support execution of program files residing within a file
 		system.  This options requires support for the posix_spawn()
 		interface (LIBC_EXECFUNCS).
+
+config NSH_SYMTAB
+	bool "Register symbol table"
+	default n
+	depends on LIBC_EXECFUNCS && BOARDCTL && !EXECFUNCS_HAVE_SYMTAB
+	select BOARDCTL_APP_SYMTAB
+	---help---
+		Enable logic to automatically register an application symbol table
+		as part of NSH initialization.  If enabled, then application logic
+		must provide the following:
+
+			const struct symtab_s g_exports[];
+			const int g_nexports;
+
+		Where g_exports is the name of the exported application symbol table
+		and g_nexports holds the number of entries in the application symbol
+		table.
+
+		This is done very early in the NSH initialization sequence.
+
+		Why might you want to do this?  There is really only one reason:  You
+		would like to have the symbol tables in place early so that programs
+		started by NSH, perhaps via an initialization script, will have all
+		of the necessary symbols in place.  Otherwise, you probably do *not*
+		want this option!
+
+if NSH_SYMTAB
+
+config NSH_SYMTAB_ARRAYNAME
+	string "Symbol table used by exec[l|v]"
+	default "g_exports"
+	---help---
+		The exec[l|v] and posix_spawn() functions needs to have (1) a
+		symbol table that provides the list of symbols exported by the base
+		code, and (2) the number of symbols in that table.  This selection
+		provides the name of that symbol table.
+
+config NSH_SYMTAB_COUNTNAME
+	string "Variable holding the number of symbols"
+	default "g_nexports"
+	---help---
+		The exec[l|v] and posix_spawn() functions needs to have (1) a
+		symbol table that provides the list of symbols exported by the base
+		code, and (2) the number of symbols in that table.  This selection
+		provides the name of 'int' variable that holds the number of symbol
+		in the table.
+
+endif # NSH_SYMTAB
 
 menu "Disable Individual commands"
 
@@ -245,10 +320,6 @@ config NSH_DISABLE_CMP
 	bool "Disable cmp"
 	default DEFAULT_SMALL
 
-config NSH_DISABLE_TIMEDATECTL
-	bool "Disable TIMEDATECTL"
-	default DEFAULT_SMALL || !LIBC_LOCALTIME || !RTC
-
 config NSH_DISABLE_DATE
 	bool "Disable date"
 	default DEFAULT_SMALL || !RTC
@@ -273,7 +344,6 @@ config NSH_DISABLE_DIRNAME
 config NSH_DISABLE_DMESG
 	bool "Disable dmesg"
 	default DEFAULT_SMALL
-	depends on RAMLOG_SYSLOG
 
 config NSH_DISABLE_ECHO
 	bool "Disable echo"
@@ -330,6 +400,10 @@ config NSH_DISABLE_LOSETUP
 config NSH_DISABLE_LOSMART
 	bool "Disable losmart"
 	default DEFAULT_SMALL || !MTD_SMART
+
+config NSH_DISABLE_LOMTD
+	bool "Disable lomtd"
+	default DEFAULT_SMALL || !MTD_LOOP
 
 config NSH_DISABLE_LN
 	bool "Disable ln"
@@ -401,7 +475,7 @@ config NSH_DISABLE_NSFMOUNT
 config NSH_DISABLE_NSLOOKUP
 	bool "Disable nslookup"
 	default DEFAULT_SMALL
-	depends on LIBC_NETDB && NETDB_DNSCLIENT
+	depends on LIBC_NETDB
 
 config NSH_DISABLE_PASSWD
 	bool "Disable passwd"
@@ -451,6 +525,16 @@ config NSH_DISABLE_READLINK
 	default DEFAULT_SMALL
 	depends on PSEUDOFS_SOFTLINKS
 
+config NSH_DISABLE_SWITCHBOOT
+	bool "Switch boot partition"
+	default DEFAULT_SMALL
+	depends on BOARDCTL_SWITCH_BOOT
+
+config NSH_DISABLE_BOOT
+	bool "Disable boot"
+	default DEFAULT_SMALL
+	depends on BOARDCTL_BOOT_IMAGE
+
 config NSH_DISABLE_REBOOT
 	bool "Disable reboot"
 	default DEFAULT_SMALL
@@ -495,13 +579,13 @@ config NSH_DISABLE_TIME
 	bool "Disable time"
 	default DEFAULT_SMALL
 
+config NSH_DISABLE_TIMEDATECTL
+	bool "Disable timedatectl"
+	default DEFAULT_SMALL || !LIBC_LOCALTIME || !RTC
+
 config NSH_DISABLE_TEST
 	bool "Disable test"
 	default DEFAULT_SMALL
-
-config NSH_DISABLE_TELNETD
-	bool "Disable telnetd"
-	default DEFAULT_SMALL || NSH_NETLOCAL
 
 config NSH_DISABLE_TRUNCATE
 	bool "Disable truncate"
@@ -517,6 +601,10 @@ config NSH_DISABLE_UNAME
 
 config NSH_DISABLE_UNSET
 	bool "Disable unset"
+	default DEFAULT_SMALL
+
+config NSH_DISABLE_UPTIME
+	bool "Disable uptime"
 	default DEFAULT_SMALL
 
 config NSH_DISABLE_URLDECODE
@@ -854,6 +942,12 @@ config NSH_FATMOUNTPT
 		will mount a FAT FS under /tmp. This is the location where the FAT
 		FS will be mounted.  Default is "/tmp".
 
+config NSH_SCRIPT_REDIRECT_PATH
+	string "rcS redirect output"
+	default ""
+	---help---
+		This option can redirect rcS output.such as /dev/log or other.
+
 endif # NSH_ROMFSETC
 endmenu # Scripting Support
 
@@ -899,7 +993,7 @@ config NSH_USBCONDEV
 	---help---
 		If NSH_USBCONSOLE is set to 'y', then NSH_USBCONDEV must
 		also be set to select the USB device used to support the
-		NSH console.   This should be set to the quoted name of a
+		NSH console.  This should be set to the quoted name of a
 		read-/write-able USB driver.  Default: "/dev/ttyACM0".
 
 config USBDEV_MINOR
@@ -949,7 +1043,7 @@ config NSH_ALTSTDIN
 		also be selected to enable use of an alternate character device
 		to support the NSH console. If CONFIG_NSH_ALTCONDEV is selected,
 		then NSH_ALTSTDIN must be set to select the "stdin" device to
-		support the NSH console.   This should be set to the quoted name
+		support the NSH console.  This should be set to the quoted name
 		of a readable character driver such as:
 
 			NSH_ALTSTDIN="/dev/ttyS1".
@@ -965,7 +1059,7 @@ config NSH_ALTSTDOUT
 		also be selected to enable use of an alternate character device
 		to support the NSH console. If CONFIG_NSH_ALTCONDEV is selected,
 		then NSH_ALTSTDOUT must be set to select the "stdout" device to
-		support the NSH console.   This should be set to the quoted name
+		support the NSH console.  This should be set to the quoted name
 		of a write-able character driver such as:
 
 			NSH_ALTSTDIN="/dev/ttyS1".
@@ -981,7 +1075,7 @@ config NSH_ALTSTDERR
 		also be selected to enable use of an alternate character device
 		to support the NSH console. If CONFIG_NSH_ALTCONDEV is selected,
 		then NSH_ALTSTDERR must be set to select the "stderr" device to
-		support the NSH console.   This should be set to the quoted name
+		support the NSH console.  This should be set to the quoted name
 		of a write-able character driver such as:
 
 			NSH_ALTSTDIN="/dev/ttyS1".
@@ -1010,7 +1104,7 @@ config NSH_USBKBD_DEVNAME
 	---help---
 		If NSH_USBKBD is set to 'y', then NSH_USBKBD_DEVNAME must also be
 		set to select the USB keyboard device used to support the NSH
-		console input.   This should be set to the quoted name of a read-
+		console input.  This should be set to the quoted name of a read-
 		able keyboard driver. Default: "/dev/kbda".
 
 endif #NSH_USBKBD
@@ -1099,59 +1193,24 @@ endif # NSH_DISABLE_WGET
 endmenu # Networking Configuration"
 
 menu "Telnet Configuration"
-	depends on NETUTILS_TELNETD
 
 config NSH_TELNET
 	bool "Use Telnet console"
 	default !DEFAULT_SMALL
-	depends on NETUTILS_TELNETD
+	depends on SYSTEM_TELNETD
 	---help---
 		If NSH_TELNET is set to 'y', then a TELENET
 		server front-end is selected.  When this option is provided,
 		you may log into NuttX remotely using telnet in order to
 		access NSH.
 
-if NSH_TELNET
-
-config NSH_TELNETD_PORT
-	int "Telnet port number"
-	default 23
+config NSH_DISABLE_TELNETSTART
+	bool "Disable to start telnetd"
+	default DEFAULT_SMALL
+	depends on NSH_TELNET
 	---help---
-		The telnet daemon will listen on this TCP port number for connections.
-		Default: 23
+		Determines if the nsh starts telnetd automatically
 
-config NSH_TELNETD_DAEMONPRIO
-	int "Telnet daemon priority"
-	default 100
-	---help---
-		Priority of the Telnet daemon. Default: 100
-
-config NSH_TELNETD_DAEMONSTACKSIZE
-	int "Telnet daemon stack size"
-	default DEFAULT_TASK_STACKSIZE
-	---help---
-		Stack size allocated for the Telnet daemon. Default: 2048
-
-config NSH_TELNETD_CLIENTPRIO
-	int "Telnet client priority"
-	default 100
-	---help---
-		Priority of the Telnet client. Default: 100
-
-config NSH_TELNETD_CLIENTSTACKSIZE
-	int "Telnet client stack size"
-	default DEFAULT_TASK_STACKSIZE
-	---help---
-		Stack size allocated for the Telnet client. Default: 2048
-
-config NSH_IOBUFFER_SIZE
-	int "Telnet I/O buffer size"
-	default 512
-	---help---
-		Determines the size of the I/O buffer to use for sending/
-		receiving TELNET commands/responses.  Default: 512
-
-endif # NSH_TELNET
 endmenu # Telnet Configuration
 
 config NSH_LOGIN
@@ -1244,6 +1303,39 @@ config NSH_LOGIN_FAILCOUNT
 	default 3
 	---help---
 		Number of login retry attempts.
+
+config NSH_PLATFORM_CHALLENGE
+	bool "Platform challenge"
+	default n
+	depends on NSH_LOGIN_PLATFORM
+	---help---
+		If this option is selected, the NSH will call into platform-specific
+		logic in order to get the challenge.  The function prototype for this
+		call is:
+
+			void platform_challenge(FAR char *buffer, size_t buflen);
+
+		Where buffer is the location to return the challenge and buflen is the
+		length of that buffer.  The maximum size of the buffer is determined
+		by NSH_FILEIOSIZE.  An appropriate location for the
+		implementation of platform_challenge would be within apps/platform/<board>.
+
+		One newline will be inserted after the platform-supplied message.
+
+		platform_challenge() is prototyped and described in apps/include/nshlib/nshlib.h
+		which may be included like:
+
+			#include "nshlib/nshlib.h"
+
+config NSH_PLATFORM_SKIP_LOGIN
+	bool "Platform skip login"
+	default n
+	---help---
+		If this option is selected, the NSH will call into platform-specific
+		logic in order to skip login.  The function prototype for this
+		call is:
+
+			int platform_skip_login(void);
 
 endif # NSH_LOGIN
 endif # NSH_LIBRARY

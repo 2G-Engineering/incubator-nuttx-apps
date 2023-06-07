@@ -97,7 +97,6 @@ CInput::CInput(CTwm4Nx *twm4nx)
   // Initialize the semaphore used to synchronize with the listener thread
 
   sem_init(&m_waitSem, 0, 0);
-  sem_setprotocol(&m_waitSem, SEM_PRIO_NONE);
 
 #ifdef CONFIG_TWM4NX_TOUCHSCREEN
   // Calibration
@@ -785,12 +784,12 @@ int CInput::session(void)
       struct pollfd pfd[NINPUT_DEVICES];
 #ifndef CONFIG_TWM4NX_NOKEYBOARD
       pfd[KBD_INDEX].fd        = m_kbdFd;
-      pfd[KBD_INDEX].events    = POLLIN | POLLERR | POLLHUP;
+      pfd[KBD_INDEX].events    = POLLIN;
       pfd[KBD_INDEX].revents   = 0;
 #endif
 #ifndef CONFIG_TWM4NX_NOMOUSE
       pfd[MOUSE_INDEX].fd      = m_mouseFd;
-      pfd[MOUSE_INDEX].events  = POLLIN | POLLERR | POLLHUP;
+      pfd[MOUSE_INDEX].events  = POLLIN;
       pfd[MOUSE_INDEX].revents = 0;
 #endif
 

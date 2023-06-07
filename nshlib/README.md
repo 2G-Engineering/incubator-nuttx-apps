@@ -670,7 +670,7 @@ system image.
 
   Dump data in hexadecimal format from a file or character device.
 
-- `ifconfig [nic_name [<ip-address>|dhcp]] [dr|gw|gateway <dr-address>] [netmask <net-mask>] [dns <dns-address>] [hw <hw-mac>]`
+- `ifconfig [nic_name [address_family] [[mtu <len>] | [<ip-address>|dhcp]] [dr|gw|gateway <dr-address>] [netmask <net-mask>|prefixlen <len>] [dns <dns-address>] [hw <hw-mac>]]`
 
   Show the current configuration of the network, for example:
 
@@ -1158,6 +1158,20 @@ system image.
 
   Show target of a soft link.
 
+- `switchboot <image path>
+
+  Switch to the updated or specified boot system. This command depends on
+  hardware support CONFIG_BOARDCTL_SWITCH_BOOT. `<image path>` point to a
+  partion or file which contain the firmware to boot.
+
+- `boot [<image path> [<header size>]]`
+
+  Boot a new firmware image. This command depends on hardware support
+  CONFIG_BOARDCTL_BOOT_IMAGE. `<image path>` may point to a partion or file
+  which contain the firmware to boot. The optional, numeric argument
+  `<header size>` may be useful for skipping metadata information preprended
+  to the firmware image.
+
 - `reboot [<n>]`
 
   Reset and reboot the system immediately. This command depends on hardware
@@ -1343,7 +1357,7 @@ system image.
   `nsh_telnetstart()` or it may be started from the NSH command line using this
   `telnetd` command.
 
-  Normally this command would be suppressed with `CONFIG_NSH_DISABLE_TELNETD`
+  Normally this command would be suppressed without `CONFIG_SYSTEM_TELNETD`
   because the Telnet daemon is automatically started in `nsh_main.c`. The
   exception is when `CONFIG_NETINIT_NETLOCAL` is selected. IN that case, the
   network is not enabled at initialization but rather must be enabled from the
@@ -1447,6 +1461,41 @@ system image.
   nsh> unset foobar
   nsh> echo $foobar
 
+  nsh>
+  ```
+
+- `uptime [options]`
+
+  Display the current time, how long the system has been running, and the load
+  average of the system over the last 1, 5, and 15 minutes.
+
+  options:
+  - -p, show uptime in pretty format
+  - -h, display this help and exit
+  - -s, system up since
+
+  **Example**:
+
+  ```
+  nsh> uptime
+  19:35:01 up 1:40, load average: 0.00, 0.00, 0.00
+  nsh>
+  nsh>
+  nsh> uptime -s
+  2022-09-16 17:54:26
+  nsh>
+  nsh>
+  nsh> uptime -p
+  up 1 hour, 40 minutes
+  nsh>
+  nsh>
+  nsh> uptime -h
+  Usage:
+  uptime [options]
+  Options:
+  -p, show uptime in pretty format
+  -h, display this help and exit
+  -s, system up since
   nsh>
   ```
 
@@ -1616,14 +1665,15 @@ rptun     | `CONFIG_RPTUN`
 set       | `CONFIG_NSH_VARS` || !`CONFIG_DISABLE_ENVIRON`
 shutdown  | `CONFIG_BOARDCTL_POWEROFF` || `CONFIG_BOARDCTL_RESET`
 sleep     | -
-source    | `CONFIG_FILE_STREAM` && !`CONFIG_NSH_DISABLESCRIPT`
+source    | !`CONFIG_NSH_DISABLESCRIPT`
 test      | !`CONFIG_NSH_DISABLESCRIPT`
-telnetd   | `CONFIG_NSH_TELNET` && !`CONFIG_NSH_DISABLE_TELNETD`
+telnetd   | `CONFIG_NSH_TELNET` && `CONFIG_SYSTEM_TELNETD`
 time      | -
 truncate  | !`CONFIG_DISABLE_MOUNTPOINT`
 umount    | !`CONFIG_DISABLE_MOUNTPOINT`
 uname     | !`CONFIG_NSH_DISABLE_UNAME`
 unset     | `CONFIG_NSH_VARS` || !`CONFIG_DISABLE_ENVIRON`
+uptime    | !`CONFIG_NSH_DISABLE_UPTIME`
 urldecode | `CONFIG_NETUTILS_CODECS` && `CONFIG_CODECS_URLCODE`
 urlencode | `CONFIG_NETUTILS_CODECS` && `CONFIG_CODECS_URLCODE`
 useradd   | !`CONFIG_DISABLE_MOUNTPOINT` && `CONFIG_NSH_LOGIN_PASSWD`
@@ -1665,9 +1715,10 @@ CONFIG_NSH_DISABLE_REBOOT,    CONFIG_NSH_DISABLE_RM,        CONFIG_NSH_DISABLE_R
 CONFIG_NSH_DISABLE_RMDIR,     CONFIG_NSH_DISABLE_ROUTE,     CONFIG_NSH_DISABLE_SET,
 CONFIG_NSH_DISABLE_SHUTDOWN,  CONFIG_NSH_DISABLE_SLEEP,     CONFIG_NSH_DISABLE_SOURCE,
 CONFIG_NSH_DISABLE_TEST,      CONFIG_NSH_DISABLE_TIME,      CONFIG_NSH_DISABLE_TRUNCATE,
-CONFIG_NSH_DISABLE_UMOUNT,    CONFIG_NSH_DISABLE_UNSET,     CONFIG_NSH_DISABLE_URLDECODE,
-CONFIG_NSH_DISABLE_URLENCODE, CONFIG_NSH_DISABLE_USERADD,   CONFIG_NSH_DISABLE_USERDEL,
-CONFIG_NSH_DISABLE_USLEEP,    CONFIG_NSH_DISABLE_WGET,      CONFIG_NSH_DISABLE_XD
+CONFIG_NSH_DISABLE_UMOUNT,    CONFIG_NSH_DISABLE_UNSET,     CONFIG_NSH_DISABLE_UPTIME,
+CONFIG_NSH_DISABLE_URLDECODE, CONFIG_NSH_DISABLE_URLENCODE, CONFIG_NSH_DISABLE_USERADD,
+CONFIG_NSH_DISABLE_USERDEL,   CONFIG_NSH_DISABLE_USLEEP,    CONFIG_NSH_DISABLE_WGET,
+CONFIG_NSH_DISABLE_XD
 ```
 
 Verbose help output can be suppressed by defining `CONFIG_NSH_HELP_TERSE`. In
@@ -1915,16 +1966,16 @@ The behavior of NSH can be modified with the following settings in the
 If Telnet is selected for the NSH console, then we must configure the resources
 used by the Telnet daemon and by the Telnet clients.
 
-- `CONFIG_NSH_TELNETD_PORT` – The telnet daemon will listen on this TCP port
+- `CONFIG_SYSTEM_TELNETD_PORT` – The telnet daemon will listen on this TCP port
   number for connections. Default: `23`
-- `CONFIG_NSH_TELNETD_DAEMONPRIO` – Priority of the Telnet daemon. Default:
+- `CONFIG_SYSTEM_TELNETD_PRIORITY` – Priority of the Telnet daemon. Default:
   `SCHED_PRIORITY_DEFAULT`
-- `CONFIG_NSH_TELNETD_DAEMONSTACKSIZE` – Stack size allocated for the Telnet
+- `CONFIG_SYSTEM_TELNETD_STACKSIZE` – Stack size allocated for the Telnet
   daemon. Default: `2048`
-- `CONFIG_NSH_TELNETD_CLIENTPRIO` – Priority of the Telnet client. Default:
+- `CONFIG_SYSTEM_TELNETD_SESSION_PRIORITY` – Priority of the Telnet client. Default:
   `SCHED_PRIORITY_DEFAULT`
-- `CONFIG_NSH_TELNETD_CLIENTSTACKSIZE` – Stack size allocated for the Telnet
-  client. Default: `2048`
+- `CONFIG_SYSTEM_TELNETD_SESSION_STACKSIZE` – Stack size allocated for the Telnet
+  client. Default: `3072`
 
 One or both of CONFIG_NSH_CONSOLE and `CONFIG_NSH_TELNET` must be defined. If
 `CONFIG_NSH_TELNET` is selected, then there some other configuration settings
@@ -1933,8 +1984,6 @@ that apply:
 - `CONFIG_NET=y` – Of course, networking must be enabled
 - `CONFIG_NET_TCP=y` – TCP/IP support is required for telnet (as well as various
   other TCP-related configuration settings).
-- `CONFIG_NSH_IOBUFFER_SIZE` – Determines the size of the I/O buffer to use for
-  sending/ receiving TELNET commands/responses.
 - `CONFIG_NETINIT_DHCPC` – Obtain the IP address via DHCP.
 - `CONFIG_NETINIT_IPADDR` – If `CONFIG_NETINIT_DHCPC` is NOT set, then the
   static IP address must be provided.

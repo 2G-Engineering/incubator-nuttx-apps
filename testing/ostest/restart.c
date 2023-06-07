@@ -24,13 +24,15 @@
 
 #include <nuttx/config.h>
 
+#include <assert.h>
+#include <errno.h>
+#include <sched.h>
+#include <semaphore.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sched.h>
-#include <errno.h>
 
 #include "ostest.h"
 
@@ -58,7 +60,9 @@ static const char g_varname[] = "VarName";
 static const char g_varvalue[] = "VarValue";
 #endif
 
-static bool g_restarted;
+static uint8_t g_restartstep;
+
+static sem_t g_sem;
 
 /****************************************************************************
  * Private Functions
@@ -79,6 +83,7 @@ static int restart_main(int argc, char *argv[])
     {
       printf("restart_main: ERROR: Expected argc=%d got argc=%d\n",
              NARGS + 1, argc);
+      ASSERT(false);
     }
 
   for (i = 0; i <= NARGS; i++)
@@ -89,6 +94,7 @@ static int restart_main(int argc, char *argv[])
           printf("restart_main: ERROR: "
                  "Expected argv[%d]=\"%s\" got \"%s\"\n",
                  i, argv[i], g_argv[i - 1]);
+          ASSERT(false);
         }
     }
 
@@ -107,29 +113,36 @@ static int restart_main(int argc, char *argv[])
                  g_varname);
           printf("restart_main:       found=%s expected=%s\n",
                  actual, g_varvalue);
+          ASSERT(false);
         }
     }
   else
     {
       printf("restart_main: ERROR: Variable=%s has no value\n", g_varname);
+      ASSERT(false);
     }
 #endif
 
   /* Were we restarted? */
 
-  if (!g_restarted)
+  switch (g_restartstep)
     {
-      /* No.. this is the first time we have been here */
-
-      g_restarted = true;
-
-      /* Now just wait to be restarted */
-
-      for (; ; )
-        {
-          sleep(2);
-          printf("restart_main: I am still here\n");
-        }
+      case 0:
+        for (; ; )
+          {
+            sleep(2);
+            printf("restart_main: I am still here\n");
+          }
+        break;
+      case 1:
+        if (sem_wait(&g_sem) != 0)
+          {
+            printf("restart_main: ERROR thread sem_wait failed\n");
+            ASSERT(false);
+          }
+        break;
+      default:
+        break;
     }
 
   return 0; /* Won't get here unless we were restarted */
@@ -143,10 +156,11 @@ void restart_test(void)
 {
   int ret;
 
+  g_restartstep = 0;
+
   /* Start the children and wait for first one to complete */
 
   printf("\nTest task_restart()\n");
-  g_restarted = false;
 
   /* Set up an environment variables */
 
@@ -155,12 +169,18 @@ void restart_test(void)
   setenv(g_varname, g_varvalue, TRUE);  /* Variable1=GoodValue1 */
 #endif
 
+  /* Initialize global variables */
+
+  g_restartstep = 0;
+  sem_init(&g_sem, 0, 0);
+
   /* Start the task */
 
   ret = task_create("ostest", PRIORITY, STACKSIZE, restart_main, g_argv);
   if (ret < 0)
     {
       printf("restart_main: ERROR Failed to start restart_main\n");
+      ASSERT(false);
     }
   else
     {
@@ -171,14 +191,37 @@ void restart_test(void)
       /* Wait a bit and restart the task */
 
       sleep(5);
+
+      g_restartstep = 1;
+
       ret = task_restart(pid);
       if (ret < 0)
         {
           printf("restart_main:  ERROR: task_restart failed\n");
+          ASSERT(false);
+        }
+
+      /* Start the task wait for a semaphore */
+
+      printf("restart_main: Started restart_main at PID=%d\n", pid);
+
+      /* Wait a bit and restart the task */
+
+      sleep(5);
+
+      g_restartstep = 2;
+
+      ret = task_restart(pid);
+      if (ret < 0)
+        {
+          printf("restart_main:  ERROR: task_restart failed\n");
+          ASSERT(false);
         }
 
       sleep(1);
     }
+
+  sem_destroy(&g_sem);
 
   printf("restart_main: Exiting\n");
 }

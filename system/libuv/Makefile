@@ -25,7 +25,7 @@ LIBUV_PATCHS ?= $(sort $(wildcard 000*.patch))
 LIBUV_VERSION  = 1.42.0
 LIBUV_UNPACK   = libuv
 LIBUV_TARBALL  = v$(LIBUV_VERSION).zip
-LIBUV_URL_BASE = https://github.com/libuv/libuv/archive/refs/tags/
+LIBUV_URL_BASE = https://github.com/libuv/libuv/archive/refs/tags
 LIBUV_URL      = $(LIBUV_URL_BASE)/$(LIBUV_TARBALL)
 
 
@@ -38,8 +38,7 @@ $(LIBUV_UNPACK): $(LIBUV_TARBALL)
 	$(call DELDIR, $(LIBUV_UNPACK))
 	$(Q) unzip $(LIBUV_TARBALL)
 	$(Q) mv libuv-$(LIBUV_VERSION) $(LIBUV_UNPACK)
-	$(Q) cat $(LIBUV_PATCHS) | \
-		patch -s -N -d $(LIBUV_UNPACK) -p1
+	$(Q) cat $(LIBUV_PATCHS) | patch -s -N -d $(LIBUV_UNPACK) -p1
 
 $(LIBUV_UNPACK)/.patch: $(LIBUV_UNPACK)
 	$(Q) touch $(LIBUV_UNPACK)/.patch
@@ -52,6 +51,11 @@ CFLAGS += -I$(LIBUV_UNPACK)/test
 CFLAGS += -Wno-shadow
 CFLAGS += -DDEF_THREADPOOL_SIZE=CONFIG_LIBUV_THREADPOOL_SIZE
 CFLAGS += -DDEF_THREADPOOL_STACKSIZE=CONFIG_LIBUV_THREAD_STACKSIZE
+
+GCCVER = $(shell $(CC) --version | grep gcc | sed -r 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+ifeq ($(GCCVER),12.2.1)
+  CFLAGS += -Wno-dangling-pointer
+endif
 
 VPATH += $(LIBUV_UNPACK)/src
 VPATH += $(LIBUV_UNPACK)/src/unix
@@ -112,8 +116,10 @@ ifneq ($(CONFIG_NET_UDP),)
 CSRCS += udp.c
 endif
 
+ifeq ($(findstring y,$(CONFIG_LIBUV_UTILS_TEST)$(CONFIG_LIBUV_UTILS_BENCHMARK)), y)
 PRIORITY  = $(CONFIG_LIBUV_UTILS_PRIORITY)
 STACKSIZE = $(CONFIG_LIBUV_UTILS_STACKSIZE)
+endif
 
 ifneq ($(CONFIG_LIBUV_UTILS_TEST),)
 
@@ -318,10 +324,13 @@ CSRCS += echo-server.c
 
 endif
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(LIBUV_UNPACK)/.git),)
 context:: $(LIBUV_UNPACK)/.patch
 
 distclean::
 	$(call DELDIR, $(LIBUV_UNPACK))
 	$(call DELFILE, $(LIBUV_TARBALL))
+endif
 
 include $(APPDIR)/Application.mk

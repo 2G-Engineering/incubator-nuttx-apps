@@ -24,6 +24,7 @@
 
 #include <nuttx/config.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -42,7 +43,7 @@
  * Name: nsh_cmpname
  ****************************************************************************/
 
-static bool nsh_cmpname(const char *pszname, const char *peqname)
+static bool nsh_cmpname(FAR const char *pszname, FAR const char *peqname)
 {
   /* Search until we find anything different in the two names */
 
@@ -282,7 +283,7 @@ int nsh_setvar(FAR struct nsh_vtbl_s *vtbl, FAR const char *name,
 
   /* Now, put the new name=value string into the NSH variable buffer */
 
-  sprintf(pair, "%s=%s", name, value);
+  snprintf(pair, varlen, "%s=%s", name, value);
   return OK;
 }
 #endif

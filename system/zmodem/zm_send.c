@@ -45,11 +45,12 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <errno.h>
-#include <crc16.h>
-#include <crc32.h>
 
+#include <nuttx/crc16.h>
+#include <nuttx/crc32.h>
 #include <nuttx/ascii.h>
-#include "system/zmodem.h"
+
+#include <system/zmodem.h>
 
 #include "zm.h"
 
@@ -704,7 +705,7 @@ static int zms_sendzsinit(FAR struct zm_state_s *pzm)
 static int zms_sendfilename(FAR struct zm_state_s *pzm)
 {
   FAR struct zms_state_s *pzms = (FAR struct zms_state_s *)pzm;
-  FAR uint8_t *ptr = pzm->scratch;
+  FAR char *ptr = (FAR char *)pzm->scratch;
   int len;
   int ret;
 
@@ -767,19 +768,19 @@ static int zms_sendfilename(FAR struct zm_state_s *pzm)
    */
 
 #ifdef CONFIG_SYSTEM_ZMODEM_TIMESTAMPS
-  sprintf((FAR char *)ptr, "%ld %lo 0 %d 1 %ld 0",
-          (unsigned long)pzms->filesize, (unsigned long)pzms->timestamp,
-          CONFIG_SYSTEM_ZMODEM_SERIALNO, (unsigned long)pzms->filesize);
+  snprintf(ptr, sizeof(pzm->scratch), "%ld %lo 0 %d 1 %ld 0",
+           (unsigned long)pzms->filesize, (unsigned long)pzms->timestamp,
+           CONFIG_SYSTEM_ZMODEM_SERIALNO, (unsigned long)pzms->filesize);
 #else
-  sprintf((FAR char *)ptr, "%ld 0 0 %d 1 %ld 0",
-          (unsigned long)pzms->filesize, CONFIG_SYSTEM_ZMODEM_SERIALNO,
-          (unsigned long)pzms->filesize);
+  snprintf(ptr, sizeof(pzm->scratch), "%ld 0 0 %d 1 %ld 0",
+           (unsigned long)pzms->filesize, CONFIG_SYSTEM_ZMODEM_SERIALNO,
+           (unsigned long)pzms->filesize);
 #endif
 
-  ptr += strlen((char *)ptr);
+  ptr += strlen(ptr);
   *ptr++ = '\0';
 
-  len =  ptr - pzm->scratch;
+  len = ptr - (FAR char *)pzm->scratch;
   DEBUGASSERT(len < CONFIG_SYSTEM_ZMODEM_SNDBUFSIZE);
   return zm_senddata(pzm, pzm->scratch, len);
 }
@@ -1595,7 +1596,7 @@ ZMSHANDLE zms_initialize(int remfd)
        * or command if it were not already active.
        */
 
-      nwritten = zm_remwrite(pzm->remfd, (uint8_t *) "rz\r", 3);
+      nwritten = zm_remwrite(pzm->remfd, (FAR uint8_t *)"rz\r", 3);
       if (nwritten < 0)
         {
           zmdbg("ERROR: zm_remwrite failed: %d\n", (int)nwritten);
@@ -1641,7 +1642,7 @@ errout_with_timer:
   zm_timerrelease(&pzms->cmn);
 errout:
   free(pzms);
-  return (ZMSHANDLE)NULL;
+  return NULL;
 }
 
 /****************************************************************************

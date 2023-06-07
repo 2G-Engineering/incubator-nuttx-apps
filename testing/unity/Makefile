@@ -40,11 +40,14 @@ UNITY_SRCDIR = $(UNITY_UNPACKNAME)$(DELIM)src
 
 APPS_INCDIR = $(APPDIR)$(DELIM)include$(DELIM)testing
 
-CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPS_INCDIR)}
+CFLAGS += ${INCDIR_PREFIX}$(APPS_INCDIR)
 CFLAGS += -DUNITY_INCLUDE_CONFIG_H
+CFLAGS += -DUNITY_INCLUDE_DOUBLE
 
 CSRCS = $(UNITY_SRCDIR)$(DELIM)unity.c
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(UNITY_UNPACKNAME)/.git),)
 $(UNITY_TARBALL):
 	@echo "Downloading: $(UNITY_TARBALL)"
 	$(Q) curl -L -O $(CONFIG_TESTING_UNITY_URL)/$(UNITY_TARBALL)
@@ -53,6 +56,7 @@ $(UNITY_UNPACKNAME): $(UNITY_TARBALL)
 	@echo "Unpacking: $(UNITY_TARBALL) -> $(UNITY_UNPACKNAME)"
 	$(Q) $(UNPACK) $(UNITY_TARBALL)
 	$(Q) touch $(UNITY_UNPACKNAME)
+endif
 
 $(UNITY_SRCDIR)$(DELIM)unity.h: $(UNITY_UNPACKNAME)
 
@@ -67,8 +71,10 @@ $(APPS_INCDIR)$(DELIM)unity_internals.h: $(UNITY_SRCDIR)$(DELIM)unity_internals.
 context:: $(APPS_INCDIR)$(DELIM)unity.h $(APPS_INCDIR)$(DELIM)unity_internals.h
 
 distclean::
+ifeq ($(wildcard $(UNITY_UNPACKNAME)/.git),)
 	$(call DELDIR, $(UNITY_UNPACKNAME))
 	$(call DELFILE, $(UNITY_TARBALL))
+endif
 	$(call DELFILE, $(APPDIR)/include/testing/unity.h)
 	$(call DELFILE, $(APPDIR)/include/testing/unity_internals.h)
 

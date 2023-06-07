@@ -29,10 +29,11 @@
 
 #include <sys/types.h>
 
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+
+#include <nuttx/queue.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -43,53 +44,45 @@
 #define nsh_clone(v)           (v)->clone(v)
 #define nsh_release(v)         (v)->release(v)
 #define nsh_write(v,b,n)       (v)->write(v,b,n)
+#define nsh_ioctl(v,c,a)       (v)->ioctl(v,c,a)
 #define nsh_linebuffer(v)      (v)->linebuffer(v)
 #define nsh_redirect(v,f,s)    (v)->redirect(v,f,s)
 #define nsh_undirect(v,s)      (v)->undirect(v,s)
 #define nsh_exit(v,s)          (v)->exit(v,s)
 
 #ifdef CONFIG_CPP_HAVE_VARARGS
-# define nsh_error(v, ...)     (v)->error(v, ##__VA_ARGS__)
-# define nsh_output(v, ...)    (v)->output(v, ##__VA_ARGS__)
+#  define nsh_error(v, ...)     (v)->error(v, ##__VA_ARGS__)
+#  define nsh_output(v, ...)    (v)->output(v, ##__VA_ARGS__)
 #else
-# define nsh_error             vtbl->error
-# define nsh_output            vtbl->output
+#  define nsh_error             vtbl->error
+#  define nsh_output            vtbl->output
 #endif
 
 /* Size of info to be saved in call to nsh_redirect
  * See struct serialsave_s in nsh_console.c
  */
 
-#define SAVE_SIZE (2 * sizeof(int) + 2 * sizeof(FILE*))
+#define SAVE_SIZE (2 * sizeof(int))
 
 /* Are we using the NuttX console for I/O?  Or some other character device? */
 
-#ifdef CONFIG_FILE_STREAM
-#  ifdef CONFIG_NSH_ALTCONDEV
+#ifdef CONFIG_NSH_ALTCONDEV
 
-#    if !defined(CONFIG_NSH_ALTSTDIN) && !defined(CONFIG_NSH_ALTSTDOUT) && \
-        !defined(CONFIG_NSH_ALTSTDERR)
-#      error CONFIG_NSH_ALTCONDEV selected but CONFIG_NSH_ALTSTDxxx not provided
-#    endif
-
-#    define INFD(p)      ((p)->cn_confd)
-#    define INSTREAM(p)  ((p)->cn_constream)
-#    define OUTFD(p)     ((p)->cn_outfd)
-#    define OUTSTREAM(p) ((p)->cn_outstream)
-#    define ERRFD(p)     ((p)->cn_errfd)
-#    define ERRSTREAM(p) ((p)->cn_errstream)
-
-#  else
-
-#    define INFD(p)      0
-#    define INSTREAM(p)  stdin
-#    define OUTFD(p)     1
-#    define OUTSTREAM(p) stdout
-#    define ERRFD(p)     2
-#    define ERRSTREAM(p) stderr
-
+#  if !defined(CONFIG_NSH_ALTSTDIN) && !defined(CONFIG_NSH_ALTSTDOUT) && \
+      !defined(CONFIG_NSH_ALTSTDERR)
+#    error CONFIG_NSH_ALTCONDEV selected but CONFIG_NSH_ALTSTDxxx not provided
 #  endif
+
+#  define INFD(p)      ((p)->cn_confd)
+
+#else
+
+#  define INFD(p)      0
+
 #endif
+
+#  define OUTFD(p)     ((p)->cn_outfd)
+#  define ERRFD(p)     ((p)->cn_errfd)
 
 /****************************************************************************
  * Public Types
@@ -112,8 +105,11 @@ struct nsh_vtbl_s
   void (*release)(FAR struct nsh_vtbl_s *vtbl);
   ssize_t (*write)(FAR struct nsh_vtbl_s *vtbl, FAR const void *buffer,
                    size_t nbytes);
-  int (*error)(FAR struct nsh_vtbl_s *vtbl, FAR const char *fmt, ...);
-  int (*output)(FAR struct nsh_vtbl_s *vtbl, FAR const char *fmt, ...);
+  int (*ioctl)(FAR struct nsh_vtbl_s *vtbl, int cmd, unsigned long arg);
+  int (*error)(FAR struct nsh_vtbl_s *vtbl, FAR const char *fmt, ...)
+      printf_like(2, 3);
+  int (*output)(FAR struct nsh_vtbl_s *vtbl, FAR const char *fmt, ...)
+      printf_like(2, 3);
   FAR char *(*linebuffer)(FAR struct nsh_vtbl_s *vtbl);
   void (*redirect)(FAR struct nsh_vtbl_s *vtbl, int fd, FAR uint8_t *save);
   void (*undirect)(FAR struct nsh_vtbl_s *vtbl, FAR uint8_t *save);
@@ -123,6 +119,14 @@ struct nsh_vtbl_s
   /* Common buffer for file I/O. */
 
   char iobuffer[IOBUFFERSIZE];
+#endif
+
+#ifdef CONFIG_NSH_ALIAS
+  /* Shell alias support */
+
+  struct nsh_alias_s atab[CONFIG_NSH_ALIAS_MAX_AMOUNT];
+  struct sq_queue_s  alist;
+  struct sq_queue_s  afreelist;
 #endif
 
   /* Parser state data */
@@ -146,18 +150,11 @@ struct console_stdio_s
 
   /* NSH input/output streams */
 
-#ifdef CONFIG_FILE_STREAM
 #ifdef CONFIG_NSH_ALTCONDEV
-  int    cn_confd;     /* Console I/O file descriptor */
+  int   cn_confd;     /* Console I/O file descriptor */
 #endif
-  int    cn_outfd;     /* Output file descriptor (possibly redirected) */
-  int    cn_errfd;     /* Error Output file descriptor (possibly redirected) */
-#ifdef CONFIG_NSH_ALTCONDEV
-  FILE  *cn_constream; /* Console I/O stream (possibly redirected) */
-#endif
-  FILE  *cn_outstream; /* Output stream */
-  FILE  *cn_errstream; /* Error Output stream */
-#endif
+  int   cn_outfd;     /* Output file descriptor (possibly redirected) */
+  int   cn_errfd;     /* Error Output file descriptor (possibly redirected) */
 
 #ifdef CONFIG_NSH_VARS
   /* Allocation and size of NSH variables */

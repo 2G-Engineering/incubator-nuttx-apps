@@ -24,6 +24,8 @@
 
 #include <nuttx/config.h>
 
+#include <string.h>
+
 #include "nsh.h"
 #include "nsh_console.h"
 
@@ -37,8 +39,10 @@
  * Name: cmd_free
  ****************************************************************************/
 
-int cmd_free(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_free(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   return nsh_catfile(vtbl, argv[0], CONFIG_NSH_PROC_MOUNTPOINT "/meminfo");
 }
 
@@ -50,13 +54,22 @@ int cmd_free(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  * Name: cmd_memdump
  ****************************************************************************/
 
-int cmd_memdump(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_memdump(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  FAR const char *arg = "used";
+  char arg[CONFIG_NSH_LINELEN] = "";
+  int i;
 
-  if (argc > 1)
+  if (argc == 1)
     {
-      arg = argv[1];
+      strlcpy(arg, "used", CONFIG_NSH_LINELEN);
+    }
+  else
+    {
+      for (i = 1; i < argc; i++)
+        {
+          strlcat(arg, argv[i], CONFIG_NSH_LINELEN);
+          strlcat(arg, " ", CONFIG_NSH_LINELEN);
+        }
     }
 
   return nsh_writefile(vtbl, argv[0], arg, strlen(arg),

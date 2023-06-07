@@ -136,7 +136,7 @@ static inline void discover_initresponse(void);
  * Private Functions
  ****************************************************************************/
 
-static inline void discover_initresponse()
+static inline void discover_initresponse(void)
 {
   int chk = 0;
   int i;
@@ -144,8 +144,8 @@ static inline void discover_initresponse()
   g_state.response[0] = DISCOVER_PROTO_ID;
   g_state.response[1] = DISCOVER_RESPONSE;
 
-  strncpy((char *) &g_state.response[2], g_state.info.description,
-          DISCOVER_RESPONSE_SIZE - 3);
+  strlcpy((char *)&g_state.response[2], g_state.info.description,
+          DISCOVER_RESPONSE_SIZE - 2);
 
   for (i = 0; i < DISCOVER_RESPONSE_SIZE - 1; i++)
     {
@@ -161,7 +161,7 @@ static int discover_daemon(int argc, char *argv[])
 {
   int sockfd = -1;
   int nbytes;
-  int addrlen = sizeof(struct sockaddr_in);
+  socklen_t addrlen = sizeof(struct sockaddr_in);
   struct sockaddr_in srcaddr;
 
   /* memset(&g_state, 0, sizeof(struct discover_state_s)); */
@@ -187,8 +187,7 @@ static int discover_daemon(int argc, char *argv[])
       /* Read the next packet */
 
       nbytes = recvfrom(sockfd, &g_state.request, sizeof(g_state.request), 0,
-                        (struct sockaddr *) &srcaddr,
-                        (socklen_t *) &addrlen);
+                        (struct sockaddr *)&srcaddr, &addrlen);
       if (nbytes < 0)
         {
           /* On errors (other EINTR), close the socket and try again */
@@ -208,7 +207,8 @@ static int discover_daemon(int argc, char *argv[])
           continue;
         }
 
-      ninfo("Received discover from %08lx'\n", srcaddr.sin_addr.s_addr);
+      ninfo("Received discover from %08" PRIx32 "\n",
+            srcaddr.sin_addr.s_addr);
 
       discover_respond(&srcaddr.sin_addr.s_addr);
     }
@@ -283,7 +283,7 @@ static inline int discover_respond(in_addr_t *ipaddr)
   return ret;
 }
 
-static inline int discover_socket()
+static inline int discover_socket(void)
 {
   int sockfd;
 #if defined(HAVE_SO_REUSEADDR) || defined(HAVE_SO_BROADCAST)
@@ -305,7 +305,7 @@ static inline int discover_socket()
 #ifdef HAVE_SO_REUSEADDR
   optval = 1;
   ret = setsockopt(sockfd, SOL_SOCKET,
-                   SO_REUSEADDR, (void *)&optval, sizeof(int));
+                   SO_REUSEADDR, &optval, sizeof(int));
   if (ret < 0)
     {
       nerr("ERROR: setsockopt SO_REUSEADDR failed: %d\n", errno);
@@ -317,7 +317,7 @@ static inline int discover_socket()
 #ifdef HAVE_SO_BROADCAST
   optval = 1;
   ret = setsockopt(sockfd, SOL_SOCKET,
-                   SO_BROADCAST, (void *)&optval, sizeof(int));
+                   SO_BROADCAST, &optval, sizeof(int));
   if (ret < 0)
     {
       nerr("ERROR: setsockopt SO_BROADCAST failed: %d\n", errno);
@@ -329,7 +329,7 @@ static inline int discover_socket()
   return sockfd;
 }
 
-static inline int discover_openlistener()
+static inline int discover_openlistener(void)
 {
   struct sockaddr_in addr;
   struct ifreq req;
@@ -347,7 +347,7 @@ static inline int discover_openlistener()
 
   /* Get the IP address of the selected device */
 
-  strncpy(req.ifr_name, CONFIG_DISCOVER_INTERFACE, IFNAMSIZ);
+  strlcpy(req.ifr_name, CONFIG_DISCOVER_INTERFACE, IFNAMSIZ);
   ret = ioctl(sockfd, SIOCGIFADDR, (unsigned long)&req);
   if (ret < 0)
     {
@@ -357,7 +357,7 @@ static inline int discover_openlistener()
     }
 
   g_state.serverip = ((struct sockaddr_in *)&req.ifr_addr)->sin_addr.s_addr;
-  ninfo("serverip: %08lx\n", ntohl(g_state.serverip));
+  ninfo("serverip: %08" PRIx32 "\n", ntohl(g_state.serverip));
 
   /* Bind the socket to a local port. We have to bind to INADDRY_ANY to
    * receive broadcast messages.

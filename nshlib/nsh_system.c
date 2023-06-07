@@ -24,7 +24,6 @@
 
 #include <nuttx/config.h>
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -45,7 +44,7 @@ static int nsh_system_(int argc, FAR char *argv[], int isctty)
 
   /* Execute the session */
 
-  ret = nsh_session(pstate, false, argc, argv);
+  ret = nsh_session(pstate, NSH_LOGIN_NONE, argc, argv);
 
   /* Exit upon return */
 

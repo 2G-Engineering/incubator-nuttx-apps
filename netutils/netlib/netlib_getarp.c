@@ -33,10 +33,10 @@
 #include <assert.h>
 #include <errno.h>
 
+#include <netinet/arp.h>
 #include <netinet/in.h>
 #include <net/if.h>
 
-#include <nuttx/net/arp.h>
 #include "netutils/netlib.h"
 
 /****************************************************************************
@@ -53,6 +53,7 @@
  * Parameters:
  *   inaddr   The IPv4 address to use in the query
  *   macaddr  The location to return the mapped Ethernet MAC address
+ *   ifname   The Network device name
  *
  * Return:
  *   0 on success; a negated errno value on failure.
@@ -60,7 +61,7 @@
  ****************************************************************************/
 
 int netlib_get_arpmapping(FAR const struct sockaddr_in *inaddr,
-                          FAR uint8_t *macaddr)
+                          FAR uint8_t *macaddr, FAR const char *ifname)
 {
   int ret = -EINVAL;
 
@@ -72,6 +73,16 @@ int netlib_get_arpmapping(FAR const struct sockaddr_in *inaddr,
           struct arpreq req;
 
           memcpy(&req.arp_pa, inaddr, sizeof(struct sockaddr_in));
+          if (ifname != NULL)
+            {
+               strlcpy((FAR char *)&req.arp_dev, ifname,
+                       sizeof(req.arp_dev));
+            }
+          else
+            {
+              req.arp_dev[0] = '\0';
+            }
+
           ret = ioctl(sockfd, SIOCGARP, (unsigned long)((uintptr_t)&req));
           if (ret < 0)
             {

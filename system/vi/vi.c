@@ -24,6 +24,7 @@
 
 #include <nuttx/config.h>
 
+#include <sys/param.h>
 #include <sys/stat.h>
 
 #include <stdarg.h>
@@ -55,34 +56,6 @@
 
 #ifndef CONFIG_SYSTEM_VI_COLS
 #  define CONFIG_SYSTEM_VI_COLS 64
-#endif
-
-/* Some environments may return CR as end-of-line, others LF, and others
- * both.  If not specified, the logic here assumes either (but not both) as
- * the default.
- */
-
-#if defined(CONFIG_EOL_IS_CR)
-#  undef  CONFIG_EOL_IS_LF
-#  undef  CONFIG_EOL_IS_BOTH_CRLF
-#  undef  CONFIG_EOL_IS_EITHER_CRLF
-#elif defined(CONFIG_EOL_IS_LF)
-#  undef  CONFIG_EOL_IS_CR
-#  undef  CONFIG_EOL_IS_BOTH_CRLF
-#  undef  CONFIG_EOL_IS_EITHER_CRLF
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-#  undef  CONFIG_EOL_IS_CR
-#  undef  CONFIG_EOL_IS_LF
-#  undef  CONFIG_EOL_IS_EITHER_CRLF
-#elif defined(CONFIG_EOL_IS_EITHER_CRLF)
-#  undef  CONFIG_EOL_IS_CR
-#  undef  CONFIG_EOL_IS_LF
-#  undef  CONFIG_EOL_IS_BOTH_CRLF
-#else
-#  undef  CONFIG_EOL_IS_CR
-#  undef  CONFIG_EOL_IS_LF
-#  undef  CONFIG_EOL_IS_BOTH_CRLF
-#  define CONFIG_EOL_IS_EITHER_CRLF 1
 #endif
 
 #ifndef CONFIG_SYSTEM_VI_YANK_THRESHOLD
@@ -307,7 +280,7 @@ struct vi_s
   struct vi_pos_s cursor;   /* Current cursor position */
   struct vi_pos_s cursave;  /* Saved cursor position */
   struct vi_pos_s display;  /* Display size */
-  FAR struct termcurses_s * tcurs;
+  FAR struct termcurses_s *tcurs;
   off_t curpos;             /* The current cursor offset into the text buffer */
   off_t textsize;           /* The size of the text buffer */
   off_t winpos;             /* Offset corresponding to the start of the display */
@@ -391,7 +364,7 @@ static void     vi_clrscreen(FAR struct vi_s *vi);
 /* Final Line display */
 
 static void     vi_printf(FAR struct vi_s *vi, FAR const char *prefix,
-                  FAR const char *fmt, ...);
+                  FAR const char *fmt, ...) printf_like(3, 4);
 
 /* Line positioning */
 
@@ -537,8 +510,8 @@ static const char g_fmtmodified[]   =
                             "No write since last change (add ! to override)";
 static const char g_fmtnotvalid[]   = "Command not valid";
 static const char g_fmtnotcmd[]     = "Not an editor command: %s";
-static const char g_fmtsrcbot[]     = "search hit BOTTOM, continuing at TOP";
-static const char g_fmtsrctop[]     = "search hit TOP, continuing at BOTTOM";
+static const char g_fmtsrcbot[]     = "search hit BOTTOM(continuing at TOP)";
+static const char g_fmtsrctop[]     = "search hit TOP(continuing at BOTTOM)";
 static const char g_fmtinsert[]     = "--INSERT--";
 
 /****************************************************************************
@@ -781,11 +754,12 @@ static void vi_setcursor(FAR struct vi_s *vi, uint16_t row, uint16_t column)
 
   /* Format the cursor position command.  The origin is (1,1). */
 
-  len = snprintf(buffer, 16, g_fmtcursorpos, row + 1, column + 1);
+  len = snprintf(buffer, sizeof(buffer), g_fmtcursorpos,
+                 row + 1, column + 1);
 
   /* Send the VT100 CURSORPOS command */
 
-  vi_write(vi, buffer, len);
+  vi_write(vi, buffer, MIN(len, sizeof(buffer)));
 }
 
 /****************************************************************************
@@ -885,10 +859,13 @@ static void vi_printf(FAR struct vi_s *vi, FAR const char *prefix,
 
   /* Expand the prefix message in the scratch buffer */
 
-  len = prefix ? snprintf(vi->scratch, SCRATCH_BUFSIZE, prefix) : 0;
+  len = prefix ? snprintf(vi->scratch,
+                          sizeof(vi->scratch), "%s", prefix) : 0;
+  len = MIN(len, sizeof(vi->scratch));
 
   va_start(ap, fmt);
-  len += vsnprintf(vi->scratch + len, SCRATCH_BUFSIZE - len, fmt, ap);
+  len += vsnprintf(vi->scratch + len, sizeof(vi->scratch) - len, fmt, ap);
+  len = MIN(len, sizeof(vi->scratch));
   vvidbg(fmt, ap);
   va_end(ap);
 
@@ -1326,8 +1303,8 @@ static bool vi_savetext(FAR struct vi_s *vi, FAR const char *filename,
 
   fclose(stream);
 
-  len = sprintf(vi->scratch, "%dC written", nwritten);
-  vi_write(vi, vi->scratch, len);
+  len = snprintf(vi->scratch, sizeof(vi->scratch), "%dC written", nwritten);
+  vi_write(vi, vi->scratch, MIN(len, sizeof(vi->scratch)));
   return true;
 }
 
@@ -1982,10 +1959,10 @@ static void vi_showlinecol(FAR struct vi_s *vi)
   vi_cursoroff(vi);
   vi_setcursor(vi, vi->display.row - 1, vi->display.column - 15);
 
-  len = snprintf(vi->scratch, SCRATCH_BUFSIZE, "%jd,%d",
+  len = snprintf(vi->scratch, sizeof(vi->scratch), "%jd,%d",
                  (uintmax_t)(vi->cursor.row + vi->vscroll + 1),
                  vi->cursor.column + vi->hscroll + 1);
-  vi_write(vi, vi->scratch, len);
+  vi_write(vi, vi->scratch, MIN(len, sizeof(vi->scratch)));
 
   vi_clrtoeol(vi);
   vi_cursoron(vi);
@@ -4035,7 +4012,7 @@ static void vi_cmd_mode(FAR struct vi_s *vi)
               {
                 /* Emulate :wq */
 
-                strcpy(vi->scratch, "wq");
+                strlcpy(vi->scratch, "wq", sizeof(vi->scratch));
                 vi->cmdlen = 2;
                 vi_parsecolon(vi);
 
@@ -4099,21 +4076,6 @@ static void vi_cmd_mode(FAR struct vi_s *vi)
           }
           break;
 
-#if defined(CONFIG_EOL_IS_CR)
-        case KEY_CMDMODE_NEXTLINE:
-        case '\r': /* CR terminates line */
-          {
-            vi->curpos = vi_nextline(vi, vi->curpos);
-            vi_gotofirstnonwhite(vi);
-          }
-          break;
-
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-       case '\r': /* Wait for the LF */
-          break;
-#endif
-
-#if defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
         case KEY_CMDMODE_NEXTLINE:
         case '\n': /* LF terminates line */
           {
@@ -4121,18 +4083,6 @@ static void vi_cmd_mode(FAR struct vi_s *vi)
             vi_gotofirstnonwhite(vi);
           }
           break;
-#endif
-
-#ifdef CONFIG_EOL_IS_EITHER_CRLF
-        case KEY_CMDMODE_NEXTLINE:
-        case '\r': /* Either CR or LF terminates line */
-        case '\n':
-          {
-            vi->curpos = vi_nextline(vi, vi->curpos);
-            vi_gotofirstnonwhite(vi);
-          }
-          break;
-#endif
 
         case KEY_CMDMODE_PREVLINE:
           {
@@ -4482,13 +4432,7 @@ static void vi_parsecolon(FAR struct vi_s *vi)
                * as unmodified.
                */
 
-              strncpy(vi->filename, filename, MAX_FILENAME - 1);
-
-             /* Make sure that the (possibly truncated) file name is NUL
-              * terminated
-              */
-
-              vi->filename[MAX_FILENAME - 1] = '\0';
+              strlcpy(vi->filename, filename, MAX_FILENAME);
               vi->modified = false;
             }
           else
@@ -4512,13 +4456,7 @@ static void vi_parsecolon(FAR struct vi_s *vi)
 
       if (filename)
         {
-          strncpy(vi->filename, filename, MAX_FILENAME - 1);
-
-         /* Make sure that the (possibly truncated) file name is NUL
-          * terminated
-          */
-
-          vi->filename[MAX_FILENAME - 1] = '\0';
+          strlcpy(vi->filename, filename, MAX_FILENAME);
         }
 
       /* If it is not a new file and if there are no changes to the text
@@ -4639,34 +4577,11 @@ static void vi_cmd_submode(FAR struct vi_s *vi)
 
           /* What do we do with carriage returns? line feeds? */
 
-#if defined(CONFIG_EOL_IS_CR)
-          case '\r': /* CR terminates line */
-            {
-              vi_parsecolon(vi);
-            }
-            break;
-
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-          case '\r': /* Wait for the LF */
-            break;
-#endif
-
-#if defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
           case '\n': /* LF terminates line */
             {
               vi_parsecolon(vi);
             }
             break;
-#endif
-
-#ifdef CONFIG_EOL_IS_EITHER_CRLF
-          case '\r': /* Either CR or LF terminates line */
-          case '\n':
-            {
-              vi_parsecolon(vi);
-            }
-            break;
-#endif
 
           default:
             {
@@ -4856,13 +4771,7 @@ static void vi_parsefind(FAR struct vi_s *vi, bool revfind)
     {
       /* Copy the new search string from the scratch to the find buffer */
 
-      strncpy(vi->findstr, vi->scratch, MAX_STRING - 1);
-
-      /* Make sure that the (possibly truncated) search string is NUL
-       * terminated
-       */
-
-      vi->findstr[MAX_STRING - 1] = '\0';
+      strlcpy(vi->findstr, vi->scratch, MAX_STRING);
     }
 
   /* Then attempt to find the string */
@@ -4941,34 +4850,11 @@ static void vi_find_submode(FAR struct vi_s *vi, bool revfind)
 
           /* What do we do with carriage returns? line feeds? */
 
-#if defined(CONFIG_EOL_IS_CR)
-          case '\r': /* CR terminates line */
-            {
-              vi_parsefind(vi, revfind);
-            }
-            break;
-
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-          case '\r': /* Wait for the LF */
-            break;
-#endif
-
-#if defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
           case '\n': /* LF terminates line */
             {
               vi_parsefind(vi, revfind);
             }
             break;
-#endif
-
-#ifdef CONFIG_EOL_IS_EITHER_CRLF
-          case '\r': /* Either CR or LF terminates line */
-          case '\n':
-            {
-              vi_parsefind(vi, revfind);
-            }
-            break;
-#endif
 
           default:
             {
@@ -5089,36 +4975,11 @@ static void vi_replacech_submode(FAR struct vi_s *vi)
 
           /* What do we do with carriage returns? line feeds? */
 
-#if defined(CONFIG_EOL_IS_CR)
-          case '\r': /* CR terminates line */
-            {
-              ch = '\n';
-              found = true;
-            }
-            break;
-
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-          case '\r': /* Wait for the LF */
-            break;
-#endif
-
-#if defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
           case '\n': /* LF terminates line */
             {
               found = true;
             }
             break;
-#endif
-
-#ifdef CONFIG_EOL_IS_EITHER_CRLF
-          case '\r': /* Either CR or LF terminates line */
-          case '\n':
-            {
-              ch = '\n';
-              found = true;
-            }
-            break;
-#endif
 
           default:
             {
@@ -5487,28 +5348,6 @@ static void vi_insert_mode(FAR struct vi_s *vi)
 
           /* What do we do with carriage returns? */
 
-#if defined(CONFIG_EOL_IS_CR)
-          case '\r': /* CR terminates line */
-            {
-              if (vi->mode == MODE_INSERT)
-                {
-                  vi_insertch(vi, '\n');
-                }
-              else
-                {
-                  vi_replacech(vi, '\n');
-                }
-
-              vi->drawtoeos = true;
-            }
-            break;
-
-#elif defined(CONFIG_EOL_IS_BOTH_CRLF)
-         case '\r': /* Wait for the LF */
-            break;
-#endif
-
-#if defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
           case '\n': /* LF terminates line */
             {
               if (vi->mode == MODE_INSERT)
@@ -5523,27 +5362,6 @@ static void vi_insert_mode(FAR struct vi_s *vi)
               vi->drawtoeos = true;
             }
             break;
-#endif
-
-#ifdef CONFIG_EOL_IS_EITHER_CRLF
-          case '\r': /* Either CR or LF terminates line */
-          case '\n':
-            {
-              if (vi->mode == MODE_INSERT)
-                {
-                  vi_insertch(vi, '\n');
-                }
-              else
-                {
-                  vi_replacech(vi, '\n');
-                }
-
-              vi_putch(vi, ' ');
-              vi_clrtoeol(vi);
-              vi->drawtoeos = true;
-            }
-            break;
-#endif
 
           case KEY_UP:         /* Move the cursor up one line */
             {
@@ -5807,15 +5625,15 @@ int main(int argc, FAR char *argv[])
 
       if (argv[optind][0] == '/')
         {
-          strncpy(vi->filename, argv[optind], MAX_STRING - 1);
+          strlcpy(vi->filename, argv[optind], MAX_STRING);
         }
       else
         {
           /* Make file relative to current working directory */
 
-          getcwd(vi->filename, MAX_STRING - 1);
-          strncat(vi->filename, "/", MAX_STRING - 1);
-          strncat(vi->filename, argv[optind], MAX_STRING - 1);
+          getcwd(vi->filename, MAX_STRING);
+          strlcat(vi->filename, "/", MAX_STRING);
+          strlcat(vi->filename, argv[optind], MAX_STRING);
         }
 
       /* Make sure the (possibly truncated) file name is NUL terminated */

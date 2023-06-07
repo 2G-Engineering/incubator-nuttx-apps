@@ -32,6 +32,8 @@
 #include <fcntl.h>
 #include <debug.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
+
 #include "wdt.h"
 #include "task_mn.h"
 
@@ -109,7 +111,8 @@ int wdt_init(void)
 {
   int fd;
   int ret;
-  strcpy(wdog.devname, CONFIG_EXAMPLES_WATCHER_DEVPATH);
+  strlcpy(wdog.devname, CONFIG_EXAMPLES_WATCHER_DEVPATH,
+          sizeof(wdog.devname));
 
   /* Open the watchdog device for reading */
 

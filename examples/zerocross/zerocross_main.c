@@ -25,11 +25,13 @@
 #include <nuttx/config.h>
 
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <debug.h>
+#include <unistd.h>
 
 #include <nuttx/sensors/zerocross.h>
 
@@ -48,16 +50,7 @@
 #endif
 
 #ifndef CONFIG_EXAMPLES_ZEROCROSS_SIGNO
-#  define CONFIG_EXAMPLES_ZEROCROSS_SIGNO 13
-#endif
-
-/* Helpers ******************************************************************/
-
-#ifndef MIN
-#  define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
-#ifndef MAX
-#  define MAX(a,b) ((a) > (b) ? (a) : (b))
+#  define CONFIG_EXAMPLES_ZEROCROSS_SIGNO 32
 #endif
 
 /****************************************************************************

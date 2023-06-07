@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "foc_debug.h"
 #include "foc_device.h"
@@ -49,7 +50,8 @@ int foc_device_init(FAR struct foc_device_s *dev, int id)
 
   /* Get FOC devpath */
 
-  sprintf(devpath, "%s%d", CONFIG_EXAMPLES_FOC_DEVPATH, id);
+  snprintf(devpath, sizeof(devpath), "%s%d",
+           CONFIG_EXAMPLES_FOC_DEVPATH, id);
 
   /* Open FOC device */
 

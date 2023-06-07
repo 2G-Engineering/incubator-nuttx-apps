@@ -25,6 +25,7 @@
 #include <nuttx/config.h>
 
 #include <nuttx/rptun/rptun.h>
+#include <nuttx/streams.h>
 #include <sys/boardctl.h>
 #include <sys/ioctl.h>
 #include <sys/utsname.h>
@@ -33,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -71,6 +73,10 @@
                         UNAME_MACHINE | UNAME_PLATFORM)
 #endif
 
+#ifndef CONFIG_NSH_PROC_MOUNTPOINT
+#  define CONFIG_NSH_PROC_MOUNTPOINT "/proc"
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -90,7 +96,7 @@ static const char g_unknown[] = "unknown";
 #if (defined(CONFIG_BOARDCTL_POWEROFF) || defined(CONFIG_BOARDCTL_RESET)) && \
     !defined(CONFIG_NSH_DISABLE_SHUTDOWN)
 
-int cmd_shutdown(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_shutdown(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
 #if defined(CONFIG_BOARDCTL_POWEROFF) && defined(CONFIG_BOARDCTL_RESET)
   /* If both shutdown and reset are supported, then a single option may
@@ -159,7 +165,7 @@ int cmd_shutdown(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #endif
 
   /* boardctl() will not return in any case.  It if does, it means that
-   * there was a problem with the shutdown/resaet operation.
+   * there was a problem with the shutdown/reset operation.
    */
 
   nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boardctl", NSH_ERRNO);
@@ -172,7 +178,31 @@ int cmd_shutdown(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #if defined(CONFIG_PM) && !defined(CONFIG_NSH_DISABLE_PMCONFIG)
-int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+static int cmd_pmconfig_recursive(FAR struct nsh_vtbl_s *vtbl,
+                                  FAR const char *dirpath,
+                                  FAR struct dirent *entryp,
+                                  FAR void *pvarg)
+{
+  FAR char *path;
+  int ret = ERROR;
+
+  if (DIRENT_ISDIRECTORY(entryp->d_type))
+    {
+      return 0;
+    }
+
+  path = nsh_getdirpath(vtbl, dirpath, entryp->d_name);
+  if (path)
+    {
+      nsh_output(vtbl, "\n%s:\n", path);
+      ret = nsh_catfile(vtbl, pvarg, path);
+      free(path);
+    }
+
+  return ret;
+}
+
+int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   struct boardioc_pm_ctrl_s ctrl =
   {
@@ -182,10 +212,6 @@ int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
     {
       int next_state;
       int last_state;
-      int normal_count;
-      int idle_count;
-      int standby_count;
-      int sleep_count;
 
       if (argc == 2)
         {
@@ -200,27 +226,12 @@ int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
       boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
       next_state = ctrl.state;
 
-      ctrl.action = BOARDIOC_PM_STAYCOUNT;
-      ctrl.state = PM_NORMAL;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      normal_count = ctrl.count;
+      nsh_output(vtbl, "Last state %d, Next state %d\n",
+                 last_state, next_state);
 
-      ctrl.state = PM_IDLE;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      idle_count = ctrl.count;
-
-      ctrl.state = PM_STANDBY;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      standby_count = ctrl.count;
-
-      ctrl.state = PM_SLEEP;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      sleep_count = ctrl.count;
-
-      nsh_output(vtbl, "Last state %d, Next state %d",
-                 "PM stay [%d, %d, %d, %d]\n",
-                 last_state, next_state, normal_count, idle_count,
-                 standby_count, sleep_count);
+      return nsh_foreach_direntry(vtbl, argv[0],
+                                  CONFIG_NSH_PROC_MOUNTPOINT "/pm",
+                                  cmd_pmconfig_recursive, argv[0]);
     }
   else if (argc <= 4)
     {
@@ -282,7 +293,7 @@ int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #if defined(CONFIG_BOARDCTL_POWEROFF) && !defined(CONFIG_NSH_DISABLE_POWEROFF)
-int cmd_poweroff(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_poweroff(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   /* Invoke the BOARDIOC_POWEROFF board control to shutdown the board.  If
    * the board_power_off function returns, then it was not possible to power-
@@ -308,11 +319,75 @@ int cmd_poweroff(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #endif
 
 /****************************************************************************
+ * Name: cmd_switchboot
+ ****************************************************************************/
+
+#if defined(CONFIG_BOARDCTL_SWITCH_BOOT) && !defined(CONFIG_NSH_DISABLE_SWITCHBOOT)
+int cmd_switchboot(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  if (argc != 2)
+    {
+      nsh_output(vtbl, g_fmtarginvalid, argv[0]);
+      return ERROR;
+    }
+
+  boardctl(BOARDIOC_SWITCH_BOOT, (uintptr_t)argv[1]);
+  return 0;
+}
+#endif
+
+/****************************************************************************
+ * Name: cmd_boot
+ ****************************************************************************/
+
+#if defined(CONFIG_BOARDCTL_BOOT_IMAGE) && !defined(CONFIG_NSH_DISABLE_BOOT)
+int cmd_boot(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  struct boardioc_boot_info_s info;
+
+  memset(&info, 0, sizeof(info));
+
+  /* Invoke the BOARDIOC_BOOT_IMAGE board control to reset the board.  If
+   * the board_boot_image() function returns, then it was not possible to
+   * boot the image due to some constraints.
+   */
+
+  switch (argc)
+    {
+      default:
+        info.header_size = strtoul(argv[2], NULL, 0);
+
+        /* Go through */
+
+      case 1:
+        info.path = argv[1];
+
+        /* Go through */
+
+      case 0:
+
+        /* Nothing to do */
+
+        break;
+    }
+
+  boardctl(BOARDIOC_BOOT_IMAGE, (uintptr_t)&info);
+
+  /* boardctl() will not return in this case.  It if does, it means that
+   * there was a problem with the boot operation.
+   */
+
+  nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boardctl", NSH_ERRNO);
+  return ERROR;
+}
+#endif
+
+/****************************************************************************
  * Name: cmd_reboot
  ****************************************************************************/
 
 #if defined(CONFIG_BOARDCTL_RESET) && !defined(CONFIG_NSH_DISABLE_REBOOT)
-int cmd_reboot(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_reboot(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   /* Invoke the BOARDIOC_RESET board control to reset the board.  If
    * the board_reset() function returns, then it was not possible to
@@ -338,20 +413,22 @@ int cmd_reboot(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #endif
 
 #if defined(CONFIG_BOARDCTL_RESET_CAUSE) && !defined(CONFIG_NSH_DISABLE_RESET_CAUSE)
-int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   int ret;
   struct boardioc_reset_cause_s cause;
 
   memset(&cause, 0, sizeof(cause));
-  ret = boardctl(BOARDIOC_RESET_CAUSE, &cause);
+  ret = boardctl(BOARDIOC_RESET_CAUSE, (uintptr_t)&cause);
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boardctl", NSH_ERRNO);
       return ERROR;
     }
 
-  nsh_output(vtbl, "cause:0x%x, flag:0x%" PRIx32 "\n",
+  nsh_output(vtbl, "cause:0x%x,flag:0x%" PRIx32 "\n",
              cause.cause, cause.flag);
   return OK;
 }
@@ -363,7 +440,7 @@ int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
 #if defined(CONFIG_RPTUN) && !defined(CONFIG_NSH_DISABLE_RPTUN)
 static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
-                          FAR const char *path, char **argv)
+                          FAR const char *path, FAR char **argv)
 {
   struct rptun_ping_s ping;
   unsigned long val = 0;
@@ -393,7 +470,8 @@ static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
     }
   else if (strcmp(argv[1], "ping") == 0)
     {
-      if (argv[3] == 0 || argv[4] == 0 || argv[5] == 0)
+      if (argv[3] == 0 || argv[4] == 0 ||
+          argv[5] == 0 || argv[6] == 0)
         {
           return ERROR;
         }
@@ -401,6 +479,7 @@ static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
       ping.times = atoi(argv[3]);
       ping.len   = atoi(argv[4]);
       ping.ack   = atoi(argv[5]);
+      ping.sleep = atoi(argv[6]);
 
       cmd = RPTUNIOC_PING;
       val = (unsigned long)&ping;
@@ -426,10 +505,11 @@ static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
 }
 
 static int cmd_rptun_recursive(FAR struct nsh_vtbl_s *vtbl,
-                               const char *dirpath,
-                               struct dirent *entryp, void *pvarg)
+                               FAR const char *dirpath,
+                               FAR struct dirent *entryp,
+                               FAR void *pvarg)
 {
-  char *path;
+  FAR char *path;
   int ret = ERROR;
 
   if (DIRENT_ISDIRECTORY(entryp->d_type))
@@ -447,7 +527,7 @@ static int cmd_rptun_recursive(FAR struct nsh_vtbl_s *vtbl,
   return ret;
 }
 
-int cmd_rptun(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_rptun(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   if (argc < 3)
     {
@@ -470,9 +550,10 @@ int cmd_rptun(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_UNAME
-int cmd_uname(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_uname(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR const char *str;
+  struct lib_memoutstream_s stream;
   struct utsname info;
   unsigned int set;
   int option;
@@ -564,6 +645,8 @@ int cmd_uname(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
   /* Process each option */
 
   first = true;
+  lib_memoutstream(&stream, alloca(sizeof(struct utsname)),
+                   sizeof(struct utsname));
   for (i = 0; set != 0; i++)
     {
       unsigned int mask = (1 << i);
@@ -608,15 +691,16 @@ int cmd_uname(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
           if (!first)
             {
-              nsh_output(vtbl, " ");
+              lib_stream_putc(&stream, ' ');
             }
 
-          nsh_output(vtbl, str);
+          lib_stream_puts(&stream, str, strlen(str));
           first = false;
         }
     }
 
-  nsh_output(vtbl, "\n");
+  lib_stream_putc(&stream, '\n');
+  nsh_write(vtbl, stream.buffer, stream.public.nput);
   return OK;
 }
 #endif

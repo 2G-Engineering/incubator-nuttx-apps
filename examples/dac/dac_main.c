@@ -58,8 +58,8 @@
 struct command
 {
   FAR const char *name;
-  CODE int (* const cmd)(int argc, const char *argv[]);
-  const char *args;
+  CODE int (* const cmd)(int argc, FAR const char *argv[]);
+  FAR const char *args;
 };
 
 struct dac_state_s
@@ -110,7 +110,7 @@ static void print_cmds(FAR const char *header,
                        size_t ncmds,
                        FAR const char *trailer)
 {
-  printf(header);
+  printf("%s", header);
   while (ncmds--)
     {
       printf("  %s %s %c", cmds->name, cmds->args,
@@ -118,7 +118,7 @@ static void print_cmds(FAR const char *header,
       cmds++;
     }
 
-  printf(trailer);
+  printf("%s", trailer);
 }
 
 static const struct command *find_cmd(FAR const char *name,

@@ -27,12 +27,17 @@
 
 #include <nuttx/config.h>
 
+#include <stdint.h>
 #include <pthread.h>
 #include <mqueue.h>
 
 #include <nuttx/motor/foc/foc.h>
 
 #include "foc_device.h"
+
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
+#  include "foc_nxscope.h"
+#endif
 
 /****************************************************************************
  * Public Type Definition
@@ -63,16 +68,23 @@ enum foc_foc_mode_e
 
 enum foc_motor_mode_e
 {
-  FOC_MMODE_INVALID = 0,     /* Reserved */
+  FOC_MMODE_INVALID    = 0,  /* Reserved */
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_TORQ
-  FOC_MMODE_TORQ    = 1,     /* Torque control */
+  FOC_MMODE_TORQ       = 1,  /* Torque control */
 #endif
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
-  FOC_MMODE_VEL     = 2,     /* Velocity control */
+  FOC_MMODE_VEL        = 2,  /* Velocity control */
 #endif
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_POS
-  FOC_MMODE_POS     = 3      /* Position control */
+  FOC_MMODE_POS        = 3,  /* Position control */
 #endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
+  FOC_MMODE_ALIGN_ONLY = 4,  /* Sensor alignment only */
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+  FOC_MMODE_IDENT_ONLY = 5,  /* Motor identification only */
+#endif
+  FOC_MMODE_IDLE       = 6,  /* IDLE state */
 };
 
 /* Controller state */
@@ -84,40 +96,28 @@ enum foc_controller_state_e
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
   FOC_CTRL_STATE_ALIGN,
 #endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+  FOC_CTRL_STATE_IDENT,
+#endif
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_RUN
   FOC_CTRL_STATE_RUN_INIT,
   FOC_CTRL_STATE_RUN,
 #endif
-  FOC_CTRL_STATE_IDLE
+  FOC_CTRL_STATE_IDLE,
+  FOC_CTRL_STATE_TERMINATE
 };
 
 /* FOC thread data */
 
 struct foc_ctrl_env_s
 {
-  mqd_t               mqd;      /* Control msg queue */
-  int                 id;       /* FOC device id */
-  int                 inst;     /* Type specific instance counter */
-  int                 type;     /* Controller type */
-  int                 fmode;    /* FOC control mode */
-  int                 mmode;    /* Motor control mode */
-#ifdef CONFIG_EXAMPLES_FOC_HAVE_OPENLOOP
-  int                 qparam;   /* Open-loop Q setting (x1000) */
-#endif
-
-#ifdef CONFIG_EXAMPLES_FOC_CONTROL_PI
-  uint32_t            foc_pi_kp; /* FOC PI Kp (x1000) */
-  uint32_t            foc_pi_ki; /* FOC PI Ki (x1000) */
-#endif
-
-#ifdef CONFIG_EXAMPLES_FOC_HAVE_TORQ
-  uint32_t            torqmax;  /* Torque max (x1000) */
-#endif
-#ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
-  uint32_t            velmax;   /* Velocity max (x1000) */
-#endif
-#ifdef CONFIG_EXAMPLES_FOC_HAVE_POS
-  uint32_t            posmax;   /* Position max (x1000) */
+  mqd_t                     mqd;   /* Control msg queue */
+  int                       id;    /* FOC device id */
+  int                       inst;  /* Type specific instance counter */
+  int                       type;  /* Controller type */
+  FAR struct foc_thr_cfg_s *cfg;   /* Control thread configuration */
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
+  FAR struct foc_nxscope_s *nxs;   /* nxscope handler */
 #endif
 };
 
@@ -132,6 +132,8 @@ struct foc_ctrl_env_s
 int foc_threads_init(void);
 void foc_threads_deinit(void);
 bool foc_threads_terminated(void);
+uint32_t foc_threads_get(void);
+int foc_thread_type(int id);
 int foc_ctrlthr_init(FAR struct foc_ctrl_env_s *foc, int i, FAR mqd_t *mqd,
                      FAR pthread_t *thread);
 

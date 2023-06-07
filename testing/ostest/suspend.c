@@ -22,14 +22,19 @@
  * Included Files
  ****************************************************************************/
 
-#include <sys/types.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <nuttx/config.h>
+
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <sched.h>
 #include <semaphore.h>
 #include <signal.h>
-#include <sched.h>
-#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "ostest.h"
 
 /****************************************************************************
@@ -63,6 +68,7 @@ void suspend_test(void)
   if (ret < 0)
     {
       printf("suspend_test: ERROR sched_getparam() failed\n");
+      ASSERT(false);
       param.sched_priority = PTHREAD_DEFAULT_PRIORITY;
     }
 
@@ -71,6 +77,7 @@ void suspend_test(void)
   if (victim == ERROR)
     {
       printf("suspend_test: ERROR failed to start victim_main\n");
+      ASSERT(false);
     }
   else
     {
@@ -90,6 +97,7 @@ void suspend_test(void)
   if (ret < 0)
     {
       printf("suspend_test: ERROR kill() failed\n");
+      ASSERT(false);
     }
 
   printf("suspend_test:  Is the victim still jabbering?\n");
@@ -101,6 +109,7 @@ void suspend_test(void)
   if (ret < 0)
     {
       printf("suspend_test: ERROR kill() failed\n");
+      ASSERT(false);
     }
 
   printf("suspend_test:  The victim should continue the rant.\n");
@@ -112,6 +121,7 @@ void suspend_test(void)
   if (ret < 0)
     {
       printf("suspend_test: ERROR kill() failed\n");
+      ASSERT(false);
     }
 
   FFLUSH();
@@ -120,6 +130,7 @@ void suspend_test(void)
   if (ret >= 0)
     {
       printf("suspend_test: ERROR kill() on the dead victim succeeded!\n");
+      ASSERT(false);
     }
 
   printf("suspend_test: done\n");

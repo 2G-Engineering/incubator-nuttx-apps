@@ -32,6 +32,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <nuttx/timers/oneshot.h>
 
@@ -48,7 +49,7 @@
 #endif
 
 #ifndef CONFIG_EXAMPLES_ONESHOT_SIGNO
-#  define CONFIG_EXAMPLES_ONESHOT_SIGNO 13
+#  define CONFIG_EXAMPLES_ONESHOT_SIGNO 32
 #endif
 
 /* For long delays that have to be broken into segments, some loss of

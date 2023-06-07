@@ -128,7 +128,7 @@ config EXAMPLES_FOC_QENCO_DEVPATH
 	default "/dev/qe"
 	---help---
 		The default path to the qenco device without the device minor number.
-		Default: /dev/qenco
+		Default: /dev/qe
 
 endif # EXAMPLES_FOC_HAVE_QENCO
 
@@ -225,6 +225,7 @@ config EXAMPLES_FOC_SETPOINT_CONST
 
 config EXAMPLES_FOC_SETPOINT_ADC
 	bool "Use ADC to control setpoint"
+	depends on ADC
 	select EXAMPLES_FOC_HAVE_ADC
 	select EXAMPLES_FOC_HAVE_SETPOINT_VAR
 
@@ -314,11 +315,13 @@ config EXAMPLES_FOC_FMODE
 config EXAMPLES_FOC_MMODE
 	int "Motor control mode"
 	default 2
-	range 1 3
+	range 1 5
 	---help---
 		1 - torque control
 		2 - velocity control
 		3 - position control
+		4 - align only
+		5 - ident only
 
 config EXAMPLES_FOC_OPENLOOP_Q
 	int "FOC open-loop Vq/Iq setting [x1000]"
@@ -374,6 +377,39 @@ config EXAMPLES_FOC_ALIGN_SEC
 
 endif # EXAMPLES_FOC_HAVE_ALIGN
 
+config EXAMPLES_FOC_HAVE_IDENT
+	bool "FOC example motor identification support"
+	select INDUSTRY_FOC_IDENT
+	default n
+
+if EXAMPLES_FOC_HAVE_IDENT
+
+config EXAMPLES_FOC_IDENT_RES_CURRENT
+	int "FOC motor ident resistance current (x1000)"
+	default 0
+
+config EXAMPLES_FOC_IDENT_RES_KI
+	int "FOC motor ident resistance Ki (x1000)"
+	default 50
+
+config EXAMPLES_FOC_IDENT_IND_VOLTAGE
+	int "FOC motor ident inductance voltage (x1000)"
+	default 0
+
+config EXAMPLES_FOC_IDENT_RES_SEC
+	int "FOC motor ident resistance time in sec (x1000)"
+	default 0
+
+config EXAMPLES_FOC_IDENT_IND_SEC
+	int "FOC motor ident inductance time in sec (x1000)"
+	default 0
+
+config EXAMPLES_FOC_IDENT_IDLE
+	int "FOC motor ident idle steps"
+	default 100
+
+endif # EXAMPLES_FOC_HAVE_IDENT
+
 endmenu # FOC controller parameters
 
 config EXAMPLES_FOC_HAVE_RUN
@@ -385,5 +421,92 @@ config EXAMPLES_FOC_RUN_DISABLE
 	bool "FOC Disable FOC motor controller"
 	default n
 
+config EXAMPLES_FOC_NXSCOPE
+	bool "FOC nxscope support"
+	depends on LOGGING_NXSCOPE
+	select LOGGING_NXSCOPE_DISABLE_PUTLOCK
+	default n
+	---help---
+		This option enables a controller real-time data capture with
+		the NxScope library.
+
+if EXAMPLES_FOC_NXSCOPE
+
+config EXAMPLES_FOC_NXSCOPE_SERIAL
+	bool "FOC nxscope on serial port"
+	select LOGGING_NXSCOPE_INTF_SERIAL
+	default y
+
+if EXAMPLES_FOC_NXSCOPE_SERIAL
+
+config EXAMPLES_FOC_NXSCOPE_SERIAL_PATH
+	string "FOC nxscope serial path"
+	default "/dev/ttyS0"
+
+config EXAMPLES_FOC_NXSCOPE_SERIAL_BAUD
+	int "FOC nxscope serial baud"
+	default 115200
+
+endif # EXAMPLES_FOC_NXSCOPE_SERIAL
+
+config EXAMPLES_FOC_NXSCOPE_STREAMBUF_LEN
+	int "FOC nxscope stream buffer length"
+	default 512
+
+config EXAMPLES_FOC_NXSCOPE_RXBUF_LEN
+	int "FOC nxscope RX buffer length"
+	default 64
+
+config EXAMPLES_FOC_NXSCOPE_RXPADDING
+	int "FOC nxscope RX padding"
+	default 0
+
+config EXAMPLES_FOC_NXSCOPE_CHANNELS
+	int "FOC nxscope channels"
+	default 0
+
+config EXAMPLES_FOC_NXSCOPE_PRESCALER
+	int "FOC nxscope prescaler"
+	default 1
+	---help---
+		This option allows you to reduce the frequency of adding samples to
+		the NxScope buffer.
+
+config EXAMPLES_FOC_NXSCOPE_CFG
+	hex "FOC nxscope configuration"
+	default 0x00000000
+	---help---
+		Each bit defines the controller state variable that can be captured.
+		Look at foc_nxscope.h for bits definitions.
+
+config EXAMPLES_FOC_NXSCOPE_START
+	bool "FOC nxscope start frame sync"
+	default n
+	---help---
+		If this option is set, the controller will be waiting for the start
+		frame from a NxScope master device. This allows us to capture
+		controller data from the very beginning of its operation.
+
+config EXAMPLES_FOC_NXSCOPE_THREAD
+	bool "FOC nxscope uses separate thread"
+	default n
+	---help---
+		Use a separate thread for NxScope communication.
+
+if EXAMPLES_FOC_NXSCOPE_THREAD
+
+config EXAMPLES_FOC_NXSCOPE_PRIO
+	int "FOC nxscope thread priority"
+	default 100
+
+config EXAMPLES_FOC_NXSCOPE_STACKSIZE
+	int "FOC nxscope thread stack size"
+	default 2048
+
+endif # EXAMPLES_FOC_NXSCOPE_THREAD
+
+endif # EXAMPLES_FOC_NXSCOPE
+
 endif # EXAMPLES_FOC
+
 

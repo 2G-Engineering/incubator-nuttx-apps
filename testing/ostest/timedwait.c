@@ -22,11 +22,13 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
+#include <errno.h>
+#include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <time.h>
-#include <pthread.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "ostest.h"
 
@@ -58,6 +60,7 @@ static void *thread_waiter(void *parameter)
     {
       printf("thread_waiter: ERROR pthread_mutex_lock failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   printf("thread_waiter: Starting 5 second wait for condition\n");
@@ -66,6 +69,7 @@ static void *thread_waiter(void *parameter)
   if (status != 0)
     {
       printf("thread_waiter: ERROR clock_gettime failed\n");
+      ASSERT(false);
     }
 
   ts.tv_sec += 5;
@@ -83,6 +87,7 @@ static void *thread_waiter(void *parameter)
         {
           printf("thread_waiter: "
                  "ERROR pthread_cond_timedwait failed, status=%d\n", status);
+          ASSERT(false);
         }
     }
   else
@@ -90,6 +95,7 @@ static void *thread_waiter(void *parameter)
       printf("thread_waiter: ERROR "
              "pthread_cond_timedwait returned without timeout, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   /* Release the mutex */
@@ -100,6 +106,7 @@ static void *thread_waiter(void *parameter)
     {
       printf("thread_waiter: ERROR pthread_mutex_unlock failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   printf("thread_waiter: Exit with status 0x12345678\n");
@@ -128,6 +135,7 @@ void timedwait_test(void)
     {
       printf("timedwait_test: ERROR pthread_mutex_init failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   /* Initialize the condition variable */
@@ -138,6 +146,7 @@ void timedwait_test(void)
     {
       printf("timedwait_test: ERROR pthread_condinit failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   /* Start the waiter thread at higher priority */
@@ -151,7 +160,7 @@ void timedwait_test(void)
     }
 
   prio_max = sched_get_priority_max(SCHED_FIFO);
-  status = sched_getparam (getpid(), &sparam);
+  status = sched_getparam (gettid(), &sparam);
   if (status != 0)
     {
       printf("timedwait_test: sched_getparam failed\n");
@@ -185,6 +194,7 @@ void timedwait_test(void)
     {
       printf("timedwait_test: ERROR pthread_join failed, status=%d\n",
               status);
+      ASSERT(false);
     }
   else
     {

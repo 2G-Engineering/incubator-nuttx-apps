@@ -24,11 +24,12 @@
 
 #include <nuttx/config.h>
 
+#include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "ostest.h"
 
@@ -61,7 +62,8 @@ int vfork_test(void)
     }
   else if (pid < 0)
     {
-      printf("vfork_test: vfork() failed: %d\n", errno);
+      printf("vfork_test: ERROR vfork() failed: %d\n", errno);
+      ASSERT(false);
       return -1;
     }
   else
@@ -74,6 +76,7 @@ int vfork_test(void)
       else
         {
           printf("vfork_test: ERROR Child %d did not run\n", pid);
+          ASSERT(false);
           return -1;
         }
     }

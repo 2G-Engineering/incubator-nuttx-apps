@@ -1,4 +1,4 @@
-/************************************************************************************
+/****************************************************************************
  * apps/system/termcurses/tcurses_vt100.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -16,11 +16,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  *
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Included Files
- ************************************************************************************/
+ ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -36,6 +36,7 @@
 #include <debug.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
 
 #include "tcurses_priv.h"
 #include "graphics/curses.h"
@@ -43,9 +44,9 @@
 #include <sys/ioctl.h>
 #include <nuttx/kmalloc.h>
 
-/************************************************************************************
+/****************************************************************************
  * Pre-processor Definitions
- ************************************************************************************/
+ ****************************************************************************/
 
 #define KEY_DOWN        0x102  /* Down arrow key */
 #define KEY_UP          0x103  /* Up arrow key */
@@ -60,9 +61,9 @@
 #define TINFO_ENTRY(n, d, c)  d, c
 #endif
 
-/************************************************************************************
+/****************************************************************************
  * Private Types
- ************************************************************************************/
+ ****************************************************************************/
 
 struct tcurses_vt100_s
 {
@@ -74,16 +75,18 @@ struct tcurses_vt100_s
   int    out_fd;
   int    keycount;
   char   keybuf[16];
+  tcflag_t lflag;
 };
 
-/************************************************************************************
+/****************************************************************************
  * Private Function Prototypes
- ************************************************************************************/
+ ****************************************************************************/
 
-static FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd);
+static FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd,
+                                                         int out_fd);
 static int tcurses_vt100_clear(FAR struct termcurses_s *dev, int type);
-static int tcurses_vt100_move(FAR struct termcurses_s *dev, int type, int col,
-              int row);
+static int tcurses_vt100_move(FAR struct termcurses_s *dev, int type,
+                              int col, int row);
 static int tcurses_vt100_getwinsize(FAR struct termcurses_s *dev,
               FAR struct winsize *winsz);
 static int tcurses_vt100_setcolors(FAR struct termcurses_s *dev,
@@ -95,9 +98,9 @@ static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
 static bool tcurses_vt100_checkkey(FAR struct termcurses_s *dev);
 static int tcurses_vt100_terminate(FAR struct termcurses_s *dev);
 
-/************************************************************************************
+/****************************************************************************
  * Private Data
- ************************************************************************************/
+ ****************************************************************************/
 
 static const struct termcurses_ops_s g_vt100_ops =
 {
@@ -711,9 +714,9 @@ static const struct keycodes_s g_ctrl_keycodes[] =
 };
 #endif /* CONFIG_SYSTEM_TERMCURSES_VT100_OSX_ALT_CODES */
 
-/************************************************************************************
+/****************************************************************************
  * Public Data
- ************************************************************************************/
+ ****************************************************************************/
 
 struct termcurses_dev_s g_vt100_tcurs =
 {
@@ -722,13 +725,13 @@ struct termcurses_dev_s g_vt100_tcurs =
   "vt100, vt102, ansi"           /* List of supported terminals */
 };
 
-/************************************************************************************
+/****************************************************************************
  * Private Functions
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Clear screen / line operations
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_clear(FAR struct termcurses_s *dev, int type)
 {
@@ -736,7 +739,7 @@ static int tcurses_vt100_clear(FAR struct termcurses_s *dev, int type)
   int ret = -ENOSYS;
   int fd;
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd = priv->out_fd;
 
   /* Perform operation based on type */
@@ -772,9 +775,9 @@ static int tcurses_vt100_clear(FAR struct termcurses_s *dev, int type)
   return ret;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Move cursor operations
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_move(FAR struct termcurses_s *dev, int type,
                               int col, int row)
@@ -810,9 +813,9 @@ static int tcurses_vt100_move(FAR struct termcurses_s *dev, int type,
   return ret;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Calculates an ANSI 256 color index based on the 24-bit RGB value given.
- ************************************************************************************/
+ ****************************************************************************/
 
 static uint8_t tcurses_vt100_getcolorindex(int red, int green, int blue)
 {
@@ -896,9 +899,9 @@ static uint8_t tcurses_vt100_getcolorindex(int red, int green, int blue)
   return 16 + r * 36 + g * 6 + b;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Set fg / bg colors
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_setcolors(FAR struct termcurses_s *dev,
                                    FAR struct termcurses_colors_s *colors)
@@ -908,16 +911,16 @@ static int tcurses_vt100_setcolors(FAR struct termcurses_s *dev,
   int  fd;
   char str[48];
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->out_fd;
 
   /* Test if FG color to be set */
 
   if ((colors->color_mask & TCURS_COLOR_FG) != 0)
     {
-      sprintf(str, g_setfgcolor,
-              tcurses_vt100_getcolorindex(colors->fg_red, colors->fg_green,
-                                          colors->fg_blue));
+      snprintf(str, sizeof(str), g_setfgcolor,
+               tcurses_vt100_getcolorindex(colors->fg_red, colors->fg_green,
+                                           colors->fg_blue));
       ret = write(fd, str, strlen(str));
     }
 
@@ -925,14 +928,15 @@ static int tcurses_vt100_setcolors(FAR struct termcurses_s *dev,
 
   if ((colors->color_mask & TCURS_COLOR_BG) != 0)
     {
-      if (colors->bg_red != 0 || colors->bg_green != 0 || colors->bg_blue != 0)
+      if (colors->bg_red != 0 || colors->bg_green != 0 ||
+          colors->bg_blue != 0)
         {
           colors->bg_red = 0;
         }
 
-      sprintf(str, g_setbgcolor,
-              tcurses_vt100_getcolorindex(colors->bg_red, colors->bg_green,
-                                          colors->bg_blue));
+      snprintf(str, sizeof(str), g_setbgcolor,
+               tcurses_vt100_getcolorindex(colors->bg_red, colors->bg_green,
+                                           colors->bg_blue));
       ret = write(fd, str, strlen(str));
     }
 
@@ -946,9 +950,9 @@ static int tcurses_vt100_setcolors(FAR struct termcurses_s *dev,
   return ret;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Get windows size from terminal emulator connected to serial port
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_getwinsize(FAR struct termcurses_s *dev,
                                     FAR struct winsize *winsz)
@@ -961,7 +965,7 @@ static int tcurses_vt100_getwinsize(FAR struct termcurses_s *dev,
   int  delay;
   int  len;
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->out_fd;
 
   /* First try the TIOCGWINSZ ioctl */
@@ -1043,9 +1047,9 @@ static int tcurses_vt100_getwinsize(FAR struct termcurses_s *dev,
   return -ENOSYS;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Set display attributes
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_setattributes(FAR struct termcurses_s *dev,
                                        unsigned long attrib)
@@ -1055,7 +1059,7 @@ static int tcurses_vt100_setattributes(FAR struct termcurses_s *dev,
   int fd;
   char str[48];
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->out_fd;
 
   /* Test for cursor hide */
@@ -1080,32 +1084,32 @@ static int tcurses_vt100_setattributes(FAR struct termcurses_s *dev,
 
   if (attrib & TCURS_ATTRIB_BOLD)
     {
-      strcpy(str, g_setbold);
+      strlcpy(str, g_setbold, sizeof(str));
     }
   else
     {
-      strcpy(str, g_setnobold);
+      strlcpy(str, g_setnobold, sizeof(str));
     }
 
   if (attrib & TCURS_ATTRIB_BLINK)
     {
-      strcat(str, g_setblink);
+      strlcat(str, g_setblink, sizeof(str));
     }
   else
     {
-      strcat(str, g_setnoblink);
+      strlcat(str, g_setnoblink, sizeof(str));
     }
 
   if (attrib & TCURS_ATTRIB_UNDERLINE)
     {
-      strcat(str, g_setunderline);
+      strlcat(str, g_setunderline, sizeof(str));
     }
   else
     {
-      strcat(str, g_setnounderline);
+      strlcat(str, g_setnounderline, sizeof(str));
     }
 
-  strcat(str, "m");
+  strlcat(str, "m", sizeof(str));
 
   ret = write(fd, str, strlen(str));
 
@@ -1116,33 +1120,33 @@ static int tcurses_vt100_setattributes(FAR struct termcurses_s *dev,
   return ret;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Get keycode from the terminal, translating special escape sequences into
  * special key values.
  *
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
                                     FAR int *specialkey,
                                     FAR int *keymodifiers)
 {
   FAR struct tcurses_vt100_s  *priv;
-  const struct keycodes_s     *pkeycodes;
-  int                         ret;
-  int                         fd;
-  bool                        esc_seq = false;
-  bool                        ctrl_seq = false;
-  bool                        ismodifier;
-  int                         keycode;
-  int                         k;
-  int                         x;
-  int                         start;
-  fd_set                      rfds;
-  struct                      timeval tv;
-  char                        ch;
-  char                        buildkey[16];
-  int                         keybuildcount;
-  static const char modtable[7] =
+  FAR const struct keycodes_s *pkeycodes;
+  int                          ret;
+  int                          fd;
+  bool                         esc_seq = false;
+  bool                         ctrl_seq = false;
+  bool                         ismodifier;
+  int                          keycode;
+  int                          k;
+  int                          x;
+  int                          start;
+  fd_set                       rfds;
+  struct timeval               tv;
+  char                         ch;
+  char                         buildkey[16];
+  int                          keybuildcount;
+  static const char            modtable[7] =
   {
     PDC_KEY_MODIFIER_SHIFT,
     PDC_KEY_MODIFIER_ALT,
@@ -1153,7 +1157,7 @@ static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
     PDC_KEY_MODIFIER_ALT | PDC_KEY_MODIFIER_CONTROL | PDC_KEY_MODIFIER_SHIFT
   };
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->in_fd;
 
   /* Watch stdin (fd 0) to see when it has input. */
@@ -1166,7 +1170,9 @@ static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
   tv.tv_sec     = 0;
   tv.tv_usec    = 1000;
 
-  /* Loop until we have a valid key code, taking escape sequences into account */
+  /* Loop until we have a valid key code, taking escape sequences
+   * into account
+   */
 
   keycode       = -1;
   *keymodifiers = 0;
@@ -1235,7 +1241,7 @@ static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
                   continue;
                 }
 
-              /* No more characters waiting in the queue.  Must be ESC key.  */
+              /* No more characters waiting in the queue.  Must be ESC key. */
 
               return '\x1b';
             }
@@ -1407,20 +1413,20 @@ static int tcurses_vt100_getkeycode(FAR struct termcurses_s *dev,
   return keycode;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Check if a key is cached for processing.
  *
- ************************************************************************************/
+ ****************************************************************************/
 
 static bool tcurses_vt100_checkkey(FAR struct termcurses_s *dev)
 {
-  FAR struct tcurses_vt100_s  *priv;
+  FAR struct tcurses_vt100_s *priv;
   int                         ret;
   int                         fd;
   fd_set                      rfds;
   struct                      timeval tv;
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->in_fd;
 
   /* Test for queued characters */
@@ -1449,26 +1455,29 @@ static bool tcurses_vt100_checkkey(FAR struct termcurses_s *dev)
   return false;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Public Functions
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Name: tcurses_vt100_initialize
  *
  * Description:
- *   Initialize a specific instance of the VT100 TermCurses handler and bind it to
- *   a specific file descriptor pair (input/output ... typically stdin / stdout).
+ *   Initialize a specific instance of the VT100 TermCurses handler and
+ *   bind it to a specific file descriptor pair
+ *   (input/output ... typically stdin / stdout).
  *
- ************************************************************************************/
+ ****************************************************************************/
 
 FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
 {
   FAR struct tcurses_vt100_s *priv;
+  struct termios cfg;
 
   /* Allocate a new device structure */
 
-  priv = (FAR struct tcurses_vt100_s *)zalloc(sizeof(struct tcurses_vt100_s));
+  priv =
+    (FAR struct tcurses_vt100_s *)zalloc(sizeof(struct tcurses_vt100_s));
   if (priv == NULL)
     {
       return NULL;
@@ -1483,23 +1492,50 @@ FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
   priv->out_fd   = out_fd;
   priv->keycount = 0;
 
-  return (FAR struct termcurses_s *) priv;
+      if (isatty(priv->in_fd))
+        {
+          if (tcgetattr(priv->in_fd, &cfg) == 0)
+            {
+              /* Save current iflags */
+
+              priv->lflag = cfg.c_lflag;
+
+              /* If ECHO enabled, disable it */
+
+              if (cfg.c_lflag & ECHO)
+                {
+                  cfg.c_lflag &= ~ECHO;
+                  tcsetattr(priv->in_fd, TCSANOW, &cfg);
+                }
+            }
+          else
+            {
+              /* Get attr failed, mark ECHO bit zero to skip set attr in
+               * tcurses_vt100_terminate
+               */
+
+              priv->lflag = 0;
+            }
+        }
+
+  return (FAR struct termcurses_s *)priv;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Name: tcurses_vt100_terminate
  *
  * Description:
  *   Terminates a specific instance of the VT100 TermCurses handler.
  *
- ************************************************************************************/
+ ****************************************************************************/
 
 static int tcurses_vt100_terminate(FAR struct termcurses_s *dev)
 {
   FAR struct tcurses_vt100_s *priv;
+  struct termios cfg;
   int  fd;
 
-  priv = (FAR struct tcurses_vt100_s *) dev;
+  priv = (FAR struct tcurses_vt100_s *)dev;
   fd   = priv->out_fd;
 
   /* Set default foreground and background colors.
@@ -1507,6 +1543,15 @@ static int tcurses_vt100_terminate(FAR struct termcurses_s *dev)
    */
 
   write(fd, g_setdefcolors, strlen(g_setdefcolors));
+
+      if (isatty(priv->in_fd))
+        {
+          if (tcgetattr(priv->in_fd, &cfg) == 0 && priv->lflag & ECHO)
+            {
+              cfg.c_lflag |= ECHO;
+              tcsetattr(priv->in_fd, TCSANOW, &cfg);
+            }
+        }
 
   return OK;
 }

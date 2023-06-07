@@ -22,9 +22,10 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #include "ostest.h"
 
@@ -78,6 +79,7 @@ static void *barrier_func(void *parameter)
     {
       printf("barrier_func: ERROR thread %d could not get semaphore value\n",
              id);
+      ASSERT(false);
     }
 
   FFLUSH();
@@ -142,6 +144,7 @@ void barrier_test(void)
           printf("barrier_test: ERROR thread %d create, status=%d\n",
                  i, status);
           printf("barrier_test: Test aborted with waiting threads\n");
+          ASSERT(false);
           goto abort_test;
         }
       else
@@ -161,6 +164,7 @@ void barrier_test(void)
         {
           printf("barrier_test: ERROR thread %d join, status=%d\n",
                  i, status);
+          ASSERT(false);
         }
       else
         {

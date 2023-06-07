@@ -25,15 +25,16 @@
 #include <nuttx/config.h>
 
 #include <sys/wait.h>
+#include <assert.h>
+#include <errno.h>
+#include <malloc.h>
+#include <sched.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#include <unistd.h>
-#include <signal.h>
 #include <string.h>
-#include <sched.h>
-#include <errno.h>
+#include <unistd.h>
 
 #ifdef CONFIG_TESTING_OSTEST_POWEROFF
 #include <sys/boardctl.h>
@@ -166,6 +167,7 @@ static void show_variable(const char *var_name, const char *exptd_value,
               printf("show_variable: ERROR Variable=%s has the wrong "
                      "value\n",
                      var_name);
+              ASSERT(false);
               printf("show_variable:       found=%s expected=%s\n",
                      actual_value, exptd_value);
             }
@@ -175,6 +177,7 @@ static void show_variable(const char *var_name, const char *exptd_value,
           printf("show_variable: ERROR Variable=%s has a value when it "
                  "should not\n",
                  var_name);
+          ASSERT(false);
           printf("show_variable:       value=%s\n",
                  actual_value);
         }
@@ -183,6 +186,7 @@ static void show_variable(const char *var_name, const char *exptd_value,
     {
       printf("show_variable: ERROR Variable=%s has no value\n",
              var_name);
+      ASSERT(false);
       printf("show_variable:       Should have had value=%s\n",
              exptd_value);
     }
@@ -200,7 +204,7 @@ static void show_environment(bool var1_valid, bool var2_valid,
   show_variable(g_var3_name, g_var3_value, var3_valid);
 }
 #else
-# define show_environment()
+#  define show_environment()
 #endif
 
 /****************************************************************************
@@ -227,6 +231,7 @@ static int user_main(int argc, char *argv[])
     {
       printf("user_main: ERROR expected argc=%d got argc=%d\n",
              NARGS + 1, argc);
+      ASSERT(false);
     }
 
   for (i = 0; i <= NARGS; i++)
@@ -241,6 +246,7 @@ static int user_main(int argc, char *argv[])
           printf("user_main: ERROR argv[%d]:  "
                  "Expected \"%s\" found \"%s\"\n",
                  i, g_argv[i - 1], argv[i]);
+          ASSERT(false);
         }
     }
 
@@ -275,6 +281,7 @@ static int user_main(int argc, char *argv[])
       if (ret < 0)
         {
           printf("user_main: ERROR: sigaction failed: %d\n", errno);
+          ASSERT(false);
         }
     }
 #endif
@@ -349,6 +356,15 @@ static int user_main(int argc, char *argv[])
 
       printf("\nuser_main: waitpid test\n");
       waitpid_test();
+      check_test_memory_usage();
+#endif
+
+#if !defined(CONFIG_DISABLE_PTHREAD) && \
+    (defined(CONFIG_SCHED_LPWORK) || defined(CONFIG_SCHED_HPWORK))
+      /* Check work queues */
+
+      printf("\nuser_main: wqueue test\n");
+      wqueue_test();
       check_test_memory_usage();
 #endif
 
@@ -634,9 +650,9 @@ int main(int argc, FAR char **argv)
   printf("ostest_main: setenv(%s, %s, TRUE)\n", g_var2_name, g_var2_value);
   setenv(g_var2_name, g_var2_value, TRUE);  /* Variable2=GoodValue2 */
 
-  printf("ostest_main: setenv(%s, %s, FALSE)\n", g_var3_name, g_var3_name);
+  printf("ostest_main: setenv(%s, %s, FALSE)\n", g_var3_name, g_var3_value);
   setenv(g_var3_name, g_var3_value, FALSE); /* Variable3=GoodValue3 */
-  printf("ostest_main: setenv(%s, %s, FALSE)\n", g_var3_name, g_var3_name);
+  printf("ostest_main: setenv(%s, %s, FALSE)\n", g_var3_name, g_bad_value2);
   setenv(g_var3_name, g_bad_value2, FALSE); /* Variable3=GoodValue3 */
   show_environment(true, true, true);
 #endif
@@ -648,6 +664,7 @@ int main(int argc, FAR char **argv)
   if (result == ERROR)
     {
       printf("ostest_main: ERROR Failed to start user_main\n");
+      ASSERT(false);
       ostest_result = ERROR;
     }
   else
@@ -661,6 +678,7 @@ int main(int argc, FAR char **argv)
         {
           printf("ostest_main: ERROR Failed to wait for user_main to "
                  "terminate\n");
+          ASSERT(false);
           ostest_result = ERROR;
         }
 #endif

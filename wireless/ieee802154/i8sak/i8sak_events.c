@@ -76,7 +76,7 @@ static pthread_addr_t i8sak_eventthread(pthread_addr_t arg)
   else if (i8sak->mode == I8SAK_MODE_NETIF)
     {
       netarg.u.enable = true;
-      strncpy(netarg.ifr_name, i8sak->ifname, IFNAMSIZ);
+      strlcpy(netarg.ifr_name, i8sak->ifname, IFNAMSIZ);
       ioctl(i8sak->fd, MAC802154IOC_ENABLE_EVENTS,
                   (unsigned long)((uintptr_t)&netarg));
     }
@@ -186,7 +186,7 @@ static pthread_addr_t i8sak_eventthread(pthread_addr_t arg)
   else if (i8sak->mode == I8SAK_MODE_NETIF)
     {
       netarg.u.enable = false;
-      strncpy(netarg.ifr_name, i8sak->ifname, IFNAMSIZ);
+      strlcpy(netarg.ifr_name, i8sak->ifname, IFNAMSIZ);
       ioctl(i8sak->fd, MAC802154IOC_ENABLE_EVENTS,
                   (unsigned long)((uintptr_t)&netarg));
     }
@@ -222,8 +222,7 @@ int i8sak_eventlistener_start(FAR struct i8sak_s *i8sak)
   i8sak->eventlistener_run = true;
 
   ret = pthread_create(&i8sak->eventlistener_threadid,
-                       NULL, i8sak_eventthread,
-                       (void *)i8sak);
+                       NULL, i8sak_eventthread, i8sak);
   if (ret != 0)
     {
       fprintf(stderr, "failed to start event thread: %d\n", ret);

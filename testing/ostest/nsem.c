@@ -22,12 +22,13 @@
  * Included Files
  ****************************************************************************/
 
-#include <stdio.h>
+#include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <sched.h>
-#include <errno.h>
+#include <semaphore.h>
+#include <stdio.h>
 
 #include "ostest.h"
 
@@ -63,6 +64,7 @@ static FAR void *nsem_peer(void *parameter)
     {
       int errcode = errno;
       printf("nsem_peer: ERROR: sem_open(1) failed: %d\n", errcode);
+      ASSERT(false);
       return NULL;
     }
 
@@ -74,6 +76,7 @@ static FAR void *nsem_peer(void *parameter)
     {
       int errcode = errno;
       printf("nsem_peer: ERROR: sem_open(2) failed: %d\n", errcode);
+      ASSERT(false);
       return NULL;
     }
 
@@ -119,6 +122,7 @@ void nsem_test(void)
     {
       int errcode = errno;
       printf("nsem_peer: ERROR: sem_open(1) failed: %d\n", errcode);
+      ASSERT(false);
       return;
     }
 
@@ -142,6 +146,7 @@ void nsem_test(void)
       printf("nsem_test: "
              "ERROR: pthread_attr_setschedparam failed, status=%d\n",
               status);
+      ASSERT(false);
     }
   else
     {
@@ -152,6 +157,7 @@ void nsem_test(void)
   if (status != 0)
     {
       printf("nsem_test: ERROR: Peer thread creation failed: %d\n",  status);
+      ASSERT(false);
       return;
     }
 
@@ -163,6 +169,7 @@ void nsem_test(void)
     {
       int errcode = errno;
       printf("nsem_test: ERROR: sem_wait(1) failed: %d\n",  errcode);
+      ASSERT(false);
       pthread_cancel(peer);
       return;
     }
@@ -182,6 +189,7 @@ void nsem_test(void)
     {
       int errcode = errno;
       printf("nsem_test: ERROR: sem_open(2) failed: %d\n", errcode);
+      ASSERT(false);
       pthread_cancel(peer);
       return;
     }
@@ -194,6 +202,7 @@ void nsem_test(void)
     {
       int errcode = errno;
       printf("nsem_test: ERROR: sem_wait(1) failed: %d\n",  errcode);
+      ASSERT(false);
       pthread_cancel(peer);
       return;
     }

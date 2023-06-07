@@ -107,13 +107,13 @@ static void ppp_reject_protocol(FAR struct ppp_context_s *ctx,
       *--dptr = *--sptr;
     }
 
-  pkt = (LCPPKT *) buffer;
+  pkt = (LCPPKT *)buffer;
   pkt->code = PROT_REJ;         /* Write Conf_rej */
 
   /* pkt->id = tid++;  write tid */
 
   pkt->len = htons(count + 6);
-  *((FAR uint16_t *) (&pkt->data[0])) = htons(protocol);
+  *((FAR uint16_t *)(&pkt->data[0])) = htons(protocol);
 
   ahdlc_tx(ctx, LCP, buffer, 0, (uint16_t)(count + 6), 0);
 }

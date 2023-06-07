@@ -294,64 +294,22 @@ static int edit(int chn, int nl)
         }
       else if ((f->inCapacity + 1) < sizeof(f->inBuf))
         {
-#ifdef CONFIG_EOL_IS_BOTH_CRLF
-          /* Ignore carriage returns that may accompany a CRLF sequence. */
+          /* Is this a new line character */
 
-          if (ch != '\r')
-#endif
+          if (ch != '\n')
             {
-              /* Is this a new line character */
+              /* No.. escape control characters other than newline and
+               * carriage return
+               */
 
-#ifdef CONFIG_EOL_IS_CR
-              if (ch != '\r')
-#elif defined(CONFIG_EOL_IS_LF)
-              if (ch != '\n')
-#elif defined(CONFIG_EOL_IS_EITHER_CRLF)
-              if (ch != '\n' && ch != '\r')
-#endif
+              if (ch >= '\0' && ch < ' ')
                 {
-                  /* No.. escape control characters other than newline and
-                   * carriage return
-                   */
-
-                  if (ch >= '\0' && ch < ' ')
-                    {
-                      FS_putChar(chn, '^');
-                      FS_putChar(chn, ch ? (ch + 'a' - 1) : '@');
-                    }
-
-                  /* Output normal, printable characters */
-
-                  else
-                    {
-                      FS_putChar(chn, ch);
-                    }
+                  FS_putChar(chn, '^');
+                  FS_putChar(chn, ch ? (ch + 'a' - 1) : '@');
                 }
-
-              /* It is a newline */
-
-              else
-                {
-                  /* Echo the newline (or not).  We always use newline
-                   * termination when talking to the host.
-                   */
-
-                  if (nl)
-                    {
-                      FS_putChar(chn, '\n');
-                    }
-
-#if defined(CONFIG_EOL_IS_CR) || defined(CONFIG_EOL_IS_EITHER_CRLF)
-                  /* If the host is talking to us with CR line terminations,
-                   * switch to use LF internally.
-                   */
-
-                  ch = '\n';
-#endif
-                }
-
-              f->inBuf[f->inCapacity++] = ch;
             }
+
+          f->inBuf[f->inCapacity++] = ch;
         }
     }
   while (ch != '\n');
@@ -430,11 +388,7 @@ int FS_opendev(int chn, int infd, int outfd)
 
   g_file[chn] = malloc(sizeof(struct FileStream));
   g_file[chn]->dev = 1;
-#ifdef CONFIG_SERIAL_TERMIOS
   g_file[chn]->tty = (infd == 0 ? isatty(infd) && isatty(outfd) : 0);
-#else
-  g_file[chn]->tty = 1;
-#endif
   g_file[chn]->recLength = 1;
   g_file[chn]->infd = infd;
   g_file[chn]->inSize = 0;
@@ -456,9 +410,12 @@ int FS_opendev(int chn, int infd, int outfd)
 
 int FS_openin(const char *name)
 {
-  int chn, fd;
+  int chn;
+  int fd;
 
-  if ((fd = open(name, O_RDONLY)) == -1)
+  fd = open(name, O_RDONLY);
+
+  if (fd < 0)
     {
       FS_errmsg = strerror(errno);
       return -1;
@@ -547,9 +504,12 @@ int FS_openinChn(int chn, const char *name, int mode)
 
 int FS_openout(const char *name)
 {
-  int chn, fd;
+  int chn;
+  int fd;
 
-  if ((fd = open(name, O_WRONLY | O_TRUNC | O_CREAT, 0666)) == -1)
+  fd = open(name, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+
+  if (fd < 0)
     {
       FS_errmsg = strerror(errno);
       return -1;
@@ -817,12 +777,10 @@ int FS_close(int dev)
   return 0;
 }
 
-#ifdef CONFIG_SERIAL_TERMIOS
 int FS_istty(int chn)
 {
   return (g_file[chn] && g_file[chn]->tty);
 }
-#endif
 
 int FS_lock(int chn, off_t offset, off_t length, int mode, int w)
 {
@@ -932,7 +890,8 @@ void FS_xonxoff(int chn, int on)
 
 int FS_put(int chn)
 {
-  ssize_t offset, written;
+  ssize_t offset;
+  size_t written;
 
   if (opened(chn, 2) == -1)
     {
@@ -1418,7 +1377,8 @@ int FS_getChar(int dev)
 
 int FS_get(int chn)
 {
-  ssize_t offset, rd;
+  ssize_t offset;
+  size_t rd;
 
   if (opened(chn, 2) == -1)
     {
@@ -1544,7 +1504,8 @@ int FS_eof(int chn)
 long int FS_loc(int chn)
 {
   int fd;
-  off_t cur, offset = 0;
+  off_t cur;
+  off_t offset = 0;
 
   if (opened(chn, -1) == -1)
     {
@@ -1794,9 +1755,11 @@ int FS_charpos(int chn)
 
 int FS_copy(const char *from, const char *to)
 {
-  int infd, outfd;
+  int infd;
+  int outfd;
   char buf[4096];
-  ssize_t inlen, outlen = -1;
+  ssize_t inlen;
+  ssize_t outlen = -1;
 
   if ((infd = open(from, O_RDONLY)) == -1)
     {

@@ -41,7 +41,7 @@
  ****************************************************************************/
 
 #ifndef NETCAT_PORT
-# define NETCAT_PORT 31337
+#  define NETCAT_PORT 31337
 #endif
 
 /****************************************************************************
@@ -269,7 +269,7 @@ int netcat_client(int argc, char * argv[])
       goto out;
     }
 
-  if (connect(id, (struct sockaddr *) &server, sizeof(server)) < 0)
+  if (connect(id, (struct sockaddr *)&server, sizeof(server)) < 0)
     {
       perror("error: net: Failed to connect");
       result = 4;

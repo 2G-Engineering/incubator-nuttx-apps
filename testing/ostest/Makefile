@@ -30,6 +30,7 @@ MODULE = $(CONFIG_TESTING_OSTEST)
 # NuttX OS Test
 
 CSRCS   = getopt.c dev_null.c restart.c sigprocmask.c sighand.c signest.c
+CSRCS  += sighelper.c
 MAINSRC = ostest_main.c
 
 ifeq ($(CONFIG_SIG_SIGSTOP_ACTION),y)
@@ -91,6 +92,10 @@ endif
 
 ifeq ($(CONFIG_SCHED_SPORADIC),y)
 CSRCS += sporadic.c sporadic2.c
+endif
+
+ifeq ($(CONFIG_SCHED_WORKQUEUE),y)
+CSRCS += wqueue.c
 endif
 endif # CONFIG_DISABLE_PTHREAD
 

@@ -32,6 +32,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/time.h>
 
 #include <nuttx/input/buttons.h>
@@ -43,7 +44,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define BUTTON_SIGNO 13
+#define BUTTON_SIGNO 32
 #define BUTTON_STACKSIZE 2048
 #define BUTTON_PRIORITY 100
 #define BUTTON_DEVPATH "/dev/buttons"
@@ -207,7 +208,6 @@ errout_with_fd:
   close(fd);
 
 errout:
-
   printf("chrono_daemon: Terminating\n");
   return EXIT_FAILURE;
 }
@@ -343,7 +343,7 @@ int main(int argc, FAR char *argv[])
       /* Initialize the output stream */
 
       memset(priv, 0, sizeof(struct slcd_chrono_s));
-      priv->stream.put   = slcd_putc;
+      priv->stream.putc  = slcd_putc;
 #ifdef CONFIG_STDIO_LINEBUFFER
       priv->stream.flush = slcd_flush;
 #endif

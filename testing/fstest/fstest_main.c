@@ -28,6 +28,10 @@
 #include <sys/ioctl.h>
 #include <sys/statfs.h>
 
+#ifdef CONFIG_TESTING_FSTEST_POWEROFF
+#include <sys/boardctl.h>
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,44 +41,16 @@
 #include <dirent.h>
 #include <string.h>
 #include <errno.h>
-#include <crc32.h>
 #include <debug.h>
 #include <assert.h>
+
+#include <nuttx/crc32.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 /* Configuration ************************************************************/
-
-#ifndef CONFIG_TESTING_FSTEST_MAXNAME
-#  define CONFIG_TESTING_FSTEST_MAXNAME 128
-#endif
-
-#if CONFIG_TESTING_FSTEST_MAXNAME > 255
-#  undef CONFIG_TESTING_FSTEST_MAXNAME
-#  define CONFIG_TESTING_FSTEST_MAXNAME 255
-#endif
-
-#ifndef CONFIG_TESTING_FSTEST_MAXFILE
-#  define CONFIG_TESTING_FSTEST_MAXFILE 8192
-#endif
-
-#ifndef CONFIG_TESTING_FSTEST_MAXIO
-#  define CONFIG_TESTING_FSTEST_MAXIO 347
-#endif
-
-#ifndef CONFIG_TESTING_FSTEST_MAXOPEN
-#  define CONFIG_TESTING_FSTEST_MAXOPEN 512
-#endif
-
-#ifndef CONFIG_TESTING_FSTEST_MOUNTPT
-#  error CONFIG_TESTING_FSTEST_MOUNTPT must be provided
-#endif
-
-#ifndef CONFIG_TESTING_FSTEST_NLOOPS
-#  define CONFIG_TESTING_FSTEST_NLOOPS 100
-#endif
 
 #ifndef CONFIG_TESTING_FSTEST_VERBOSE
 #  define CONFIG_TESTING_FSTEST_VERBOSE 0
@@ -101,12 +77,14 @@ struct fstest_filedesc_s
 
 struct fstest_ctx_s
 {
-  uint8_t fileimage[CONFIG_TESTING_FSTEST_MAXFILE];
-  struct fstest_filedesc_s files[CONFIG_TESTING_FSTEST_MAXOPEN];
+  FAR uint8_t *fileimage;
+  FAR struct fstest_filedesc_s *files;
   char mountdir[CONFIG_TESTING_FSTEST_MAXNAME];
   int nfiles;
   int ndeleted;
   int nfailed;
+  int max_file;
+  int max_open;
   struct mallinfo mmbefore;
   struct mallinfo mmprevious;
   struct mallinfo mmafter;
@@ -203,7 +181,7 @@ static bool fstest_checkexist(FAR struct fstest_ctx_s *ctx,
   int i;
   bool ret = false;
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       if (&ctx->files[i] != file && ctx->files[i].name &&
           strcmp(ctx->files[i].name, file->name) == 0)
@@ -268,7 +246,7 @@ static inline void fstest_randfile(FAR struct fstest_ctx_s *ctx,
 {
   int i;
 
-  file->len = (rand() % CONFIG_TESTING_FSTEST_MAXFILE) + 1;
+  file->len = (rand() % ctx->max_file) + 1;
   for (i = 0; i < file->len; i++)
     {
       ctx->fileimage[i] = fstest_randchar();
@@ -368,7 +346,7 @@ static int fstest_gc(FAR struct fstest_ctx_s *ctx, size_t nbytes)
 
   /* Find the first valid file */
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name != NULL && !file->deleted)
@@ -517,7 +495,7 @@ static int fstest_fillfs(FAR struct fstest_ctx_s *ctx)
 
   /* Create a file for each unused file structure */
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name == NULL)
@@ -689,7 +667,7 @@ static unsigned long long fstest_filesize(FAR struct fstest_ctx_s *ctx)
 
   bytes_used = 0;
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name != NULL && !file->deleted)
@@ -709,7 +687,7 @@ static unsigned long fstest_filesize(FAR struct fstest_ctx_s *ctx)
 
   bytes_used = 0;
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name != NULL && !file->deleted)
@@ -734,7 +712,7 @@ static int fstest_verifyfs(FAR struct fstest_ctx_s *ctx)
 
   /* Create a file for each unused file structure */
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name != NULL)
@@ -826,7 +804,7 @@ static int fstest_delfiles(FAR struct fstest_ctx_s *ctx)
         {
           /* Test for wrap-around */
 
-          if (j >= CONFIG_TESTING_FSTEST_MAXOPEN)
+          if (j >= ctx->max_open)
             {
               j = 0;
             }
@@ -881,7 +859,7 @@ static int fstest_delallfiles(FAR struct fstest_ctx_s *ctx)
   int ret;
   int i;
 
-  for (i = 0; i < CONFIG_TESTING_FSTEST_MAXOPEN; i++)
+  for (i = 0; i < ctx->max_open; i++)
     {
       file = &ctx->files[i];
       if (file->name)
@@ -967,6 +945,10 @@ static void show_useage(void)
   printf("-n    num of test loop e.g. [%d]\n", CONFIG_TESTING_FSTEST_NLOOPS);
   printf("-m    mount point to be tested e.g. [%s]\n",
           CONFIG_TESTING_FSTEST_MOUNTPT);
+  printf("-o    num of open file e.g. [%d]\n",
+         CONFIG_TESTING_FSTEST_MAXOPEN);
+  printf("-s    size of every file e.g. [%d]\n",
+         CONFIG_TESTING_FSTEST_MAXFILE);
 }
 
 /****************************************************************************
@@ -999,16 +981,19 @@ int main(int argc, FAR char *argv[])
 
   srand(0x93846);
   loop_num = CONFIG_TESTING_FSTEST_NLOOPS;
-  strcpy(ctx->mountdir, CONFIG_TESTING_FSTEST_MOUNTPT);
+  ctx->max_file = CONFIG_TESTING_FSTEST_MAXFILE;
+  ctx->max_open = CONFIG_TESTING_FSTEST_MAXOPEN;
+  strlcpy(ctx->mountdir, CONFIG_TESTING_FSTEST_MOUNTPT,
+          sizeof(ctx->mountdir));
 
   /* Opt Parse */
 
-  while ((option = getopt(argc, argv, ":m:hn:")) != -1)
+  while ((option = getopt(argc, argv, ":m:hn:o:s:")) != -1)
     {
       switch (option)
         {
           case 'm':
-            strcpy(ctx->mountdir, optarg);
+            strlcpy(ctx->mountdir, optarg, sizeof(ctx->mountdir));
             break;
           case 'h':
             show_useage();
@@ -1016,6 +1001,12 @@ int main(int argc, FAR char *argv[])
             exit(0);
           case 'n':
             loop_num = atoi(optarg);
+            break;
+          case 'o':
+            ctx->max_open = atoi(optarg);
+            break;
+          case 's':
+            ctx->max_file = atoi(optarg);
             break;
           case ':':
             printf("Error: Missing required argument\n");
@@ -1030,7 +1021,22 @@ int main(int argc, FAR char *argv[])
 
   if (ctx->mountdir[strlen(ctx->mountdir)-1] != '/')
     {
-      strcat(ctx->mountdir, "/");
+      strlcat(ctx->mountdir, "/", sizeof(ctx->mountdir));
+    }
+
+  ctx->fileimage = calloc(ctx->max_file, 1);
+  if (ctx->fileimage == NULL)
+    {
+      free(ctx);
+      exit(1);
+    }
+
+  ctx->files = calloc(sizeof(struct fstest_filedesc_s), ctx->max_open);
+  if (ctx->files == NULL)
+    {
+      free(ctx->fileimage);
+      free(ctx);
+      exit(1);
     }
 
   /* Set up memory monitoring */
@@ -1173,6 +1179,17 @@ int main(int argc, FAR char *argv[])
   fstest_delallfiles(ctx);
   fstest_endmemusage(ctx);
   fflush(stdout);
+  free(ctx->fileimage);
+  free(ctx->files);
   free(ctx);
+
+#ifdef CONFIG_TESTING_FSTEST_POWEROFF
+  /* Power down. This is useful when used with the simulator and gcov,
+   * as the graceful shutdown allows for the generation of the .gcda files.
+   */
+
+  boardctl(BOARDIOC_POWEROFF, 0);
+#endif
+
   return 0;
 }

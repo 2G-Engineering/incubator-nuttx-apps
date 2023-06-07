@@ -71,6 +71,9 @@ CSRCS += $(MCUBOOT_UNPACK)/ext/tinycrypt/lib/source/aes_encrypt.c \
          $(MCUBOOT_UNPACK)/ext/tinycrypt/lib/source/ecc_dh.c \
          $(MCUBOOT_UNPACK)/ext/tinycrypt/lib/source/sha256.c \
          $(MCUBOOT_UNPACK)/ext/tinycrypt/lib/source/utils.c
+
+CFLAGS += ${INCDIR_PREFIX}mcuboot/ext/tinycrypt/lib/include
+CXXFLAGS += ${INCDIR_PREFIX}mcuboot/ext/tinycrypt/lib/include
 endif
 
 $(MCUBOOT_TARBALL):
@@ -83,10 +86,13 @@ $(MCUBOOT_UNPACK): $(MCUBOOT_TARBALL)
 	$(Q) mv mcuboot-$(MCUBOOT_VERSION) $(MCUBOOT_UNPACK)
 	$(Q) touch $(MCUBOOT_UNPACK)
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(MCUBOOT_UNPACK)/.git),)
 context:: $(MCUBOOT_UNPACK)
 
 distclean::
 	$(call DELFILE, $(MCUBOOT_TARBALL))
 	$(call DELDIR, $(MCUBOOT_UNPACK))
+endif
 
 include $(APPDIR)/Application.mk

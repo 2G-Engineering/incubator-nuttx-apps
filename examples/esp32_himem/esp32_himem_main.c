@@ -23,11 +23,13 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <nuttx/himem/himem.h>
 
@@ -58,7 +60,7 @@ static bool check_mem(void *mem, int len, int phys_addr)
         if (val != *p)
           {
             printf("check_mem: %x has 0x%08x expected 0x%08x\n",
-                   phys_addr + ((char *) p - (char *) mem), *p, val);
+                   phys_addr + ((char *)p - (char *)mem), *p, val);
             return false;
           }
         p++;

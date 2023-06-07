@@ -51,6 +51,17 @@ config INTERPRETERS_NONE
 
 endchoice
 
+config INTERPRETERS_WAMR_DEBUG_INTERP
+	bool "Enable debugger support in the interpreter"
+	default n
+	# Note: It only works with the classic interpreter
+	depends on INTERPRETERS_WAMR_CLASSIC
+	# Note: It uses thread-manager internally
+	depends on INTERPRETERS_WAMR_THREAD_MGR
+	# Note: It sets up the listening socket with SO_LINGER
+	depends on NET_TCP
+	depends on NET_SOLINGER
+
 config INTERPRETERS_WAMR_LOG
 	bool "Enable log"
 	default n
@@ -61,6 +72,7 @@ config INTERPRETERS_WAMR_LIBC_BUILTIN
 
 config INTERPRETERS_WAMR_LIBC_WASI
 	bool "Enable WASI libc"
+	select PSEUDOFS_SOFTLINKS
 	default n
 	---help---
 	Note: As of writing this, this works only with main branch of
@@ -81,12 +93,32 @@ config INTERPRETERS_WAMR_MINILOADER
 	---help---
 	Mini-loader don't check the integrity of wasm module
 
+config INTERPRETERS_WAMR_REF_TYPES
+	bool "Enable reference types support"
+	default n
+
+config INTERPRETERS_WAMR_ENABLE_SPEC_TEST
+	bool "Enable spectest support"
+	default n
+
+config INTERPRETERS_WAMR_STACK_GUARD_SIZE
+	int "Custom stack guard size"
+	default 0
+	---help---
+	Reserve some space in stack as guard to detect stack overflow,
+	use stack base by default but may not safe enough.
+
 config INTERPRETERS_WAMR_THREAD_MGR
 	bool "Enable thread manager"
 	default n
 
 config INTERPRETERS_WAMR_LIB_PTHREAD
 	bool "Enable lib pthread"
+	default n
+
+config INTERPRETERS_WAMR_LIB_PTHREAD_SEMAPHORE
+	bool "Enable semaphore"
+	depends on INTERPRETERS_WAMR_LIB_PTHREAD
 	default n
 
 config INTERPRETERS_WAMR_SHARED_MEMORY
@@ -107,6 +139,10 @@ config INTERPRETERS_WAMR_MEMORY_PROFILING
 
 config INTERPRETERS_WAMR_MEMORY_TRACING
 	bool "Enable memory tracing"
+	default n
+
+config INTERPRETERS_WAMR_DUMP_CALL_STACK
+	bool "Enable dump call stack (on exception)"
 	default n
 
 config INTERPRETERS_WAMR_DISABLE_HW_BOUND_CHECK

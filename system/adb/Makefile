@@ -21,7 +21,7 @@
 include $(APPDIR)/Make.defs
 
 ADBD_URL ?= "https://github.com/spiriou/microADB/archive"
-ADBD_VERSION ?= 5b3c9229e70f74fedfbbf1a0b9000836c9a34789
+ADBD_VERSION ?= 305007e0e574e7cc2b8d706b0f5d8cc76675fc51
 
 ADB_DIR := $(APPDIR)/system/adb
 ADB_UNPACKNAME := microADB
@@ -82,12 +82,15 @@ CSRCS += $(ADB_UNPACKNAME)/tcp_service.c
 CSRCS += $(ADB_UNPACKNAME)/hal/hal_uv_socket.c
 endif
 
-context:: $(ADB_UNPACKDIR)
-
 clean::
 	$(call DELFILE, $(OBJS))
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(ADB_UNPACKDIR)/.git),)
+context:: $(ADB_UNPACKDIR)
+
 distclean::
 	$(call DELDIR, $(ADB_UNPACKDIR))
+endif
 
 include $(APPDIR)/Application.mk

@@ -23,9 +23,9 @@ CONFIGURED_APPS += $(APPDIR)/interpreters/lua
 
 # Enable <lua.h> and <lauxlib.h> includes.
 
-CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" \
-	$(APPDIR)/interpreters/lua/lua-$(CONFIG_INTERPRETER_LUA_VERSION)/src}
-CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" \
-	$(APPDIR)/interpreters/lua/lua-$(CONFIG_INTERPRETER_LUA_VERSION)/src}
+CFLAGS += ${INCDIR_PREFIX}\
+	$(APPDIR)/interpreters/lua/lua
+CXXFLAGS += ${INCDIR_PREFIX}\
+	$(APPDIR)/interpreters/lua/lua
 
 endif

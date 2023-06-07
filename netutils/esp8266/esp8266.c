@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <debug.h>
+#include <unistd.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -145,7 +146,7 @@ typedef struct
 
   /* ESP Got only One ip + 1 for NULL that indicate end of list */
 
-  in_addr_t *     h_addr_list_buf[2];
+  in_addr_t      *h_addr_list_buf[2];
 
   in_addr_t       in_addr;
 } lesp_state_t;
@@ -1058,8 +1059,7 @@ static int lesp_parse_cwjap_ans_line(char *ptr, lesp_ap_t *ap)
           case 1:
               ptr++; /* Remove first '"' */
               *(ptr_next - 1) = '\0';
-              strncpy(ap->ssid, ptr, LESP_SSID_SIZE);
-              ap->ssid[LESP_SSID_SIZE] = '\0';
+              strlcpy(ap->ssid, ptr, LESP_SSID_SIZE + 1);
               break;
 
           case 2:
@@ -1184,8 +1184,7 @@ static int lesp_parse_cwlap_ans_line(char *ptr, lesp_ap_t *ap)
           case 2:
               ptr++; /* Remove first '"' */
               *(ptr_next - 1) = '\0';
-              strncpy(ap->ssid, ptr, LESP_SSID_SIZE);
-              ap->ssid[LESP_SSID_SIZE] = '\0';
+              strlcpy(ap->ssid, ptr, LESP_SSID_SIZE + 1);
               break;
 
           case 3:

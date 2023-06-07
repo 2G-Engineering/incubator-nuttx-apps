@@ -1,5 +1,5 @@
 ############################################################################
-# apps/testing/Make.defs
+# apps/testing/unity/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,6 +18,6 @@
 #
 ############################################################################
 
-ifeq ($(CONFIG_TESTING_UNITY),y)
+ifneq ($(CONFIG_TESTING_UNITY),)
 CONFIGURED_APPS += $(APPDIR)/testing/unity
 endif

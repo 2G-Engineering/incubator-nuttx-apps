@@ -26,7 +26,6 @@
 
 #include <sys/boardctl.h>
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -62,11 +61,6 @@
 
 static void nsh_configstdio(int fd)
 {
-  /* Make sure the stdout, and stderr are flushed */
-
-  fflush(stdout);
-  fflush(stderr);
-
   /* Dup the fd to create standard fd 0-2 */
 
   dup2(fd, 0);
@@ -248,12 +242,6 @@ int nsh_consolemain(int argc, FAR char *argv[])
 
   DEBUGASSERT(pstate);
 
-  /* Initialize any USB tracing options that were requested */
-
-#ifdef CONFIG_NSH_USBDEV_TRACE
-  usbtrace_enable(TRACE_BITSET);
-#endif
-
   /* Initialize the USB serial driver */
 
 #if defined(CONFIG_PL2303) || defined(CONFIG_CDCACM)
@@ -284,24 +272,6 @@ int nsh_consolemain(int argc, FAR char *argv[])
   nsh_nullstdio();
 #endif
 
-  /* Execute the one-time start-up script (output may go to /dev/null) */
-
-#ifdef CONFIG_NSH_ROMFSETC
-  nsh_initscript(&pstate->cn_vtbl);
-#endif
-
-#ifdef CONFIG_NSH_NETINIT
-  /* Bring up the network */
-
-  netinit_bringup();
-#endif
-
-#if defined(CONFIG_NSH_ARCHINIT) && defined(CONFIG_BOARDCTL_FINALINIT)
-  /* Perform architecture-specific final-initialization (if configured) */
-
-  boardctl(BOARDIOC_FINALINIT, 0);
-#endif
-
   /* Now loop, executing creating a session for each USB connection */
 
   for (; ; )
@@ -316,7 +286,7 @@ int nsh_consolemain(int argc, FAR char *argv[])
 
       /* Execute the session */
 
-      nsh_session(pstate, true, argc, argv);
+      nsh_session(pstate, NSH_LOGIN_LOCAL, argc, argv);
 
       /* Switch to /dev/null because we probably no longer have a
        * valid console device.

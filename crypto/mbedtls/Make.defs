@@ -18,15 +18,15 @@
 #
 ############################################################################
 
-ifeq ($(CONFIG_CRYPTO_MBEDTLS),y)
+ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
 CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
 
 # Allows `<mbedtls/<>.h>` import.
 
-CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/crypto/mbedtls/mbedtls/include}
-CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/crypto/mbedtls/mbedtls/include}
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
+CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
 
-CFLAGS += ${shell $(DEFINE) "$(CC)" MBEDTLS_CONFIG_FILE='"<crypto/mbedtls_config.h>"'}
-CXXFLAGS += ${shell $(DEFINE) "$(CC)" MBEDTLS_CONFIG_FILE='"<crypto/mbedtls_config.h>"'}
+CFLAGS += ${DEFINE_PREFIX}MBEDTLS_CONFIG_FILE="<crypto/mbedtls_config.h>"
+CXXFLAGS += ${DEFINE_PREFIX}MBEDTLS_CONFIG_FILE="<crypto/mbedtls_config.h>"
 
 endif

@@ -24,11 +24,12 @@
 
 #include <nuttx/config.h>
 
-#include <stdio.h>
-#include <fcntl.h>
 #include <assert.h>
-
 #include <dsp.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "foc_cfg.h"
 #include "foc_debug.h"
@@ -36,6 +37,10 @@
 
 #include "industry/foc/foc_utils.h"
 #include "industry/foc/foc_common.h"
+
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
+#  include "logging/nxscope/nxscope.h"
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -173,6 +178,91 @@ static int foc_state_print(FAR struct foc_motor_f32_s *motor)
 }
 #endif
 
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
+/****************************************************************************
+ * Name: foc_float_nxscope
+ ****************************************************************************/
+
+static void foc_float_nxscope(FAR struct foc_nxscope_s *nxs,
+                              FAR struct foc_motor_f32_s *motor,
+                              FAR struct foc_device_s *dev)
+{
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG != 0)
+  FAR float *ptr = NULL;
+  int        i = nxs->ch_per_inst * motor->envp->id;
+#endif
+
+  nxscope_lock(&nxs->nxs);
+
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_IABC)
+  ptr = (FAR float *)&motor->foc_state.curr;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, CONFIG_MOTOR_FOC_PHASES);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_IDQ)
+  ptr = (FAR float *)&motor->foc_state.idq;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_IAB)
+  ptr = (FAR float *)&motor->foc_state.iab;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VABC)
+  ptr = (FAR float *)&motor->foc_state.volt;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, CONFIG_MOTOR_FOC_PHASES);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VDQ)
+  ptr = (FAR float *)&motor->foc_state.vdq;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VAB)
+  ptr = (FAR float *)&motor->foc_state.vab;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_AEL)
+  ptr = (FAR float *)&motor->angle_el;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 1);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_AM)
+  ptr = (FAR float *)&motor->angle_m;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 1);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VEL)
+#  warning not supported yet
+  i++;
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VM)
+#  warning not supported yet
+  i++;
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VBUS)
+  ptr = (FAR float *)&motor->vbus;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 1);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_SPTORQ)
+  ptr = (FAR float *)&motor->torq;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 3);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_SPVEL)
+  ptr = (FAR float *)&motor->vel;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 3);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_SPPOS)
+  ptr = (FAR float *)&motor->pos;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 3);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_DQREF)
+  ptr = (FAR float *)&motor->dq_ref;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VDQCOMP)
+  ptr = (FAR float *)&motor->vdq_comp;
+  nxscope_put_vfloat(&nxs->nxs, i++, ptr, 2);
+#endif
+
+  nxscope_unlock(&nxs->nxs);
+}
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -186,9 +276,10 @@ int foc_float_thr(FAR struct foc_ctrl_env_s *envp)
   struct foc_mq_s         handle;
   struct foc_motor_f32_s  motor;
   struct foc_device_s     dev;
-  int                     time      = 0;
-  int                     ret       = OK;
+  int                     time = 0;
+  int                     ret  = OK;
 
+  UNUSED(time);
   DEBUGASSERT(envp);
 
   PRINTFV("foc_float_thr, id=%d\n", envp->id);
@@ -337,6 +428,15 @@ int foc_float_thr(FAR struct foc_ctrl_env_s *envp)
             }
 #endif
 
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
+          /* Capture nxscope samples */
+
+          if (time % CONFIG_EXAMPLES_FOC_NXSCOPE_PRESCALER == 0)
+            {
+              foc_float_nxscope(envp->nxs, &motor, &dev);
+            }
+#endif
+
 #ifdef CONFIG_EXAMPLES_FOC_STATE_USE_MODEL_PMSM
           /* Feed FOC model with data */
 
@@ -351,6 +451,14 @@ int foc_float_thr(FAR struct foc_ctrl_env_s *envp)
           if (ret < 0)
             {
               PRINTF("ERROR: foc_dev_prams_set failed %d!\n", ret);
+              goto errout;
+            }
+
+          /* Terminate control thread */
+
+          if (motor.ctrl_state == FOC_CTRL_STATE_TERMINATE)
+            {
+              PRINTF("TERMINATE CTRL THREAD\n");
               goto errout;
             }
         }

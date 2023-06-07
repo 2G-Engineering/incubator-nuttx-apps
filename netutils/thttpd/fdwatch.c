@@ -42,6 +42,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/param.h>
 #include <debug.h>
 #include <poll.h>
 #include <debug.h>
@@ -66,10 +67,6 @@
 #else
 #  define fwerr    _none
 #  define fwinfo   _none
-#endif
-
-#ifndef MIN
-#  define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
 /****************************************************************************
@@ -344,7 +341,7 @@ void *fdwatch_get_next_client_data(struct fdwatch_s *fw)
   if (fw->next >= fw->nwatched)
     {
       fwinfo("All client data returned: %d\n", fw->next);
-      return (void *)-1;
+      return (void *)(uintptr_t)-1;
     }
 
   fwinfo("client_data[%d]: %p\n", fw->next, fw->client[fw->next]);

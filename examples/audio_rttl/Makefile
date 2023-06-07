@@ -1,5 +1,5 @@
 ############################################################################
-# audio_beep/Makefile
+# apps/examples/audio_rttl/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -37,7 +37,7 @@ AUDIODIR = $(SDKDIR)$(DELIM)modules$(DELIM)audio
 
 # Audio Example flags
 
-CXXFLAGS += ${shell $(INCDIR) "$(CC)" "$(AUDIODIR)"}
+CXXFLAGS += ${INCDIR_PREFIX}"$(AUDIODIR)"
 CXXFLAGS += -D_POSIX
 
 include $(APPDIR)/Application.mk

@@ -27,6 +27,7 @@
 #include <nuttx/mtd/configdata.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -52,10 +53,11 @@ static void cfgdatacmd_help(void)
 {
   printf("\nUsage: cfgdata <cmd> [arguments]\n");
   printf("Where <cmd> is one of:\n\n");
-  printf("  all:   show all config entries\n");
-  printf("  print: display a specific config entry\n");
-  printf("  set:   set or change a config entry\n");
-  printf("  unset: delete a config entry\n\n");
+  printf("  all:    show all config entries\n");
+  printf("  print:  display a specific config entry\n");
+  printf("  set:    set or change a config entry\n");
+  printf("  unset:  delete a config entry\n");
+  printf("  format: delete all config entries\n\n");
 
   printf("Syntax for 'set' cmd:\n");
 #ifdef CONFIG_MTD_CONFIG_NAMED
@@ -236,17 +238,17 @@ static void cfgdatacmd_parse_byte_array(struct config_data_s *cfg,
 
 static void cfgdatacmd_set(int argc, char *argv[])
 {
-  int                   ret;
-  int                   fd;
-  int                   x;
-  struct config_data_s  cfg;
-  uint8_t               data[32];
+  int                  ret;
+  int                  fd;
+  int                  x;
+  struct config_data_s cfg;
+  uint8_t              data[32];
 
 #ifdef CONFIG_MTD_CONFIG_NAMED
 
   /* Copy the name to the cfg struct */
 
-  strncpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
+  strlcpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
 
 #else
 
@@ -368,14 +370,14 @@ static void cfgdatacmd_set(int argc, char *argv[])
 
 static void cfgdatacmd_unset(int argc, char *argv[])
 {
-  int                   ret;
-  int                   fd;
-  struct config_data_s  cfg;
+  int                  ret;
+  int                  fd;
+  struct config_data_s cfg;
 
 #ifdef CONFIG_MTD_CONFIG_NAMED
   /* Copy the name to the cfg struct */
 
-  strncpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
+  strlcpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
 
 #else
   int                   x;
@@ -431,17 +433,17 @@ static void cfgdatacmd_unset(int argc, char *argv[])
 
 static void cfgdatacmd_print(int argc, char *argv[])
 {
-  int                   ret;
-  int                   fd;
-  int                   x;
-  struct config_data_s  cfg;
-  bool                  isstring;
+  int                  ret;
+  int                  fd;
+  int                  x;
+  struct config_data_s cfg;
+  bool                 isstring;
 
 #ifdef CONFIG_MTD_CONFIG_NAMED
 
   /* Copy the name to the cfg struct */
 
-  strncpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
+  strlcpy(cfg.name, argv[2], CONFIG_MTD_CONFIG_NAME_LEN);
 
 #else
 
@@ -540,12 +542,12 @@ static void cfgdatacmd_print(int argc, char *argv[])
 
 static void cfgdatacmd_show_all_config_items(void)
 {
-  int                   ret;
-  int                   fd;
-  int                   x;
-  struct config_data_s  cfg;
-  char                  fmtstr[24];
-  bool                  isstring;
+  int                  ret;
+  int                  fd;
+  int                  x;
+  struct config_data_s cfg;
+  char                 fmtstr[24];
+  bool                 isstring;
 
   /* Try to open the /dev/config file */
 
@@ -560,13 +562,15 @@ static void cfgdatacmd_show_all_config_items(void)
   /* Print header */
 
 #ifdef CONFIG_MTD_CONFIG_NAMED
-  sprintf(fmtstr, "%%-%ds%%-6sData\n", CONFIG_MTD_CONFIG_NAME_LEN);
+  snprintf(fmtstr, sizeof(fmtstr),
+           "%%-%ds%%-6sData\n", CONFIG_MTD_CONFIG_NAME_LEN);
   printf(fmtstr, "Name", "Len");
-  sprintf(fmtstr, "%%-%ds%%-6d", CONFIG_MTD_CONFIG_NAME_LEN);
+  snprintf(fmtstr, sizeof(fmtstr),
+           "%%-%ds%%-6d", CONFIG_MTD_CONFIG_NAME_LEN);
 #else
-  strcpy(fmtstr, "%-6s%-6s%-6sData\n");
+  strlcpy(fmtstr, "%-6s%-6s%-6sData\n", sizeof(fmtstr));
   printf(fmtstr, "ID", "Inst", "Len");
-  strcpy(fmtstr, "%-6d%-6d%-6d");
+  strlcpy(fmtstr, "%-6d%-6d%-6d", sizeof(fmtstr));
 #endif
 
   /* Get the first config item */
@@ -616,9 +620,10 @@ static void cfgdatacmd_show_all_config_items(void)
           char fmtstr2[10];
 
 #ifdef CONFIG_MTD_CONFIG_NAMED
-          sprintf(fmtstr2, "\n%ds", CONFIG_MTD_CONFIG_NAME_LEN + 6);
+          snprintf(fmtstr2, sizeof(fmtstr2),
+                   "\n%ds", CONFIG_MTD_CONFIG_NAME_LEN + 6);
 #else
-          strcpy(fmtstr2, "\n%18s");
+          strlcpy(fmtstr2, "\n%18s", sizeof(fmtstr2));
 #endif
           /* Loop though all bytes and display them */
 
