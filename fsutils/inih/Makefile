@@ -81,10 +81,10 @@ context:: $(INIH_SOURCES)
 	$(Q) $(MAKE) create_includes
 
 clean::
-	$(Q) $(call DELFILE, $(APPDIR)/include/fsutils/ini.h)
 	$(Q) $(foreach COBJ, $(COBJS), $(call DELFILE, $(COBJ)))
 
 distclean::
+	$(Q) $(call DELFILE, $(APPDIR)/include/fsutils/ini.h)
 	$(Q) $(call DELDIR, $(INIH_SOURCES))
 	$(Q) $(call DELDIR, $(INIH_TARBALL))
 
