@@ -24,7 +24,6 @@
 
 #include <nuttx/config.h>
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -33,8 +32,6 @@
 
 #include "nsh.h"
 #include "nsh_console.h"
-
-#include "netutils/netinit.h"
 
 #if defined(CONFIG_NSH_ALTCONDEV) && !defined(HAVE_USB_CONSOLE)
 
@@ -62,10 +59,6 @@ static int nsh_clone_console(FAR struct console_stdio_s *pstate)
       return -ENODEV;
     }
 
-  /* Flush stderr: we only flush stderr if we opened the alternative one */
-
-  fflush(stderr);
-
   /* Associate the new opened file descriptor to stderr */
 
   dup2(fd, 2);
@@ -85,10 +78,6 @@ static int nsh_clone_console(FAR struct console_stdio_s *pstate)
       return -ENODEV;
     }
 
-  /* Flush stdout: we only flush stdout if we opened the alternative one */
-
-  fflush(stdout);
-
   /* Associate the new opened file descriptor to stdout */
 
   dup2(fd, 1);
@@ -102,23 +91,11 @@ static int nsh_clone_console(FAR struct console_stdio_s *pstate)
 
   /* Setup the stderr */
 
-  pstate->cn_errfd     = 2;
-  pstate->cn_errstream = fdopen(pstate->cn_errfd, "a");
-  if (!pstate->cn_errstream)
-    {
-      free(pstate);
-      return -EIO;
-    }
+  ERRFD(pstate) = 2;
 
   /* Setup the stdout */
 
-  pstate->cn_outfd     = 1;
-  pstate->cn_outstream = fdopen(pstate->cn_outfd, "a");
-  if (!pstate->cn_outstream)
-    {
-      free(pstate);
-      return -EIO;
-    }
+  OUTFD(pstate) = 1;
 
   return OK;
 }
@@ -172,8 +149,7 @@ static int nsh_wait_inputdev(FAR struct console_stdio_s *pstate,
                * to open the keyboard device.
                */
 
-              puts(msg);
-              fflush(stdout);
+              write(STDOUT_FILENO, msg, strlen(msg));
               msg = NULL;
             }
 
@@ -197,15 +173,6 @@ static int nsh_wait_inputdev(FAR struct console_stdio_s *pstate,
       /* Setup the input console */
 
       pstate->cn_confd = 0;
-
-      /* Create a standard C stream on the console device */
-
-      pstate->cn_constream = fdopen(pstate->cn_confd, "r+");
-      if (!pstate->cn_constream)
-        {
-          free(pstate);
-          return -EIO;
-        }
 
       /* Close the input device that we just opened */
 
@@ -251,36 +218,9 @@ int nsh_consolemain(int argc, FAR char *argv[])
 
   DEBUGASSERT(pstate);
 
-  /* Initialize any USB tracing options that were requested */
-
-#ifdef CONFIG_NSH_USBDEV_TRACE
-  usbtrace_enable(TRACE_BITSET);
-#endif
-
-  /* Execute the one-time start-up script.
-   * Any output will go to /dev/console.
-   */
-
-#ifdef CONFIG_NSH_ROMFSETC
-  nsh_initscript(&pstate->cn_vtbl);
-#endif
-
-#ifdef CONFIG_NSH_NETINIT
-  /* Bring up the network */
-
-  netinit_bringup();
-#endif
-
-#if defined(CONFIG_NSH_ARCHINIT) && defined(CONFIG_BOARDCTL_FINALINIT)
-  /* Perform architecture-specific final-initialization (if configured) */
-
-  boardctl(BOARDIOC_FINALINIT, 0);
-#endif
-
   /* First map stderr and stdout to alternative devices */
 
   ret = nsh_clone_console(pstate);
-
   if (ret < 0)
     {
       return ret;
@@ -302,7 +242,7 @@ int nsh_consolemain(int argc, FAR char *argv[])
 
       /* Execute the session */
 
-      nsh_session(pstate, true, argc, argv);
+      nsh_session(pstate, NSH_LOGIN_LOCAL, argc, argv);
 
       /* We lost the connection.  Wait for the keyboard to
        * be re-connected.

@@ -36,7 +36,7 @@
  * Private Function Prototypes
  ****************************************************************************/
 
-static void modprint(FAR const char *fmt, ...);
+static void modprint(FAR const char *fmt, ...) printf_like(1, 2);
 
 /****************************************************************************
  * Private Data
@@ -45,7 +45,7 @@ static void modprint(FAR const char *fmt, ...);
 static const struct symtab_s g_modprint_exports[1] =
 {
   {
-    (FAR const char *)"modprint", (FAR const void *)modprint,
+    "modprint", (FAR const void *)modprint,
   }
 };
 

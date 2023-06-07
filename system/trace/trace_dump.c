@@ -128,11 +128,10 @@ static void note_ioctl(int cmd, unsigned long arg)
 {
   int notefd;
 
-  notefd = open("/dev/note", O_RDONLY);
+  notefd = open("/dev/note/ram", O_RDONLY);
   if (notefd < 0)
     {
-      fprintf(stderr,
-             "trace: cannot open /dev/note\n");
+      fprintf(stderr, "trace: cannot open /dev/note/ram\n");
       return;
     }
 
@@ -247,7 +246,7 @@ FAR static struct trace_dump_task_context_s *get_task_context(pid_t pid,
       (*tctxp)->syscall_nest = 0;
       (*tctxp)->name[0] = '\0';
 
-#if CONFIG_DRIVER_NOTERAM_TASKNAME_BUFSIZE > 0
+#ifdef NOTERAM_GETTASKNAME
         {
           struct noteram_get_taskname_s tnm;
           int res;
@@ -292,17 +291,11 @@ static void trace_dump_header(FAR FILE *out,
                               FAR struct trace_dump_context_s *ctx)
 {
   pid_t pid;
-#ifdef CONFIG_SCHED_INSTRUMENTATION_HIRES
   uint32_t nsec;
   uint32_t sec;
 
   trace_dump_unflatten(&nsec, note->nc_systime_nsec, sizeof(nsec));
   trace_dump_unflatten(&sec, note->nc_systime_sec, sizeof(sec));
-#else
-  uint32_t systime;
-
-  trace_dump_unflatten(&systime, note->nc_systime, sizeof(systime));
-#endif
 #ifdef CONFIG_SMP
   int cpu = note->nc_cpu;
 #else
@@ -313,13 +306,7 @@ static void trace_dump_header(FAR FILE *out,
 
   fprintf(out, "%8s-%-3u [%d] %3" PRIu32 ".%09" PRIu32 ": ",
           get_task_name(pid, ctx), get_pid(pid), cpu,
-#ifdef CONFIG_SCHED_INSTRUMENTATION_HIRES
           sec, nsec
-#else
-          systime / (1000 * 1000 / CONFIG_USEC_PER_TICK),
-          (systime % (1000 * 1000 / CONFIG_USEC_PER_TICK))
-            * CONFIG_USEC_PER_TICK * 1000
-#endif
          );
 }
 
@@ -640,15 +627,24 @@ static int trace_dump_one(trace_dump_t type, FAR FILE *out, FAR uint8_t *p,
           trace_dump_unflatten(&ip, nst->nst_ip, sizeof(ip));
 
           if (type == TRACE_TYPE_ANDROID &&
-              strlen(nst->nst_data) > 2 &&
-              (memcmp(nst->nst_data, "B|", 2) == 0 ||
-               memcmp(nst->nst_data, "E|", 2) == 0))
+              nst->nst_data[1] == '\0' &&
+              (nst->nst_data[0] == 'B' ||
+               nst->nst_data[0] == 'E'))
             {
-              fprintf(out, "tracing_mark_write: %s\n", nst->nst_data);
+              fprintf(out, "tracing_mark_write: %c|%d|%pS\n",
+                      nst->nst_data[0], pid, (FAR void *)ip);
+            }
+          else if (type == TRACE_TYPE_ANDROID &&
+              nst->nst_data[1] == '|' &&
+              (nst->nst_data[0] == 'B' ||
+               nst->nst_data[0] == 'E'))
+            {
+              fprintf(out, "tracing_mark_write: %s\n",
+                      nst->nst_data);
             }
           else
             {
-              fprintf(out, "0x%" PRIdPTR ": %s\n", ip, nst->nst_data);
+              fprintf(out, "%pS: %s\n", (FAR void *)ip, nst->nst_data);
             }
         }
         break;
@@ -712,11 +708,10 @@ int trace_dump(trace_dump_t type, FAR FILE *out)
 
   /* Open note for read */
 
-  fd = open("/dev/note", O_RDONLY);
+  fd = open("/dev/note/ram", O_RDONLY);
   if (fd < 0)
     {
-      fprintf(stderr,
-              "trace: cannot open /dev/note\n");
+      fprintf(stderr, "trace: cannot open /dev/note/ram\n");
       return ERROR;
     }
 

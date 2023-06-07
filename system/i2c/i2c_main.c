@@ -140,7 +140,7 @@ static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
                  i2ctool->autoincr ? "YES" : "NO");
   i2ctool_printf(i2ctool,
                  "  [-f freq] I2C frequency."
-                 "  Default: %d Current: %d\n",
+                 "  Default: %d Current: %" PRIu32 "\n",
                  CONFIG_I2CTOOL_DEFFREQ, i2ctool->freq);
 
   i2ctool_printf(i2ctool, "\nSpecial non-sticky options:\n");
@@ -414,7 +414,7 @@ int main(int argc, FAR char *argv[])
  *
  ****************************************************************************/
 
-int i2ctool_printf(FAR struct i2ctool_s *i2ctool, const char *fmt, ...)
+int i2ctool_printf(FAR struct i2ctool_s *i2ctool, FAR const char *fmt, ...)
 {
   va_list ap;
   int     ret;

@@ -31,6 +31,8 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+
 #include <nuttx/timers/timer.h>
 
 /****************************************************************************
@@ -56,7 +58,7 @@
 #endif
 
 #ifndef CONFIG_EXAMPLES_TIMER_SIGNO
-#  define CONFIG_EXAMPLES_TIMER_SIGNO 17
+#  define CONFIG_EXAMPLES_TIMER_SIGNO 32
 #endif
 
 /****************************************************************************
@@ -135,14 +137,14 @@ int main(int argc, FAR char *argv[])
   int i;
   int opt;
   char devname[DEVNAME_SIZE];
-  strcpy(devname, CONFIG_EXAMPLES_TIMER_DEVNAME);
+  strlcpy(devname, CONFIG_EXAMPLES_TIMER_DEVNAME, sizeof(devname));
 
   while ((opt = getopt(argc, argv, ":d:")) != -1)
     {
       switch (opt)
       {
         case 'd':
-            strcpy(devname, optarg);
+            strlcpy(devname, optarg, sizeof(devname));
             break;
         case ':':
             fprintf(stderr, "ERROR: Option needs a value\n");

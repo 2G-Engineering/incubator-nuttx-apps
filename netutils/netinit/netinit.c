@@ -33,19 +33,19 @@
 #  define CONFIG_DEBUG_NET 1
 #endif
 
-#include <sys/ioctl.h>
-
-#include <stdint.h>
-#include <string.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <signal.h>
+#include <arpa/inet.h>
 #include <assert.h>
 #include <debug.h>
-
 #include <net/if.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <pthread.h>
+#include <sched.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #include <nuttx/net/mii.h>
 
@@ -595,7 +595,7 @@ static void netinit_net_bringup(void)
       return;
     }
 
-#ifdef CONFIG_WIRELESS_WAPI
+#if defined(CONFIG_WIRELESS_WAPI) && defined(CONFIG_DRIVERS_IEEE80211)
   /* Associate the wlan with an access point. */
 
   if (netinit_associate(NET_DEVNAME) < 0)
@@ -703,7 +703,7 @@ static void netinit_configure(void)
 
 #ifdef CONFIG_NETINIT_MONITOR
 static void netinit_signal(int signo, FAR siginfo_t *siginfo,
-                               FAR void * context)
+                           FAR void *context)
 {
   int semcount;
   int ret;
@@ -785,7 +785,7 @@ static int netinit_monitor(void)
       /* Configure to receive a signal on changes in link status */
 
       memset(&ifr, 0, sizeof(struct ifreq));
-      strncpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
+      strlcpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
 
       ifr.ifr_mii_notify_event.sigev_notify = SIGEV_SIGNAL;
       ifr.ifr_mii_notify_event.sigev_signo  = CONFIG_NETINIT_SIGNO;
@@ -995,10 +995,10 @@ static pthread_addr_t netinit_thread(pthread_addr_t arg)
 int netinit_bringup(void)
 {
 #ifdef CONFIG_NETINIT_THREAD
-  struct sched_param  sparam;
-  pthread_attr_t      attr;
-  pthread_t           tid;
-  int                 ret;
+  struct sched_param sparam;
+  pthread_attr_t     attr;
+  pthread_t          tid;
+  int                ret;
 
   /* Start the network initialization thread to perform the network bring-up
    * asynchronously.

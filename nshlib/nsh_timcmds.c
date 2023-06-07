@@ -289,15 +289,15 @@ errout_bad_parm:
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_TIME
-int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   struct timespec start;
 #ifndef CONFIG_NSH_DISABLEBG
   bool bgsave;
 #endif
-#ifdef CONFIG_FILE_STREAM
   bool redirsave;
-#endif
   int ret;
 
   /* Get the current time */
@@ -314,9 +314,7 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifndef CONFIG_NSH_DISABLEBG
   bgsave    = vtbl->np.np_bg;
 #endif
-#ifdef CONFIG_FILE_STREAM
   redirsave = vtbl->np.np_redirect;
-#endif
 
   /* Execute the command */
 
@@ -355,9 +353,7 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifndef CONFIG_NSH_DISABLEBG
   vtbl->np.np_bg       = bgsave;
 #endif
-#ifdef CONFIG_FILE_STREAM
   vtbl->np.np_redirect = redirsave;
-#endif
 
   return ret;
 }
@@ -368,7 +364,7 @@ int cmd_time(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_DATE
-int cmd_date(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_date(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR char *newtime = NULL;
   FAR const char *errfmt;
@@ -433,7 +429,7 @@ errout:
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_TIMEDATECTL
-int cmd_timedatectl(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_timedatectl(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   char timbuf[MAX_TIME_STRING];
   FAR char *newtz = NULL;

@@ -27,10 +27,12 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -71,6 +73,8 @@ struct dbgmem_s
 static int mem_parse(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv,
                      FAR struct dbgmem_s *mem)
 {
+  UNUSED(vtbl);
+
   FAR char *pcvalue = strchr(argv[1], '=');
   unsigned long lvalue = 0;
 
@@ -166,7 +170,7 @@ int cmd_mb(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
           /* Make sure we end it with a newline */
 
-          nsh_output(vtbl, "\n", *ptr);
+          nsh_output(vtbl, "\n");
         }
     }
 
@@ -222,7 +226,7 @@ int cmd_mh(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
           /* Make sure we end it with a newline */
 
-          nsh_output(vtbl, "\n", *ptr);
+          nsh_output(vtbl, "\n");
         }
     }
 
@@ -252,7 +256,7 @@ int cmd_mw(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         {
           /* Print the value at the address */
 
-          nsh_output(vtbl, "  %p = 0x%08x", ptr, *ptr);
+          nsh_output(vtbl, "  %p = 0x%08" PRIx32, ptr, *ptr);
 
           /* Are we supposed to write a value to this address? */
 
@@ -264,12 +268,12 @@ int cmd_mw(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
                */
 
               *ptr = mem.dm_value;
-              nsh_output(vtbl, " -> 0x%08x", *ptr);
+              nsh_output(vtbl, " -> 0x%08" PRIx32, *ptr);
             }
 
           /* Make sure we end it with a newline */
 
-          nsh_output(vtbl, "\n", *ptr);
+          nsh_output(vtbl, "\n");
         }
     }
 
@@ -285,6 +289,7 @@ void nsh_dumpbuffer(FAR struct nsh_vtbl_s *vtbl, FAR const char *msg,
                     FAR const uint8_t *buffer, ssize_t nbytes)
 {
   char line[128];
+  size_t size;
   int ch;
   int i;
   int j;
@@ -292,18 +297,22 @@ void nsh_dumpbuffer(FAR struct nsh_vtbl_s *vtbl, FAR const char *msg,
   nsh_output(vtbl, "%s:\n", msg);
   for (i = 0; i < nbytes; i += 16)
     {
-      sprintf(line, "%04x: ", i);
+      snprintf(line, sizeof(line), "%04x: ", i);
+      size = strlen(line);
 
       for (j = 0; j < 16; j++)
         {
           if (i + j < nbytes)
             {
-              sprintf(&line[strlen(line)], "%02x ", buffer[i + j]);
+              snprintf(&line[size], sizeof(line) - size,
+                       "%02x ", buffer[i + j]);
             }
           else
             {
-              strcpy(&line[strlen(line)], "   ");
+              strlcpy(&line[size], "   ", sizeof(line) - size);
             }
+
+          size += strlen(&line[size]);
         }
 
       for (j = 0; j < 16; j++)
@@ -311,8 +320,9 @@ void nsh_dumpbuffer(FAR struct nsh_vtbl_s *vtbl, FAR const char *msg,
           if (i + j < nbytes)
             {
               ch = buffer[i + j];
-              sprintf(&line[strlen(line)], "%c",
-                      ch >= 0x20 && ch <= 0x7e ? ch : '.');
+              snprintf(&line[size], sizeof(line) - size,
+                       "%c", ch >= 0x20 && ch <= 0x7e ? ch : '.');
+              size += strlen(&line[size]);
             }
         }
 
@@ -327,6 +337,8 @@ void nsh_dumpbuffer(FAR struct nsh_vtbl_s *vtbl, FAR const char *msg,
 #ifndef CONFIG_NSH_DISABLE_XD
 int cmd_xd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   FAR char *addr;
   FAR char *endptr;
   int       nbytes;
@@ -493,6 +505,8 @@ int cmd_hexdump(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef HAVE_IRQINFO
 int cmd_irqinfo(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   return nsh_catfile(vtbl, argv[0], CONFIG_NSH_PROC_MOUNTPOINT "/irqs");
 }
 #endif

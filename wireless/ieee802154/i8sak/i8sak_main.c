@@ -42,9 +42,11 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <queue.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+
+#include <nuttx/queue.h>
 #include <nuttx/fs/ioctl.h>
 
 #include <nuttx/wireless/ieee802154/ieee802154_mac.h>
@@ -85,7 +87,7 @@ struct i8sak_command_s
 
 static const struct i8sak_command_s g_i8sak_commands[] =
 {
-  {"help",        (CODE void *)NULL},
+  {"help",        NULL},
   {"acceptassoc", (CODE void *)i8sak_acceptassoc_cmd},
   {"assoc",       (CODE void *)i8sak_assoc_cmd},
   {"blaster",     (CODE void *)i8sak_blaster_cmd},
@@ -590,7 +592,7 @@ static int i8sak_setup(FAR struct i8sak_s *i8sak, FAR const char *ifname)
       return ERROR;
     }
 
-  strcpy(&i8sak->ifname[0], ifname);
+  strlcpy(i8sak->ifname, ifname, sizeof(i8sak->ifname));
 
   i8sak->chan = 11;
   i8sak->chpage = 0;
@@ -680,10 +682,8 @@ static int i8sak_setup(FAR struct i8sak_s *i8sak, FAR const char *ifname)
   sem_init(&i8sak->exclsem, 0, 1);
 
   sem_init(&i8sak->updatesem, 0, 0);
-  sem_setprotocol(&i8sak->updatesem, SEM_PRIO_NONE);
 
   sem_init(&i8sak->sigsem, 0, 0);
-  sem_setprotocol(&i8sak->sigsem, SEM_PRIO_NONE);
 
   sem_init(&i8sak->eventsem, 0, 1);
 
@@ -764,7 +764,7 @@ static int i8sak_daemon(int argc, FAR char *argv[])
           i8sak->startblaster = false;
 
           ret = pthread_create(&i8sak->blaster_threadid, NULL,
-                               i8sak_blaster_thread, (void *)i8sak);
+                               i8sak_blaster_thread, i8sak);
           if (ret != 0)
             {
               fprintf(stderr, "failed to start blaster thread: %d\n", ret);
@@ -778,7 +778,7 @@ static int i8sak_daemon(int argc, FAR char *argv[])
           i8sak->startsniffer = false;
 
           ret = pthread_create(&i8sak->sniffer_threadid, NULL,
-                               i8sak_sniffer_thread, (void *)i8sak);
+                               i8sak_sniffer_thread, i8sak);
           if (ret != 0)
             {
               fprintf(stderr, "failed to start sniffer thread: %d\n", ret);

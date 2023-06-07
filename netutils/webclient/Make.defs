@@ -1,3 +1,4 @@
+############################################################################
 # apps/netutils/webclient/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
@@ -17,6 +18,6 @@
 #
 ############################################################################
 
-ifeq ($(CONFIG_NETUTILS_WEBCLIENT),y)
+ifneq ($(CONFIG_NETUTILS_WEBCLIENT),)
 CONFIGURED_APPS += $(APPDIR)/netutils/webclient
 endif

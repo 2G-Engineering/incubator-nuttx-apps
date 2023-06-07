@@ -11,11 +11,13 @@
 *.lib
 *.lst
 *.o
+*.wo
 *.obj
 *.rel
 *.src
 *.swp
 *.sym
+*.su
 *~
 .context
 .depend
@@ -25,9 +27,13 @@
 /external
 /Kconfig
 /romfs.img
+/staging
 /symtab_apps.c
+/wasm
 cscope.out
 Make.dep
 .context
 # nuttx/$(TOPDIR)/Makefile.[unix|win]::$(DIRLINKS_EXTERNAL_DIRS)
 .dirlinks
+.vscode
+.DS_Store

@@ -27,10 +27,10 @@ include $(TOPDIR)/scripts/Make.defs
 # Compiler
 
 ARCHCRT0OBJ = $(call CONVERT_PATH,$(TOPDIR)$(DELIM)startup$(DELIM)crt0$(OBJEXT))
-ARCHINCLUDES += ${shell $(INCDIR) -s "$(CC)" $(TOPDIR)$(DELIM)include}
+ARCHINCLUDES += ${INCSYSDIR_PREFIX}$(TOPDIR)$(DELIM)include
 
-ARCHXXINCLUDES += ${shell $(INCDIR) -s "$(CC)" $(TOPDIR)$(DELIM)include}
-ARCHXXINCLUDES += ${shell $(INCDIR) -s "$(CC)" $(TOPDIR)$(DELIM)include$(DELIM)cxx}
+ARCHXXINCLUDES += ${INCSYSDIR_PREFIX}$(TOPDIR)$(DELIM)include
+ARCHXXINCLUDES += ${INCSYSDIR_PREFIX}$(TOPDIR)$(DELIM)include$(DELIM)cxx
 
 ARCHCFLAGS += -fno-common -pipe
 ARCHCXXFLAGS += -fno-common -nostdinc++ -pipe
@@ -66,7 +66,7 @@ LDLIBPATH = $(addprefix -L,$(call CONVERT_PATH,$(TOPDIR)$(DELIM)libs))
 # Link with user libraries
 
 ifeq ($(CONFIG_BUILD_KERNEL),y)
-  LDLIBS = -lapps -lmm -lc -lproxies
+  LDLIBS += -lmm -lc -lproxies
   ifeq ($(CONFIG_HAVE_CXX),y)
     LDLIBS += -lxx
   endif
@@ -90,5 +90,5 @@ endif
 
 # ELF module definitions
 
-LDELFFLAGS = -r -e _start -Bstatic
+LDELFFLAGS += -r -e _start -Bstatic
 LDELFFLAGS += $(addprefix -T,$(call CONVERT_PATH,$(TOPDIR)/scripts/gnu-elf.ld))

@@ -112,7 +112,7 @@
 
 /* Output is via printf but can be changed using this macro */
 
-# define i2c_output         printf
+#  define i2c_output         printf
 
 /****************************************************************************
  * Public Types
@@ -134,8 +134,8 @@ struct i2ctool_s
   /* Output streams */
 
 #ifdef CONFIG_I2CTOOL_OUTDEV
-  int    ss_outfd;     /* Output file descriptor */
-  FILE  *ss_outstream; /* Output stream */
+  int   ss_outfd;     /* Output file descriptor */
+  FILE *ss_outstream; /* Output stream */
 #endif
 };
 
@@ -170,7 +170,8 @@ extern const char g_i2cxfrerror[];
 
 ssize_t i2ctool_write(FAR struct i2ctool_s *i2ctool, FAR const void *buffer,
                       size_t nbytes);
-int i2ctool_printf(FAR struct i2ctool_s *i2ctool, const char *fmt, ...);
+int i2ctool_printf(FAR struct i2ctool_s *i2ctool,
+                   FAR const char *fmt, ...) printf_like(2, 3);
 void i2ctool_flush(FAR struct i2ctool_s *i2ctool);
 void i2ctool_hexdump(FILE *outstream, void *addr, int len);
 

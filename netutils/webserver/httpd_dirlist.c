@@ -109,7 +109,7 @@ bool httpd_is_file(FAR const char *filename)
 {
   char *path;
   int fd;
-  bool ret = false;
+  bool ret = true;
 
   path = malloc(CONFIG_NAME_MAX);
   ASSERT(path);
@@ -117,12 +117,12 @@ bool httpd_is_file(FAR const char *filename)
   snprintf(path, CONFIG_NAME_MAX, "%s/%s",
            CONFIG_NETUTILS_HTTPD_PATH, filename);
 
-  fd = open(path, O_RDONLY);
+  fd = open(path, O_DIRECTORY);
 
   if (-1 != fd)
     {
       close(fd);
-      ret = true;
+      ret = false;
     }
 
   free(path);
@@ -241,7 +241,6 @@ ssize_t httpd_dirlist(int outfd, FAR struct httpd_fs_file *file)
   closedir(dir);
 
 errout_with_hdr:
-
   memset(&info, 0, sizeof(info));
   uname(&info);
 
@@ -262,7 +261,6 @@ errout_with_hdr:
   ret = total;
 
 errout:
-
   free(tmp);
   return ret;
 }

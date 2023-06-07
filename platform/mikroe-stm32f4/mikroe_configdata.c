@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <debug.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 
 #include "platform/configdata.h"
@@ -94,10 +95,10 @@ int platform_setconfig(enum config_data_e id, int instance,
 
   config.id         = (enum config_data_e)id;
   config.instance   = instance;
-  config.configdata = (FAR uint8_t *) configdata;
+  config.configdata = (FAR uint8_t *)configdata;
   config.len        = datalen;
 
-  ret = ioctl(fd, CFGDIOC_SETCONFIG, (unsigned long) &config);
+  ret = ioctl(fd, CFGDIOC_SETCONFIG, (unsigned long)&config);
   close(fd);
   return ret;
 
@@ -200,9 +201,9 @@ int platform_getconfig(enum config_data_e id, int instance,
 #endif
 
 #ifdef CONFIG_MIKROE_STM32F4_CONFIGDATA_PART
-  struct config_data_s  config;
-  int                   ret;
-  int                   fd;
+  struct config_data_s config;
+  int                  ret;
+  int                  fd;
 
   /* Try to open the /dev/config device file */
 
@@ -220,7 +221,7 @@ int platform_getconfig(enum config_data_e id, int instance,
   config.configdata = configdata;
   config.len = datalen;
 
-  ret = ioctl(fd, CFGDIOC_GETCONFIG, (unsigned long) &config);
+  ret = ioctl(fd, CFGDIOC_GETCONFIG, (unsigned long)&config);
   close(fd);
   return ret;
 

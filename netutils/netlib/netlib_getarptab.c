@@ -30,9 +30,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include <netinet/arp.h>
 #include <netpacket/netlink.h>
-
-#include <nuttx/net/arp.h>
 
 #include "netutils/netlib.h"
 
@@ -72,7 +71,7 @@ struct netlib_recvfrom_response_s
  * Parameters:
  *   arptab   - The location to store the copy of the ARP table
  *   nentries - The size of the provided 'arptab' in number of entries each
- *              of size sizeof(struct arp_entry_s)
+ *              of size sizeof(struct arpreq)
  *
  * Return:
  *   The number of ARP table entries read is returned on success; a negated
@@ -80,7 +79,7 @@ struct netlib_recvfrom_response_s
  *
  ****************************************************************************/
 
-ssize_t netlib_get_arptable(FAR struct arp_entry_s *arptab,
+ssize_t netlib_get_arptable(FAR struct arpreq *arptab,
                             unsigned int nentries)
 {
   FAR struct netlib_recvfrom_response_s *resp;
@@ -99,7 +98,7 @@ ssize_t netlib_get_arptable(FAR struct arp_entry_s *arptab,
 
   /* Pre-allocate a buffer to hold the response */
 
-  maxsize   = CONFIG_NET_ARPTAB_SIZE * sizeof(struct arp_entry_s);
+  maxsize   = nentries * sizeof(struct arpreq);
   allocsize = SIZEOF_NETLIB_RECVFROM_RESPONSE_S(maxsize);
   resp = (FAR struct netlib_recvfrom_response_s *)malloc(allocsize);
   if (resp == NULL)
@@ -122,7 +121,7 @@ ssize_t netlib_get_arptable(FAR struct arp_entry_s *arptab,
 
   /* Bind the socket so that we can use send() and receive() */
 
-  pid            = getpid();
+  pid            = gettid();
   addr.nl_family = AF_NETLINK;
   addr.nl_pad    = 0;
   addr.nl_pid    = pid;
@@ -201,7 +200,7 @@ ssize_t netlib_get_arptable(FAR struct arp_entry_s *arptab,
     }
 
   memcpy(arptab, resp->data, paysize);
-  ret = paysize / sizeof(struct arp_entry_s);
+  ret = paysize / sizeof(struct arpreq);
 
 errout_with_socket:
   close(fd);

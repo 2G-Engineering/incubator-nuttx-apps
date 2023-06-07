@@ -67,7 +67,9 @@ struct cmdhist_s
 
 /* <esc>[K is the VT100 command erases to the end of the line. */
 
+#ifdef CONFIG_READLINE_ECHO
 static const char g_erasetoeol[] = VT100_CLEAREOL;
+#endif
 
 #ifdef CONFIG_READLINE_TABCOMPLETION
 /* Prompt string to present at the beginning of the line */
@@ -280,13 +282,13 @@ static void tab_completion(FAR struct rl_common_s *vtbl, char *buf,
               RL_PUTC(vtbl, ' ');
               RL_PUTC(vtbl, ' ');
 
-              for (j = 0; j < strlen(name); j++)
+              for (j = 0; j < (int)strlen(name); j++)
                 {
                   /* Removing characters that aren't common to all the
                    * matches.
                    */
 
-                  if (j < sizeof(tmp_name) && name[j] != tmp_name[j])
+                  if (j < (int)sizeof(tmp_name) && name[j] != tmp_name[j])
                     {
                       tmp_name[j] = '\0';
                     }
@@ -333,15 +335,14 @@ static void tab_completion(FAR struct rl_common_s *vtbl, char *buf,
             }
 
 #endif
-          strncpy(buf, tmp_name, buflen - 1);
-
+          strlcpy(buf, tmp_name, buflen);
           name_len = strlen(tmp_name);
 
           /* Output the original prompt */
 
           if (g_readline_prompt != NULL)
             {
-              for (i = 0; i < strlen(g_readline_prompt); i++)
+              for (i = 0; i < (int)strlen(g_readline_prompt); i++)
                 {
                   RL_PUTC(vtbl, g_readline_prompt[i]);
                 }
@@ -665,13 +666,7 @@ ssize_t readline_common(FAR struct rl_common_s *vtbl, FAR char *buf,
        * others both.
        */
 
-#if  defined(CONFIG_EOL_IS_LF) || defined(CONFIG_EOL_IS_BOTH_CRLF)
       else if (ch == '\n')
-#elif defined(CONFIG_EOL_IS_CR)
-      else if (ch == '\r')
-#elif defined(CONFIG_EOL_IS_EITHER_CRLF)
-      else if (ch == '\n' || ch == '\r')
-#endif
         {
 #ifdef CONFIG_READLINE_CMD_HISTORY
           /* Save history of command, only if there was something
@@ -712,11 +707,6 @@ ssize_t readline_common(FAR struct rl_common_s *vtbl, FAR char *buf,
           buf[nch++] = '\n';
           buf[nch]   = '\0';
 
-#ifdef CONFIG_READLINE_ECHO
-          /* Echo the newline to the console */
-
-          RL_PUTC(vtbl, '\n');
-#endif
           return nch;
         }
 
@@ -728,11 +718,6 @@ ssize_t readline_common(FAR struct rl_common_s *vtbl, FAR char *buf,
         {
           buf[nch++] = ch;
 
-#ifdef CONFIG_READLINE_ECHO
-          /* Echo the character to the console */
-
-          RL_PUTC(vtbl, ch);
-#endif
           /* Check if there is room for another character and the line's
            * null terminator.  If not then we have to end the line now.
            */

@@ -23,9 +23,12 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include <assert.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h>
+
 #include "ostest.h"
 
 /****************************************************************************
@@ -47,6 +50,7 @@ int dev_null(void)
   if (fd < 0)
     {
       printf("dev_null: ERROR Failed to open /dev/null\n");
+      ASSERT(false);
       return -1;
     }
 
@@ -54,6 +58,7 @@ int dev_null(void)
   if (nbytes < 0)
     {
       printf("dev_null: ERROR Failed to read from /dev/null\n");
+      ASSERT(false);
       close(fd);
       return -1;
     }
@@ -64,6 +69,7 @@ int dev_null(void)
   if (nbytes < 0)
     {
       printf("dev_null: ERROR Failed to write to /dev/null\n");
+      ASSERT(false);
       close(fd);
       return -1;
     }

@@ -41,7 +41,7 @@
  ****************************************************************************/
 
 #ifdef A_COLOR
-#  define TITLECOLOR       1    /* color pair indices */
+#  define TITLECOLOR       1            /* color pair indices */
 #  define MAINMENUCOLOR    (2 | A_BOLD)
 #  define MAINMENUREVCOLOR (3 | A_BOLD | A_REVERSE)
 #  define SUBMENUCOLOR     (4 | A_BOLD)
@@ -51,7 +51,7 @@
 #  define INPUTBOXCOLOR    8
 #  define EDITBOXCOLOR     (9 | A_BOLD | A_REVERSE)
 #else
-#  define TITLECOLOR       0    /* color pair indices */
+#  define TITLECOLOR       0            /* color pair indices */
 #  define MAINMENUCOLOR    (A_BOLD)
 #  define MAINMENUREVCOLOR (A_BOLD | A_REVERSE)
 #  define SUBMENUCOLOR     (A_BOLD)
@@ -62,11 +62,11 @@
 #  define EDITBOXCOLOR     (A_BOLD | A_REVERSE)
 #endif
 
-#define th 1                    /* title window height */
-#define mh 1                    /* main menu height */
-#define sh 2                    /* status window height */
+#define th 1                            /* title window height */
+#define mh 1                            /* main menu height */
+#define sh 2                            /* status window height */
 #define bh (LINES - th - mh - sh)       /* body window height */
-#define bw COLS                 /* body window width */
+#define bw COLS                         /* body window width */
 
 /****************************************************************************
  * Private Data
@@ -92,8 +92,9 @@ static char *padstr(char *s, int length)
   static char buf[MAXSTRLEN];
   char fmt[10];
 
-  sprintf(fmt, (int)strlen(s) > length ? "%%.%ds" : "%%-%ds", length);
-  sprintf(buf, fmt, s);
+  snprintf(fmt, sizeof(fmt),
+           (int)strlen(s) > length ? "%%.%ds" : "%%-%ds", length);
+  snprintf(buf, sizeof(buf), fmt, s);
 
   return buf;
 }
@@ -206,7 +207,7 @@ static void idle(void)
     }
 
   tp = localtime(&t);
-  sprintf(buf, " %.2d-%.2d-%.4d  %.2d:%.2d:%.2d",
+  snprintf(buf, sizeof(buf), " %.2d-%.2d-%.4d  %.2d:%.2d:%.2d",
           tp->tm_mday, tp->tm_mon + 1, tp->tm_year + 1900,
           tp->tm_hour, tp->tm_min, tp->tm_sec);
 
@@ -298,7 +299,12 @@ static void mainhelp(void)
 
 static void mainmenu(menu *mp)
 {
-  int nitems, barlen, old = -1, cur = 0, c, cur0;
+  int nitems;
+  int barlen;
+  int c;
+  int cur0;
+  int old = -1;
+  int cur = 0;
 
   menudim(mp, &nitems, &barlen);
   repaintmainmenu(barlen, mp);
@@ -599,13 +605,12 @@ void domenu(const menu *mp)
           do
             {
               cur = (cur + 1) % nitems;
-
             }
-          while ((cur != cur0) && (hotkey(mp[cur].name) != toupper((int)key)));
+          while ((cur != cur0) && (hotkey(mp[cur].name)
+                                   != toupper((int)key)));
 
           key = (hotkey(mp[cur].name) == toupper((int)key)) ? '\n' : ERR;
         }
-
     }
 
   rmerror();
@@ -692,18 +697,27 @@ static void repainteditbox(WINDOW *win, int x, char *buf)
 
 int weditstr(WINDOW *win, char *buf, int field)
 {
-  char org[MAXSTRLEN], *tp, *bp = buf;
-  bool defdisp = true, stop = false, insert = false;
-  int cury, curx, begy, begx, oldattr;
-  WINDOW *wedit;
+  char org[MAXSTRLEN];
+  char *tp;
+  char *bp = buf;
+  bool defdisp = true;
+  bool stop = false;
+  bool insert = false;
+  int cury;
+  int curx;
+  int begy;
+  int begx;
+  int oldattr;
   int c = 0;
+  WINDOW *wedit;
 
-  if ((field >= MAXSTRLEN) || (buf == NULL) || ((int)strlen(buf) > field - 1))
+  if ((field >= MAXSTRLEN) || (buf == NULL) ||
+      ((int)strlen(buf) > field - 1))
     {
       return ERR;
     }
 
-  strcpy(org, buf);             /* save original */
+  strlcpy(org, buf, sizeof(org));             /* save original */
 
   wrefresh(win);
   getyx(win, cury, curx);
@@ -760,7 +774,7 @@ int weditstr(WINDOW *win, char *buf, int field)
         case KEY_DC:
           if (*bp != 0)
             {
-              memmove((void *)(bp), (const void *)(bp+1), strlen(bp));
+              memmove((void *)(bp), (const void *)(bp + 1), strlen(bp));
             }
           break;
 
@@ -769,7 +783,8 @@ int weditstr(WINDOW *win, char *buf, int field)
             {
               if (bp > buf)
                 {
-                  memmove((void *)(bp - 1), (const void *)bp, strlen(bp) + 1);
+                  memmove((void *)(bp - 1), (const void *)bp,
+                          strlen(bp) + 1);
                   bp--;
                 }
             }
@@ -834,7 +849,10 @@ int weditstr(WINDOW *win, char *buf, int field)
 WINDOW *winputbox(WINDOW *win, int nlines, int ncols)
 {
   WINDOW *winp;
-  int cury, curx, begy, begx;
+  int cury;
+  int curx;
+  int begy;
+  int begx;
 
   getyx(win, cury, curx);
   getbegyx(win, begy, begx);
@@ -848,7 +866,16 @@ WINDOW *winputbox(WINDOW *win, int nlines, int ncols)
 int getstrings(const char *desc[], char *buf[], int field)
 {
   WINDOW *winput;
-  int oldy, oldx, maxy, maxx, nlines, ncols, i, n, l, mmax = 0;
+  int oldy;
+  int oldx;
+  int maxy;
+  int maxx;
+  int nlines;
+  int ncols;
+  int i;
+  int n;
+  int l;
+  int mmax = 0;
   int c = 0;
   bool stop = false;
 

@@ -36,7 +36,13 @@ MBEDTLS_UNPACKLIBDIR = $(MBEDTLS_UNPACKNAME)$(DELIM)library
 MBEDTLS_UNPACKPROGDIR = $(MBEDTLS_UNPACKNAME)$(DELIM)programs
 
 # This lets Mbed TLS better use some of the POSIX features we have
-CFLAGS += ${shell $(DEFINE) "$(CC)" __unix__}
+CFLAGS += ${DEFINE_PREFIX}__unix__
+
+library/bignum.c_CFLAGS += -fno-lto
+
+ifeq ($(CONFIG_ARCH_SIM),y)
+  CFLAGS += -O0
+endif
 
 CSRCS = $(wildcard $(MBEDTLS_UNPACKLIBDIR)$(DELIM)*.c)
 
@@ -50,11 +56,14 @@ $(MBEDTLS_UNPACKNAME): $(MBEDTLS_ZIP)
 	$(Q) mv	mbedtls-$(MBEDTLS_VERSION) $(MBEDTLS_UNPACKNAME)
 	$(Q) touch $(MBEDTLS_UNPACKNAME)
 
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(MBEDTLS_UNPACKNAME)/.git),)
 context:: $(MBEDTLS_UNPACKNAME)
 
 distclean::
 	$(call DELDIR, $(MBEDTLS_UNPACKNAME))
 	$(call DELFILE, $(MBEDTLS_ZIP))
+endif
 
 # Configuration Applications
 

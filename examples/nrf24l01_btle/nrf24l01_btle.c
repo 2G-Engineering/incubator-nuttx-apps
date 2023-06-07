@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <debug.h>
+#include <unistd.h>
 
 #include <nuttx/signal.h>
 #include <nuttx/sensors/dhtxx.h>
@@ -35,6 +36,7 @@
 #include <stdio.h>
 #include <poll.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "nrf24l01_btle.h"
 
@@ -468,7 +470,7 @@ static void adv_packet(int wl_fd)
 
 FAR void *advertise(FAR void *arg)
 {
-  uint32_t wl_fd = *(uint32_t *)arg;
+  uint32_t wl_fd = *(FAR uint32_t *)arg;
   while (!quit)
     {
       if (current == 2)

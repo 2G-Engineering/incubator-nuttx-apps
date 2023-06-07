@@ -33,8 +33,6 @@
 
 #include <netpacket/netlink.h>
 
-#include <nuttx/net/arp.h>
-
 #include "netutils/netlib.h"
 
 #ifdef CONFIG_NETLINK_ROUTE
@@ -110,7 +108,7 @@ ssize_t netlib_get_devices(FAR struct netlib_device_s *devlist,
 
   /* Bind the socket so that we can use send() and receive() */
 
-  pid            = getpid();
+  pid            = gettid();
   addr.nl_family = AF_NETLINK;
   addr.nl_pad    = 0;
   addr.nl_pid    = pid;

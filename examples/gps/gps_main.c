@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/examples/hello/gps_main.c
+ * apps/examples/gps/gps_main.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -28,8 +28,15 @@
 #include <fcntl.h>
 #include <wchar.h>
 #include <syslog.h>
+#include <unistd.h>
 
-#include "gpsutils/minmea.h"
+#include "minmea/minmea.h"
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#define MINMEA_MAX_LENGTH    256
 
 /****************************************************************************
  * Public Functions
@@ -127,6 +134,9 @@ int main(int argc, FAR char *argv[])
           case MINMEA_SENTENCE_GLL:
           case MINMEA_SENTENCE_GST:
           case MINMEA_SENTENCE_GSV:
+          case MINMEA_SENTENCE_GBS:
+          case MINMEA_SENTENCE_VTG:
+          case MINMEA_SENTENCE_ZDA:
             {
             }
             break;

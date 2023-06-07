@@ -25,6 +25,7 @@
 #include <nuttx/config.h>
 
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <nuttx/i2c/i2c_master.h>
 
@@ -174,7 +175,6 @@ int i2ccmd_dev(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
   close(fd);
 
 errout:
-
   /* Restore the previous "sticky" register address unless a new register
    * address was provided on the command line.  In that case the new
    * register address is retained.

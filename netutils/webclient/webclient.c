@@ -285,6 +285,7 @@ static int webclient_static_body_func(FAR void *buffer,
                                       size_t reqsize,
                                       FAR void *ctx)
 {
+  UNUSED(buffer);
   *datap = ctx;
   *sizep = reqsize;
   return 0;
@@ -456,10 +457,9 @@ static inline int wget_parsestatus(struct webclient_context *ctx,
               ninfo("Got HTTP status %lu\n", http_status);
               if (ctx->http_reason != NULL)
                 {
-                  strncpy(ctx->http_reason,
+                  strlcpy(ctx->http_reason,
                           ep + 1,
-                          ctx->http_reason_len - 1);
-                  ctx->http_reason[ctx->http_reason_len - 1] = 0;
+                          ctx->http_reason_len);
                 }
 
               /* Check for 2xx (Successful) */
@@ -692,7 +692,7 @@ static inline int wget_parseheaders(struct webclient_context *ctx,
                       *dest = 0;
                     }
 
-                  strncpy(ws->mimetype, ws->line + strlen(g_httpcontenttype),
+                  strlcpy(ws->mimetype, ws->line + strlen(g_httpcontenttype),
                           sizeof(ws->mimetype));
                   found = true;
                 }
@@ -797,6 +797,8 @@ static inline int wget_parsechunkheader(struct webclient_context *ctx,
   int offset;
   int ndx;
   int ret = OK;
+
+  UNUSED(ctx);
 
   offset = ws->offset;
   ndx    = ws->ndx;
@@ -908,6 +910,8 @@ static inline int wget_parsechunkenddata(struct webclient_context *ctx,
   int ndx;
   int ret = OK;
 
+  UNUSED(ctx);
+
   offset = ws->offset;
   ndx    = ws->ndx;
 
@@ -965,6 +969,8 @@ static inline int wget_parsechunktrailer(struct webclient_context *ctx,
   int offset;
   int ndx;
   int ret = OK;
+
+  UNUSED(ctx);
 
   offset = ws->offset;
   ndx    = ws->ndx;
@@ -1417,10 +1423,25 @@ int webclient_perform(FAR struct webclient_context *ctx)
                   tv.tv_sec  = ctx->timeout_sec;
                   tv.tv_usec = 0;
 
-                  setsockopt(conn->sockfd, SOL_SOCKET, SO_RCVTIMEO,
-                             (FAR const void *)&tv, sizeof(struct timeval));
-                  setsockopt(conn->sockfd, SOL_SOCKET, SO_SNDTIMEO,
-                             (FAR const void *)&tv, sizeof(struct timeval));
+                  /* Check return value one by one */
+
+                  ret = setsockopt(conn->sockfd, SOL_SOCKET, SO_RCVTIMEO,
+                                   &tv, sizeof(struct timeval));
+                  if (ret != 0)
+                    {
+                      ret = -errno;
+                      nerr("ERROR: setsockopt failed: %d\n", ret);
+                      goto errout_with_errno;
+                    }
+
+                  ret = setsockopt(conn->sockfd, SOL_SOCKET, SO_SNDTIMEO,
+                                   &tv, sizeof(struct timeval));
+                  if (ret != 0)
+                    {
+                      ret = -errno;
+                      nerr("ERROR: setsockopt failed: %d\n", ret);
+                      goto errout_with_errno;
+                    }
                 }
             }
 
@@ -1542,7 +1563,7 @@ int webclient_perform(FAR struct webclient_context *ctx)
                 {
                   memset(&server_un, 0, sizeof(server_un));
                   server_un.sun_family = AF_LOCAL;
-                  strncpy(server_un.sun_path, ctx->unix_socket_path,
+                  strlcpy(server_un.sun_path, ctx->unix_socket_path,
                           sizeof(server_un.sun_path));
 #if !defined(__NuttX__) && !defined(__linux__)
                   server_un.sun_len = SUN_LEN(&server_un);
@@ -1748,7 +1769,7 @@ int webclient_perform(FAR struct webclient_context *ctx)
               char post_size[sizeof("18446744073709551615")];
 
               dest = append(dest, ep, g_httpcontsize);
-              sprintf(post_size, "%zu", ctx->bodylen);
+              snprintf(post_size, sizeof(post_size), "%zu", ctx->bodylen);
               dest = append(dest, ep, post_size);
               dest = append(dest, ep, g_httpcrnl);
             }
@@ -1856,7 +1877,7 @@ int webclient_perform(FAR struct webclient_context *ctx)
 
               DEBUGASSERT(bytes_to_send <= ws->state_len);
               ssize_t ssz = webclient_conn_send(conn,
-                                                ws->data_buffer +
+                                                (char *)ws->data_buffer +
                                                 ws->state_offset,
                                                 bytes_to_send);
               if (ssz < 0)
@@ -1875,8 +1896,8 @@ int webclient_perform(FAR struct webclient_context *ctx)
                     ws->state_len);
               ws->state_len -= ssz;
               ws->state_offset += ssz;
-              DEBUGASSERT(ws->state_offset <= ws->data_len);
-              if (ws->state_offset == ws->data_len)
+              DEBUGASSERT((size_t)ws->state_offset <= ws->data_len);
+              if ((size_t)ws->state_offset == ws->data_len)
                 {
                   ws->data_buffer = NULL;
                 }

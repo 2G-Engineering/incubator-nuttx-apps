@@ -48,7 +48,7 @@
 
 int main(int argc, FAR char *argv[])
 {
-  struct inode * inode;
+  struct inode *inode;
   int           ret;
   int           x;
   int           logsector;
@@ -73,7 +73,7 @@ int main(int argc, FAR char *argv[])
   if (ret < 0)
     {
       fprintf(stderr, "Failed to open %s\n", argv[1]);
-      goto errout;
+      return ret;
     }
 
   /* Get the low-level format from the device. */
@@ -113,14 +113,14 @@ int main(int argc, FAR char *argv[])
 
   /* Allocate buffers to use */
 
-  buffer = (char *) malloc(fmt.availbytes);
+  buffer = (char *)malloc(fmt.availbytes);
   if (buffer == NULL)
     {
       fprintf(stderr, "Error allocating buffer\n");
       goto errout_with_driver;
     }
 
-  seqs = (uint16_t *) malloc(fmt.nsectors << 1);
+  seqs = (uint16_t *)malloc(fmt.nsectors << 1);
   if (seqs == NULL)
     {
       free(buffer);
@@ -128,7 +128,7 @@ int main(int argc, FAR char *argv[])
       goto errout_with_driver;
     }
 
-  sectors = (uint16_t *) malloc(fmt.nsectors << 1);
+  sectors = (uint16_t *)malloc(fmt.nsectors << 1);
   if (sectors == NULL)
     {
       free(seqs);
@@ -156,18 +156,19 @@ int main(int argc, FAR char *argv[])
 
       /* Save the sector in our array */
 
-      sectors[x] = (uint16_t) logsector;
+      sectors[x] = (uint16_t)logsector;
       seqs[x] = seq++;
 
       /* Now write some data to the sector */
 
-      sprintf(buffer, "Logical sector %d sequence %d\n",
-              sectors[x], seqs[x]);
+      snprintf(buffer, fmt.availbytes,
+               "Logical sector %d sequence %d\n",
+               sectors[x], seqs[x]);
 
       readwrite.logsector = sectors[x];
       readwrite.offset = 0;
       readwrite.count = strlen(buffer) + 1;
-      readwrite.buffer = (uint8_t *) buffer;
+      readwrite.buffer = (uint8_t *)buffer;
       inode->u.i_bops->ioctl(inode, BIOC_WRITESECT, (unsigned long)
                              &readwrite);
 
@@ -188,7 +189,7 @@ int main(int argc, FAR char *argv[])
       readwrite.logsector = sectors[x];
       readwrite.offset = 0;
       readwrite.count = fmt.availbytes;
-      readwrite.buffer = (uint8_t *) buffer;
+      readwrite.buffer = (uint8_t *)buffer;
       ret = inode->u.i_bops->ioctl(inode, BIOC_READSECT, (unsigned long)
                                    &readwrite);
 
@@ -202,8 +203,9 @@ int main(int argc, FAR char *argv[])
 
       printf("\r%d     ", sectors[x]);
 
-      sprintf(&buffer[100], "Logical sector %d sequence %d\n",
-              sectors[x], seqs[x]);
+      snprintf(&buffer[100], fmt.availbytes - 100,
+               "Logical sector %d sequence %d\n",
+               sectors[x], seqs[x]);
 
       if (strcmp(buffer, &buffer[100]) != 0)
         {
@@ -224,12 +226,13 @@ int main(int argc, FAR char *argv[])
       /* Now write over the sector data with new data, causing a relocation.
        */
 
-      sprintf(buffer, "Logical sector %d sequence %d\n",
-              sectors[x], seqs[x]);
+      snprintf(buffer, fmt.availbytes,
+               "Logical sector %d sequence %d\n",
+               sectors[x], seqs[x]);
       readwrite.logsector = sectors[x];
       readwrite.offset = 0;
       readwrite.count = strlen(buffer) + 1;
-      readwrite.buffer = (uint8_t *) buffer;
+      readwrite.buffer = (uint8_t *)buffer;
       inode->u.i_bops->ioctl(inode, BIOC_WRITESECT, (unsigned long)
                              &readwrite);
 
@@ -252,11 +255,12 @@ int main(int argc, FAR char *argv[])
        * causing a relocation.
        */
 
-      sprintf(buffer, "Appended data in sector %d\n", sectors[x]);
+      snprintf(buffer, fmt.availbytes,
+               "Appended data in sector %d\n", sectors[x]);
       readwrite.logsector = sectors[x];
       readwrite.offset = 64;
       readwrite.count = strlen(buffer) + 1;
-      readwrite.buffer = (uint8_t *) buffer;
+      readwrite.buffer = (uint8_t *)buffer;
       inode->u.i_bops->ioctl(inode, BIOC_WRITESECT, (unsigned long)
                              &readwrite);
 
@@ -293,8 +297,5 @@ errout_with_driver:
   /* Now close the block device and exit */
 
   close_blockdriver(inode);
-
-errout:
-
   return 0;
 }

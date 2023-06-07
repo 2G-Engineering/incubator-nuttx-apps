@@ -41,10 +41,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ****************************************************************************/
 
-/*
- *  Lightweight Embedded XML-RPC Server main
+/* Lightweight Embedded XML-RPC Server main
  *
- *  mtj@cogitollc.com
+ * mtj@cogitollc.com
  *
  */
 
@@ -66,13 +65,8 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#include <nuttx/net/arp.h>
 #include "netutils/netlib.h"
 #include "netutils/xmlrpc.h"
-
-#ifdef CONFIG_EXAMPLES_XMLRPC_DHCPC
-#  include <arpa/inet.h>
-#endif
 
 /* Here we include the header file for the application(s) we use in
  * our project as defined in the config/<board-name>/defconfig file
@@ -88,8 +82,8 @@
  * Private Data
  ****************************************************************************/
 
-static const char *notimplemented = { "HTTP/1.1 501 Not Implemented\n\n" };
-static const char *separator = { "\015\012\015\012" };
+static const FAR char *notimplemented = "HTTP/1.1 501 Not Implemented\n\n";
+static const FAR char *separator = "\015\012\015\012";
 
 /****************************************************************************
  * External Function Prototypes
@@ -133,9 +127,10 @@ static char *xmlrpc_findbody(char *buf)
  *
  ****************************************************************************/
 
-static int xmlrpc_getheader(char *buffer, char *header, char *value, int size)
+static int xmlrpc_getheader(FAR char *buffer, FAR char *header,
+                            FAR char *value, int size)
 {
-  char *temp;
+  FAR char *temp;
   int i = 0;
 
   temp = strstr(buffer, header);
@@ -178,10 +173,17 @@ static void xmlrpc_handler(int fd)
 {
   fd_set rfds;
   struct timeval tv;
-  int ret, len, max = 0, loadlen = -1;
-  char buffer[CONFIG_EXAMPLES_XMLRPC_BUFFERSIZE] = { 0 };
+  int ret;
+  int len;
+  int max = 0;
+  int loadlen = -1;
+  char buffer[CONFIG_EXAMPLES_XMLRPC_BUFFERSIZE] =
+    {
+      0
+    };
+
   char value[CONFIG_XMLRPC_STRINGSIZE + 1];
-  char *temp;
+  FAR char *temp;
 
   /* Read in the Request Header */
 
@@ -237,7 +239,6 @@ static void xmlrpc_handler(int fd)
           if (strlen(temp) - 4 == loadlen)
             break;
         }
-
     }
   while (1);
 
@@ -264,8 +265,8 @@ static void xmlrpc_handler(int fd)
 
 static int xmlrpc_netinit(void)
 {
-  /* If this task is excecutated as an NSH built-in function, then the network
-   * has already been configured by NSH's start-up logic.
+  /* If this task is excecutated as an NSH built-in function,
+   * then the network has already been configured by NSH's start-up logic.
    */
 
 #ifndef CONFIG_NSH_NETINIT
@@ -277,7 +278,7 @@ static int xmlrpc_netinit(void)
   void *handle;
 #endif
 
-/* Many embedded network interfaces must have a software assigned MAC */
+  /* Many embedded network interfaces must have a software assigned MAC */
 
 #ifdef CONFIG_EXAMPLES_XMLRPC_NOMAC
   mac[0] = 0x00;
@@ -323,15 +324,17 @@ static int xmlrpc_netinit(void)
 
   handle = dhcpc_open("eth0", &mac, IFHWADDRLEN);
 
-  /* Get an IP address.  Note: there is no logic here for renewing the address
-   * in this example.  The address should be renewed in ds.lease_time/2
-   * seconds.
+  /* Get an IP address.  Note: there is no logic here for renewing the
+   * address in this example.  The address should be renewed in
+   * ds.lease_time/2 seconds.
    */
 
   printf("Getting IP address\n");
   if (handle)
     {
       struct dhcpc_state ds;
+      char inetaddr[INET_ADDRSTRLEN];
+
       dhcpc_request(handle, &ds);
       netlib_set_ipv4addr("eth0", &ds.ipaddr);
 
@@ -351,7 +354,7 @@ static int xmlrpc_netinit(void)
         }
 
       dhcpc_close(handle);
-      printf("IP: %s\n", inet_ntoa(ds.ipaddr));
+      printf("IP: %s\n", inet_ntoa_r(ds.ipaddr, inetaddr, sizeof(inetaddr)));
     }
 
 #endif /* CONFIG_EXAMPLES_XMLRPC_DHCPC */
@@ -374,9 +377,12 @@ static int xmlrpc_netinit(void)
 
 int main(int argc, FAR char *argv[])
 {
-  int listenfd, connfd, on = 1;
+  int listenfd;
+  int connfd;
+  int on = 1;
   socklen_t clilen;
-  struct sockaddr_in cliaddr, servaddr;
+  struct sockaddr_in cliaddr;
+  struct sockaddr_in servaddr;
 
   if (xmlrpc_netinit() < 0)
     {
@@ -392,7 +398,7 @@ int main(int argc, FAR char *argv[])
 
   setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
-  memset((void *)&servaddr, 0, sizeof(servaddr));
+  memset(&servaddr, 0, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   servaddr.sin_port = htons(80);
@@ -401,7 +407,7 @@ int main(int argc, FAR char *argv[])
 
   listen(listenfd, 5);
 
-  for (;;)
+  for (; ; )
     {
       clilen = sizeof(cliaddr);
       connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
@@ -409,6 +415,7 @@ int main(int argc, FAR char *argv[])
         {
           break;
         }
+
       ninfo("Connection accepted: %d\n", connfd);
 
       xmlrpc_handler(connfd);

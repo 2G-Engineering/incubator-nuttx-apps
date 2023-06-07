@@ -422,7 +422,7 @@ static int zmr_zsrintdata(FAR struct zm_state_s *pzm)
   pzmr->attn = NULL;
   if (pzm->pktbuf[0] != '\0')
     {
-      pzmr->attn = strdup((char *)pzm->pktbuf);
+      pzmr->attn = strdup((FAR char *)pzm->pktbuf);
     }
 
   /* And send ZACK */
@@ -1057,7 +1057,7 @@ static int zmr_zstderr(FAR struct zm_state_s *pzm)
   zmdbg("ZMR_STATE %d\n", pzm->state);
 
   pzm->pktbuf[pzm->pktlen] = '\0';
-  fprintf(stderr, "Message: %s", (char *)pzm->pktbuf);
+  fprintf(stderr, "Message: %s", (FAR char *)pzm->pktbuf);
   return OK;
 }
 
@@ -1143,8 +1143,8 @@ static int zmr_parsefilename(FAR struct zmr_state_s *pzmr,
 
   /* Extend the relative path to the file storage directory */
 
-  asprintf(&pzmr->filename, "%s/%s", pzmr->pathname, namptr);
-  if (!pzmr->filename)
+  ret = asprintf(&pzmr->filename, "%s/%s", pzmr->pathname, namptr);
+  if (ret < 0)
     {
       zmdbg("ERROR: Failed to allocate full path %s/%s\n",
             CONFIG_SYSTEM_ZMODEM_MOUNTPOINT, namptr);
@@ -1331,9 +1331,9 @@ static int zmr_parsefilename(FAR struct zmr_state_s *pzmr,
               {
                 /* Create a candidate file name */
 
-                asprintf(&candidate, "%s_%" PRId32, pzmr->filename,
-                         ++uniqno);
-                if (!candidate)
+                ret = asprintf(&candidate, "%s_%" PRId32, pzmr->filename,
+                               ++uniqno);
+                if (ret < 0)
                   {
                     zmdbg("ERROR:  Failed to allocate candidate %s_%d\n",
                           pzmr->filename, uniqno);
@@ -1629,7 +1629,7 @@ ZMRHANDLE zmr_initialize(int remfd)
         {
           zmdbg("ERROR: zm_timerinit failed: %d\n", ret);
           free(pzmr);
-          return (ZMRHANDLE)NULL;
+          return NULL;
         }
 
       /* Note that no action is taken now... a timeout of zero is set

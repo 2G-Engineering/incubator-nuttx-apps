@@ -37,16 +37,14 @@ endif
 # we need to fix up the path so the DELIM will match the actual delimiter.
 
 ifeq ($(CONFIG_WINDOWS_NATIVE),y)
-CWD = $(strip ${shell echo %CD% | cut -d: -f2})
+  CWD = $(strip ${shell echo %CD% | cut -d: -f2})
 else
-CWD = $(CURDIR)
+  CWD = $(CURDIR)
 endif
 
-# Add the static application library to the linked libraries. Don't do this
-# with CONFIG_BUILD_KERNEL as there is no static app library
-ifneq ($(CONFIG_BUILD_KERNEL),y)
-  LDLIBS += $(call CONVERT_PATH,$(BIN))
-endif
+# Add the static application library to the linked libraries.
+
+LDLIBS += $(call CONVERT_PATH,$(BIN))
 
 # When building a module, link with the compiler runtime.
 # This should be linked after libapps. Consider that mbedtls in libapps
@@ -64,7 +62,8 @@ ifeq ($(BUILD_MODULE),y)
 endif
 
 SUFFIX = $(subst $(DELIM),.,$(CWD))
-PROGNAME := $(shell echo $(PROGNAME))
+
+PROGNAME := $(subst ",,$(PROGNAME))
 
 # Object files
 
@@ -88,11 +87,16 @@ MAINRUSTOBJ = $(MAINRUSTSRCS:=$(SUFFIX)$(OBJEXT))
 MAINZIGOBJ = $(MAINZIGSRCS:=$(SUFFIX)$(OBJEXT))
 
 SRCS = $(ASRCS) $(CSRCS) $(CXXSRCS) $(MAINSRC)
-OBJS = $(RAOBJS) $(CAOBJS) $(COBJS) $(CXXOBJS) $(RUSTOBJS) $(ZIGOBJS)
+OBJS = $(RAOBJS) $(CAOBJS) $(COBJS) $(CXXOBJS) $(RUSTOBJS) $(ZIGOBJS) $(EXTOBJS)
 
 ifneq ($(BUILD_MODULE),y)
-  OBJS += $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJS)
+  OBJS += $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ)
 endif
+
+# Compile flags, notice the default flags only suitable for flat build
+
+ZIGELFFLAGS ?= $(ZIGFLAGS)
+RUSTELFFLAGS ?= $(RUSTFLAGS)
 
 DEPPATH += --dep-path .
 DEPPATH += --obj-path .
@@ -106,33 +110,40 @@ all:: $(OBJS)
 .PRECIOUS: $(BIN)
 
 define ELFASSEMBLE
-	@echo "AS: $1"
+	$(ECHO_BEGIN)"AS: $1 "
 	$(Q) $(CC) -c $(AELFFLAGS) $($(strip $1)_AELFFLAGS) $1 -o $2
+	$(ECHO_END)
 endef
 
 define ELFCOMPILE
-	@echo "CC: $1"
+	$(ECHO_BEGIN)"CC: $1 "
 	$(Q) $(CC) -c $(CELFFLAGS) $($(strip $1)_CELFFLAGS) $1 -o $2
+	$(ECHO_END)
 endef
 
 define ELFCOMPILEXX
-	@echo "CXX: $1"
+	$(ECHO_BEGIN)"CXX: $1 "
 	$(Q) $(CXX) -c $(CXXELFFLAGS) $($(strip $1)_CXXELFFLAGS) $1 -o $2
+	$(ECHO_END)
 endef
 
 define ELFCOMPILERUST
-	@echo "RUSTC: $1"
+	$(ECHO_BEGIN)"RUSTC: $1 "
 	$(Q) $(RUSTC) --emit obj $(RUSTELFFLAGS) $($(strip $1)_RUSTELFFLAGS) $1 -o $2
+	$(ECHO_END)
 endef
 
 define ELFCOMPILEZIG
-       @echo "ZIG: $1"
-       $(Q) $(ZIG) build-obj $(ZIGELFFLAGS) $($(strip $1)_ZIGELFFLAGS) $1 --name $2
+	$(ECHO_BEGIN)"ZIG: $1 "
+	# Remove target suffix here since zig compiler add .o automatically
+	$(Q) $(ZIG) build-obj $(ZIGELFFLAGS) $($(strip $1)_ZIGELFFLAGS) --name $(basename $2) $1
+	$(ECHO_END)
 endef
 
 define ELFLD
-	@echo "LD: $2"
+	$(ECHO_BEGIN)"LD: $2 "
 	$(Q) $(LD) $(LDELFFLAGS) $(LDLIBPATH) $(ARCHCRT0OBJ) $1 $(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) -o $2
+	$(ECHO_END)
 endef
 
 $(RAOBJS): %.s$(SUFFIX)$(OBJEXT): %.s
@@ -193,16 +204,16 @@ else
 MAINNAME := $(addsuffix _main,$(PROGNAME))
 
 $(MAINCXXOBJ): %$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
-	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(firstword $(MAINNAME))})
-	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(firstword $(MAINNAME))})
-	$(eval MAINNAME=$(filter-out $(firstword $(MAINNAME)),$(MAINNAME)))
+	$(eval MAIN=$(word $(call GETINDEX,$<,$(MAINCXXSRCS)),$(MAINNAME)))
+	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(MAIN)})
+	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(MAIN)})
 	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CXXELFFLAGS)), \
 		$(call ELFCOMPILEXX, $<, $@), $(call COMPILEXX, $<, $@))
 
 $(MAINCOBJ): %.c$(SUFFIX)$(OBJEXT): %.c
-	$(eval $<_CFLAGS += ${shell $(DEFINE) "$(CC)" main=$(firstword $(MAINNAME))})
-	$(eval $<_CELFFLAGS += ${shell $(DEFINE) "$(CC)" main=$(firstword $(MAINNAME))})
-	$(eval MAINNAME=$(filter-out $(firstword $(MAINNAME)),$(MAINNAME)))
+	$(eval MAIN=$(word $(call GETINDEX,$<,$(MAINCSRCS)),$(MAINNAME)))
+	$(eval $<_CFLAGS += ${DEFINE_PREFIX}main=$(MAIN))
+	$(eval $<_CELFFLAGS += ${DEFINE_PREFIX}main=$(MAIN))
 	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
 		$(call ELFCOMPILE, $<, $@), $(call COMPILE, $<, $@))
 
@@ -252,3 +263,13 @@ distclean:: clean
 	$(call DELFILE, .depend)
 
 -include Make.dep
+
+# Default values for WASM_BUILD from Application.mk
+
+WASM_BUILD ?= n
+
+ifeq ($(WASM_BUILD),y)
+	ifneq ($(CONFIG_INTERPRETERS_WAMR)$(CONFIG_INTERPRETERS_WASM)$(CONFIG_INTERPRETERS_TOYWASM),)
+		include $(APPDIR)/tools/Wasm.mk
+	endif
+endif

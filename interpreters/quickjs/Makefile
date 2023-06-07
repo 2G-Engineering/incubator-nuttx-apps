@@ -28,13 +28,6 @@ QUICKJS_URL      = $(QUICKJS_URL_BASE)/$(QUICKJS_TARBALL)
 
 CSRCS = quickjs.c libregexp.c libbf.c libunicode.c cutils.c
 
-ifeq ($(CONFIG_INTERPRETERS_QUICKJS_MINI),y)
-MAINSRC = qjsmini.c
-else
-CSRCS += quickjs-libc.c repl.c
-MAINSRC = qjs.c
-endif
-
 VERSION=\"$(QUICKJS_VERSION)\"
 
 CFLAGS += -DCONFIG_VERSION=$(VERSION) -Wno-shadow
@@ -59,10 +52,12 @@ endif
 
 VPATH += $(QUICKJS_UNPACK)
 
+ifneq ($(CONFIG_INTERPRETERS_QUICKJS_NONE),y)
 PROGNAME  = qjs
 PRIORITY  = $(CONFIG_INTERPRETERS_QUICKJS_PRIORITY)
 STACKSIZE = $(CONFIG_INTERPRETERS_QUICKJS_STACKSIZE)
 MODULE    = $(CONFIG_INTERPRETERS_QUICKJS)
+endif
 
 $(QUICKJS_TARBALL):
 	$(Q) echo "Downloading $(QUICKJS_TARBALL)"
@@ -77,17 +72,29 @@ $(QUICKJS_UNPACK): $(QUICKJS_TARBALL)
 $(QUICKJS_UNPACK)/.patch: $(QUICKJS_UNPACK)
 	$(Q) touch $(QUICKJS_UNPACK)/.patch
 
-build_host: $(QUICKJS_UNPACK)/.patch
-	make -C $(QUICKJS_UNPACK) \
-		CONFIG_BIGNUM=$(CONFIG_INTERPRETERS_QUICKJS_BIGNUM)
-
-context:: build_host
-
-clean::
-	$(Q) test ! -d $(QUICKJS_UNPACK) || make -C $(QUICKJS_UNPACK) clean
-
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(QUICKJS_UNPACK)/.git),)
+QUICKJS_DOWNLOAD=$(QUICKJS_UNPACK)/.patch
 distclean::
 	$(call DELDIR, $(QUICKJS_UNPACK))
 	$(call DELFILE, $(QUICKJS_TARBALL))
+endif
+
+ifeq ($(CONFIG_INTERPRETERS_QUICKJS_MINI),y)
+MAINSRC = qjsmini.c
+endif
+
+ifeq ($(CONFIG_INTERPRETERS_QUICKJS_FULL),y)
+CSRCS += quickjs-libc.c repl.c
+MAINSRC = qjs.c
+context:: $(QUICKJS_DOWNLOAD)
+	$(MAKE) -C $(QUICKJS_UNPACK) \
+		CONFIG_BIGNUM=$(CONFIG_INTERPRETERS_QUICKJS_BIGNUM)
+else
+context:: $(QUICKJS_DOWNLOAD)
+endif
+
+clean::
+	$(Q) test ! -d $(QUICKJS_UNPACK) || $(MAKE) -C $(QUICKJS_UNPACK) clean
 
 include $(APPDIR)/Application.mk

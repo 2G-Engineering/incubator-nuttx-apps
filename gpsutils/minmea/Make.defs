@@ -18,6 +18,7 @@
 #
 ############################################################################
 
-ifeq ($(CONFIG_GPSUTILS_MINMEA_LIB),y)
+ifneq ($(CONFIG_GPSUTILS_MINMEA_LIB),)
 CONFIGURED_APPS += $(APPDIR)/gpsutils/minmea
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/gpsutils/minmea
 endif

@@ -22,12 +22,13 @@
  * Included Files
  ****************************************************************************/
 
-#include <sys/types.h>
+#include <assert.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <signal.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/types.h>
 
 #include "ostest.h"
 
@@ -69,6 +70,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout;
     }
 
@@ -79,6 +81,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigemptyset failed: %d\n", errcode);
+      ASSERT(false);
       goto errout;
     }
 
@@ -87,6 +90,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -101,6 +105,7 @@ void sigprocmask_test(void)
         {
           int errcode = errno;
           printf("sigprocmask_test: ERROR sigaddset failed: %d\n", errcode);
+          ASSERT(false);
           goto errout_with_mask;
         }
 
@@ -109,6 +114,7 @@ void sigprocmask_test(void)
         {
           int errcode = errno;
           printf("sigprocmask_test: ERROR sighold failed: %d\n", errcode);
+          ASSERT(false);
           goto errout_with_mask;
         }
     }
@@ -120,6 +126,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -128,6 +135,7 @@ void sigprocmask_test(void)
   if (memcmp(&currmask, &newmask, sizeof(sigset_t)) != 0)
     {
       printf("sigprocmask_test: ERROR unexpected sigprocmask\n");
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -138,6 +146,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigfillset failed: %d\n", errcode);
+      ASSERT(false);
       goto errout;
     }
 
@@ -146,6 +155,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -160,6 +170,7 @@ void sigprocmask_test(void)
         {
           int errcode = errno;
           printf("sigprocmask_test: ERROR sigdelset failed: %d\n", errcode);
+          ASSERT(false);
           goto errout_with_mask;
         }
 
@@ -168,6 +179,7 @@ void sigprocmask_test(void)
         {
           int errcode = errno;
           printf("sigprocmask_test: ERROR sigrelse failed: %d\n", errcode);
+          ASSERT(false);
           goto errout_with_mask;
         }
     }
@@ -179,6 +191,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -187,6 +200,7 @@ void sigprocmask_test(void)
   if (memcmp(&currmask, &newmask, sizeof(sigset_t)) != 0)
     {
       printf("sigprocmask_test: ERROR unexpected sigprocmask\n");
+      ASSERT(false);
       goto errout_with_mask;
     }
 
@@ -195,6 +209,7 @@ void sigprocmask_test(void)
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout;
     }
 
@@ -208,6 +223,7 @@ errout_with_mask:
     {
       int errcode = errno;
       printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
       goto errout;
     }
 

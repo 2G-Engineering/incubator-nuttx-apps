@@ -22,20 +22,24 @@
  * Included Files
  ****************************************************************************/
 
-#include <stdio.h>
-#include <unistd.h>
+#include <assert.h>
+#include <errno.h>
+#include <sched.h>
 #include <semaphore.h>
 #include <signal.h>
-#include <sched.h>
-#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include <nuttx/signal.h>
+
 #include "ostest.h"
 
 /****************************************************************************
  * Private Definitions
  ****************************************************************************/
 
-#define MY_TIMER_SIGNAL 17
-#define SIGVALUE_INT  42
+#define MY_TIMER_SIGNAL SIGRTMIN
+#define SIGVALUE_INT    42
 
 /****************************************************************************
  * Private Data
@@ -64,6 +68,7 @@ static void timer_expiration(int signo, siginfo_t *info, void *ucontext)
     {
       printf("timer_expiration: ERROR expected signo=%d\n",
              MY_TIMER_SIGNAL);
+      ASSERT(false);
     }
 
   /* Check siginfo */
@@ -72,6 +77,7 @@ static void timer_expiration(int signo, siginfo_t *info, void *ucontext)
     {
       printf("timer_expiration: ERROR sival_int=%d expected %d\n",
               info->si_value.sival_int, SIGVALUE_INT);
+      ASSERT(false);
     }
   else
     {
@@ -82,6 +88,7 @@ static void timer_expiration(int signo, siginfo_t *info, void *ucontext)
     {
       printf("timer_expiration: ERROR expected si_signo=%d, got=%d\n",
                MY_TIMER_SIGNAL, info->si_signo);
+      ASSERT(false);
     }
 
   if (info->si_code == SI_TIMER)
@@ -92,6 +99,7 @@ static void timer_expiration(int signo, siginfo_t *info, void *ucontext)
     {
       printf("timer_expiration: ERROR si_code=%d, expected SI_TIMER=%d\n",
              info->si_code, SI_TIMER);
+      ASSERT(false);
     }
 
   /* Check ucontext_t */
@@ -106,12 +114,15 @@ static void timer_expiration(int signo, siginfo_t *info, void *ucontext)
     {
       printf("timer_expiration: ERROR sigprocmask failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
-  if (oldset != allsigs)
+  if (!sigset_isequal(&oldset, &allsigs))
     {
-      printf("timer_expiration: ERROR sigprocmask=%jx expected=%jx\n",
-              (uintmax_t)oldset, (uintmax_t)allsigs);
+      printf("timer_expiration: ERROR sigprocmask=" SIGSET_FMT
+             " expected=" SIGSET_FMT "\n",
+             SIGSET_ELEM(&oldset), SIGSET_ELEM(&allsigs));
+      ASSERT(false);
     }
 }
 
@@ -144,6 +155,7 @@ void timer_test(void)
     {
       printf("timer_test: ERROR sigprocmask failed, status=%d\n",
               status);
+      ASSERT(false);
     }
 
   printf("timer_test: Registering signal handler\n");
@@ -157,11 +169,13 @@ void timer_test(void)
   if (status != OK)
     {
       printf("timer_test: ERROR sigaction failed, status=%d\n" , status);
+      ASSERT(false);
     }
 
 #ifndef SDCC
-  printf("timer_test: oact.sigaction=%p oact.sa_flags=%x oact.sa_mask=%jx\n",
-          oact.sa_sigaction, oact.sa_flags, (uintmax_t)oact.sa_mask);
+  printf("timer_test: oact.sigaction=%p oact.sa_flags=%x "
+         "oact.sa_mask=" SIGSET_FMT "\n",
+         oact.sa_sigaction, oact.sa_flags, SIGSET_ELEM(&oact.sa_mask));
 #endif
 
   /* Create the POSIX timer */
@@ -179,7 +193,8 @@ void timer_test(void)
   status = timer_create(CLOCK_REALTIME, &notify, &timerid);
   if (status != OK)
     {
-      printf("timer_test: timer_create failed, errno=%d\n", errno);
+      printf("timer_test: ERROR timer_create failed, errno=%d\n", errno);
+      ASSERT(false);
       goto errorout;
     }
 
@@ -195,7 +210,8 @@ void timer_test(void)
   status = timer_settime(timerid, 0, &timer, NULL);
   if (status != OK)
     {
-      printf("timer_test: timer_settime failed, errno=%d\n", errno);
+      printf("timer_test: ERROR timer_settime failed, errno=%d\n", errno);
+      ASSERT(false);
       goto errorout;
     }
 
@@ -217,11 +233,13 @@ void timer_test(void)
           else
             {
               printf("timer_test: ERROR sem_wait failed, errno=%d\n", error);
+              ASSERT(false);
             }
         }
       else
         {
           printf("timer_test: ERROR awakened with no error!\n");
+          ASSERT(false);
         }
 
       printf("timer_test: g_nsigreceived=%d\n", g_nsigreceived);
@@ -236,7 +254,8 @@ errorout:
   status = timer_delete(timerid);
   if (status != OK)
     {
-      printf("timer_test: timer_create failed, errno=%d\n", errno);
+      printf("timer_test: ERROR timer_create failed, errno=%d\n", errno);
+      ASSERT(false);
     }
 
   /* Detach the signal handler */

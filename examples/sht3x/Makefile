@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/sht3x/Make.defs
+# apps/examples/sht3x/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,7 +20,7 @@
 
 include $(APPDIR)/Make.defs
 
-# Hello, World! built-in application info
+# SHT3X built-in application info
 
 PROGNAME  = $(CONFIG_EXAMPLES_SHT3X_PROGNAME)
 PRIORITY  = $(CONFIG_EXAMPLES_SHT3X_PRIORITY)

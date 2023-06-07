@@ -39,7 +39,6 @@
  ****************************************************************************/
 
 #define IDENT_PI_KP           (0.0f)
-#define IDENT_PI_KI           (0.05f)
 
 /****************************************************************************
  * Private Data Types
@@ -82,6 +81,7 @@ struct foc_ident_f32_s
   float                                sign;
   float                                curr1_sum;
   float                                curr2_sum;
+
 #ifdef CONFIG_INDUSTRY_FOC_IDENT_FLUX
   /* global data in flux linkage identification */
 
@@ -194,7 +194,8 @@ int foc_ident_res_run_f32(FAR struct foc_ident_f32_s *ident,
 
   if (ident->cntr == 0)
     {
-      pi_controller_init(&ident->pi, IDENT_PI_KP, IDENT_PI_KI);
+      DEBUGASSERT(ident->cfg.res_ki > 0.0f);
+      pi_controller_init(&ident->pi, IDENT_PI_KP, ident->cfg.res_ki);
     }
 
   /* PI saturation */
@@ -407,13 +408,13 @@ int foc_ident_fluxlink_run_f32(FAR struct foc_ident_f32_s *ident,
                                        ident->cfg.flux_vel, ident->vel);
     }
 
-  /* Force q axis voltage = ident->cfg.flux_volt */
+  /* Force q axis current = ident->cfg.flux_curr */
 
-  out->dq_ref.q   = ident->cfg.flux_volt;
+  out->dq_ref.q   = ident->cfg.flux_curr;
   out->dq_ref.d   = 0.0f;
   out->vdq_comp.q = 0.0f;
   out->vdq_comp.d = 0.0f;
-  out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+  out->foc_mode   = FOC_HANDLER_MODE_CURRENT;
 
   /* Increase counter */
 
@@ -437,7 +438,7 @@ int foc_ident_fluxlink_run_f32(FAR struct foc_ident_f32_s *ident,
       /* Get flux linkage */
 
       ident->final.flux = (volt_avg - ident->final.res * curr_avg) /
-                          ident->vel;
+                          ident->vel - ident->final.ind * curr_avg;
 
       /* Force IDLE state */
 
@@ -576,9 +577,15 @@ int foc_routine_ident_cfg_f32(FAR foc_routine_f32_t *r, FAR void *cfg)
       goto errout;
     }
 
+  if (i->cfg.res_ki <= 0.0f)
+    {
+      ret = -EINVAL;
+      goto errout;
+    }
+
   if (i->cfg.res_current <= 0.0f || i->cfg.ind_volt <= 0.0f
 #ifdef CONFIG_INDUSTRY_FOC_IDENT_FLUX
-     || i->cfg.flux_volt <= 0.0f
+     || i->cfg.flux_curr <= 0.0f
 #endif
      )
     {
@@ -628,6 +635,9 @@ int foc_routine_ident_run_f32(FAR foc_routine_f32_t *r,
 
   DEBUGASSERT(r->data);
   i = r->data;
+#ifdef CONFIG_INDUSTRY_FOC_IDENT_FLUX
+  DEBUGASSERT(i->cfg.cb.kpki != NULL);
+#endif
 
   /* Force IDLE state at default */
 
@@ -650,12 +660,23 @@ int foc_routine_ident_run_f32(FAR foc_routine_f32_t *r,
           break;
         }
 
-      case FOC_IDENT_RUN_IDLE1:
-      case FOC_IDENT_RUN_IDLE2:
       case FOC_IDENT_RUN_IDLE3:
 #ifdef CONFIG_INDUSTRY_FOC_IDENT_FLUX
+        if (i->cntr == 0)
+          {
+            ret = i->cfg.cb.kpki(i->cfg.cb.priv_kpki, i->final.res,
+                                 i->final.ind, i->cfg.per);
+            if (ret < 0)
+              {
+                FOCLIBERR("ERROR: ident kpki callback failed %d!\n", ret);
+                goto errout;
+              }
+          }
+
       case FOC_IDENT_RUN_IDLE4:
 #endif
+      case FOC_IDENT_RUN_IDLE1:
+      case FOC_IDENT_RUN_IDLE2:
         {
           /* De-energetize motor */
 
@@ -742,6 +763,7 @@ int foc_routine_ident_run_f32(FAR foc_routine_f32_t *r,
       case FOC_IDENT_RUN_DONE:
         {
           ret = FOC_ROUTINE_RUN_DONE;
+          i->stage = FOC_IDENT_RUN_INIT;
 
           break;
         }

@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <debug.h>
+#include <unistd.h>
 
 #include <arpa/inet.h>
 
@@ -282,7 +283,10 @@ static void ipcfg_dump_ipv4addr(FAR const char *variable, in_addr_t address)
         address
       };
 
-      printf("%s%s\n", variable, inet_ntoa(saddr));
+      char inetaddr[INET_ADDRSTRLEN];
+
+      printf("%s%s\n", variable,
+             inet_ntoa_r(saddr, inetaddr, sizeof(inetaddr)));
     }
 }
 #endif

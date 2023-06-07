@@ -24,11 +24,14 @@
 
 #include <nuttx/config.h>
 
-#include <sys/wait.h>
+#include <assert.h>
+#include <errno.h>
+#include <sched.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <signal.h>
-#include <errno.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "ostest.h"
 
@@ -75,6 +78,7 @@ static void waitpid_start_children(void)
         {
           printf("waitpid_start_child: "
                  "ERROR Failed to start waitpid_main\n");
+          ASSERT(false);
         }
       else
         {
@@ -109,6 +113,7 @@ static void waitpid_last(void)
   if (pid < 0)
     {
       printf("waitpid_last: ERROR: Nothing to wait for\n");
+      ASSERT(false);
       return;
     }
 
@@ -138,6 +143,7 @@ static void waitpid_last(void)
         {
           printf("waitpid_last: ERROR: PID %d waitpid failed: %d\n",
                  g_waitpids[NCHILDREN - 1], errcode);
+          ASSERT(false);
         }
     }
   else if (WEXITSTATUS(stat_loc) != RETURN_STATUS)
@@ -147,6 +153,7 @@ static void waitpid_last(void)
              g_waitpids[NCHILDREN - 1],
              WEXITSTATUS(stat_loc),
              RETURN_STATUS);
+      ASSERT(false);
     }
   else
     {
@@ -198,18 +205,21 @@ int waitpid_test(void)
         {
           printf("waitpid_test: ERROR: PID %d waitpid failed: %d\n",
                  g_waitpids[0], errcode);
+          ASSERT(false);
         }
     }
   else if (ret != g_waitpids[0])
     {
       printf("waitpid_test: ERROR: PID %d wait returned PID %d\n",
              g_waitpids[0], ret);
+      ASSERT(false);
     }
   else if (WEXITSTATUS(stat_loc) != RETURN_STATUS)
     {
       printf("waitpid_test: ERROR: "
              "PID %d return status is %d, expected %d\n",
              g_waitpids[0], WEXITSTATUS(stat_loc), RETURN_STATUS);
+      ASSERT(false);
     }
   else
     {
@@ -253,18 +263,21 @@ int waitpid_test(void)
         {
           printf("waitpid_test: ERROR: PID %d waitid failed: %d\n",
                  g_waitpids[0], errcode);
+          ASSERT(false);
         }
     }
   else if (info.si_pid != g_waitpids[0])
     {
       printf("waitpid_test: ERROR: PID %d waitid returned PID %d\n",
              g_waitpids[0], info.si_pid);
+      ASSERT(false);
     }
   else if (info.si_status != RETURN_STATUS)
     {
       printf("waitpid_test: ERROR: "
              "PID %d return status is %d, expected %d\n",
              info.si_pid, info.si_status, RETURN_STATUS);
+      ASSERT(false);
     }
   else
     {
@@ -305,6 +318,7 @@ int waitpid_test(void)
       else
         {
           printf("waitpid_test: ERROR: waitid failed: %d\n", errcode);
+          ASSERT(false);
         }
     }
   else if (info.si_status != RETURN_STATUS)
@@ -312,6 +326,7 @@ int waitpid_test(void)
       printf("waitpid_test: ERROR: "
              "PID %d return status is %d, expected %d\n",
              info.si_pid, info.si_status, RETURN_STATUS);
+      ASSERT(false);
     }
   else
     {
@@ -352,6 +367,7 @@ int waitpid_test(void)
       else
         {
           printf("waitpid_test: ERROR: wait failed: %d\n", errcode);
+          ASSERT(false);
         }
     }
   else if (WEXITSTATUS(stat_loc) != RETURN_STATUS)
@@ -359,6 +375,7 @@ int waitpid_test(void)
       printf("waitpid_test: ERROR: "
              "PID %d return status is %d, expected %d\n",
              ret, WEXITSTATUS(stat_loc), RETURN_STATUS);
+      ASSERT(false);
     }
   else
     {

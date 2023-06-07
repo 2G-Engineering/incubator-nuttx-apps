@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
   int nbytes;
   int i;
   int ret;
-  int reccount;
+  int reccount = 0;
   struct sockaddr_can addr;
   struct canfd_frame frame;
   struct msghdr msg;
@@ -263,26 +263,30 @@ int main(int argc, char *argv[])
               if (nbytes == CAN_MTU)
                 {
                   reccount++;
-                  debug_print("R%d, Id:0x%lX\n", reccount, frame.can_id);
+                  debug_print("R%d, Id:0x%" PRIx32 "\n",
+                              reccount, frame.can_id);
                   if (frame.can_id & CAN_EFF_FLAG)
                     {
                       /* 29 bit address */
 
                       frame.can_id = frame.can_id & ~CAN_EFF_FLAG;
-                      sprintf(sbuf, "T%08lX%d", frame.can_id, frame.len);
+                      snprintf(sbuf, sizeof(sbuf), "T%08" PRIx32 "%d",
+                               frame.can_id, frame.len);
                       sbp = &sbuf[10];
                     }
                   else
                     {
                       /* 11 bit address */
 
-                      sprintf(sbuf, "t%03lX%d", frame.can_id, frame.len);
+                      snprintf(sbuf, sizeof(sbuf), "t%03" PRIx32 "%d",
+                               frame.can_id, frame.len);
                       sbp = &sbuf[5];
                     }
 
                   for (i = 0; i < frame.len; i++)
                     {
-                      sprintf(sbp, "%02X", frame.data[i]);
+                      snprintf(sbp, sizeof(sbuf) - (sbp - sbuf),
+                               "%02X", frame.data[i]);
                       sbp += 2;
                     }
 
@@ -358,8 +362,7 @@ int main(int argc, char *argv[])
 
                           /* set the device name */
 
-                          strncpy(ifr.ifr_name, argv[1], IFNAMSIZ - 1);
-                          ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+                          strlcpy(ifr.ifr_name, argv[1], IFNAMSIZ);
 
                           ifr.ifr_ifru.ifru_can_data.arbi_bitrate =
                             canspeed / 1000; /* Convert bit/s to kbit/s */

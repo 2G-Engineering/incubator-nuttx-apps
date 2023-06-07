@@ -50,6 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <nuttx/modem/u-blox.h>
 
@@ -303,15 +304,14 @@ static int ubloxmodem_reset(FAR struct ubloxmodem_cxt *cxt)
 
 static int ubloxmodem_status(FAR struct ubloxmodem_cxt *cxt)
 {
-  int ret, i;
   struct ubxmdm_status status;
+  int ret;
+  int i;
 
   /* Allocate name-value pairs */
 
   FAR struct ubxmdm_regval register_values[UBLOXMODEM_MAX_REGISTERS];
   char regname[4];   /* Null-terminated string buffer */
-
-  regname[3] = '\0'; /* Set the null string terminator */
 
   /* Set the maximum value, to be updated by driver */
 
@@ -330,7 +330,7 @@ static int ubloxmodem_status(FAR struct ubloxmodem_cxt *cxt)
        i < status.register_values_size && i < UBLOXMODEM_MAX_REGISTERS;
        i++)
     {
-      strncpy(regname, status.register_values[i].name, 3);
+      strlcpy(regname, status.register_values[i].name, sizeof(regname));
       printf("%s=%d ",
              regname,
              (int) status.register_values[i].val);
@@ -342,9 +342,10 @@ static int ubloxmodem_status(FAR struct ubloxmodem_cxt *cxt)
 
 static int ubloxmodem_at(FAR struct ubloxmodem_cxt *cxt)
 {
-  int fd, ret;
   FAR char *atcmd;
   FAR char *resp;
+  int ret;
+  int fd;
 
   atcmd = cxt->argv[2];
   resp  = cxt->argv[3];

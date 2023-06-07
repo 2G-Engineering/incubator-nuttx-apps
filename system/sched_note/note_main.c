@@ -1,4 +1,4 @@
-/************************************************************************************
+/****************************************************************************
  * apps/system/sched_note/note_main.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -16,11 +16,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  *
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Included Files
- ************************************************************************************/
+ ****************************************************************************/
 
 #include <nuttx/config.h>
 
@@ -32,28 +32,22 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <nuttx/sched_note.h>
 
-/************************************************************************************
+/****************************************************************************
  * Pre-processor Definitions
- ************************************************************************************/
+ ****************************************************************************/
 
-#ifdef CONFIG_SCHED_INSTRUMENTATION_HIRES
-#  define syslog_time(priority, fmt, ...) \
-            syslog(priority, "%08lx.%08lx: " fmt, \
-                   (unsigned long)systime_sec, (unsigned long)systime_nsec, \
-                   __VA_ARGS__)
-#else
 #  define syslog_time(priority, fmt, ...) \
             syslog(priority, "%08lx: " fmt, \
                    (unsigned long)systime, \
                    __VA_ARGS__)
-#endif
 
-/************************************************************************************
+/****************************************************************************
  * Private Data
- ************************************************************************************/
+ ****************************************************************************/
 
 static bool g_note_daemon_started;
 static uint8_t g_note_buffer[CONFIG_SYSTEM_NOTE_BUFFERSIZE];
@@ -79,13 +73,13 @@ static FAR const char *g_statenames[] =
 #define NSTATES (sizeof(g_statenames)/sizeof(FAR const char *))
 #endif
 
-/************************************************************************************
+/****************************************************************************
  * Private Functions
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Name: trace_dump_unflatten
- ************************************************************************************/
+ ****************************************************************************/
 
 static void trace_dump_unflatten(FAR void *dst,
                                  FAR uint8_t *src, size_t len)
@@ -101,19 +95,15 @@ static void trace_dump_unflatten(FAR void *dst,
 #endif
 }
 
-/************************************************************************************
+/****************************************************************************
  * Name: dump_notes
- ************************************************************************************/
+ ****************************************************************************/
 
 static void dump_notes(size_t nread)
 {
   FAR struct note_common_s *note;
-#ifdef CONFIG_SCHED_INSTRUMENTATION_HIRES
   uint32_t systime_sec;
   uint32_t systime_nsec;
-#else
-  uint32_t systime;
-#endif
   pid_t pid;
   off_t offset;
 
@@ -122,14 +112,10 @@ static void dump_notes(size_t nread)
     {
       note    = (FAR struct note_common_s *)&g_note_buffer[offset];
       trace_dump_unflatten(&pid, note->nc_pid, sizeof(pid));
-#ifdef CONFIG_SCHED_INSTRUMENTATION_HIRES
       trace_dump_unflatten(&systime_nsec,
                            note->nc_systime_nsec, sizeof(systime_nsec));
       trace_dump_unflatten(&systime_sec,
                            note->nc_systime_sec, sizeof(systime_sec));
-#else
-      trace_dump_unflatten(&systime, note->nc_systime, sizeof(systime));
-#endif
 
       switch (note->nc_type)
         {
@@ -189,8 +175,8 @@ static void dump_notes(size_t nread)
 #ifdef CONFIG_SMP
               syslog_time(LOG_INFO,
                      "Task %u stopped, CPU%u, priority %u\n",
-                     (unsigned int)pid,
-                     (unsigned int)note->nc_cpu, (unsigned int)note->nc_priority);
+                     (unsigned int)pid, (unsigned int)note->nc_cpu,
+                     (unsigned int)note->nc_priority);
 #else
               syslog_time(LOG_INFO,
                      "Task %u stopped, priority %u\n",
@@ -405,21 +391,23 @@ static void dump_notes(size_t nread)
                   return;
                 }
 
-              trace_dump_unflatten(&count, note_preempt->npr_count, sizeof(count));
+              trace_dump_unflatten(&count, note_preempt->npr_count,
+                                   sizeof(count));
 
               if (note->nc_type == NOTE_PREEMPT_LOCK)
                 {
 #ifdef CONFIG_SMP
                   syslog_time(LOG_INFO,
                          "Task %u locked, CPU%u, priority %u, count=%u\n",
-                         (unsigned int)pid,
-                         (unsigned int)note->nc_cpu,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)pid, (unsigned int)note->nc_cpu,
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
 #else
                   syslog_time(LOG_INFO,
                          "Task %u locked, priority %u, count=%u\n",
                          (unsigned int)pid,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
 #endif
                 }
               else
@@ -427,14 +415,15 @@ static void dump_notes(size_t nread)
 #ifdef CONFIG_SMP
                   syslog_time(LOG_INFO,
                          "Task %u unlocked, CPU%u, priority %u, count=%u\n",
-                         (unsigned int)pid,
-                         (unsigned int)note->nc_cpu,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)pid, (unsigned int)note->nc_cpu,
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
 #else
                   syslog_time(LOG_INFO,
                          "Task %u unlocked, priority %u, count=%u\n",
                          (unsigned int)pid,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
 #endif
                 }
             }
@@ -461,38 +450,41 @@ static void dump_notes(size_t nread)
                 }
 
 #ifdef CONFIG_SMP
-              trace_dump_unflatten(&count, note_csection->ncs_count, sizeof(count));
+              trace_dump_unflatten(&count, note_csection->ncs_count,
+                                   sizeof(count));
 
               if (note->nc_type == NOTE_CSECTION_ENTER)
                 {
                   syslog_time(LOG_INFO,
                          "Task %u enter csection, CPU%u, priority %u, "
                          "count=%u\n",
-                         (unsigned int)pid,
-                         (unsigned int)note->nc_cpu,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)pid, (unsigned int)note->nc_cpu,
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
                 }
               else
                 {
                   syslog_time(LOG_INFO,
                          "Task %u leave csection, CPU%u, priority %u, "
                          "count=%u\n",
-                         (unsigned int)pid,
-                         (unsigned int)note->nc_cpu,
-                         (unsigned int)note->nc_priority, (unsigned int)count);
+                         (unsigned int)pid, (unsigned int)note->nc_cpu,
+                         (unsigned int)note->nc_priority,
+                         (unsigned int)count);
                 }
 #else
               if (note->nc_type == NOTE_CSECTION_ENTER)
                 {
-                  syslog_time(LOG_INFO, "Task %u enter csection, priority %u\n",
-                       (unsigned int)pid,
-                       (unsigned int)note->nc_priority);
+                  syslog_time(LOG_INFO,
+                         "Task %u enter csection, priority %u\n",
+                         (unsigned int)pid,
+                         (unsigned int)note->nc_priority);
                 }
               else
                 {
-                  syslog_time(LOG_INFO, "Task %u leave csection, priority %u\n",
-                       (unsigned int)pid,
-                       (unsigned int)note->nc_priority);
+                  syslog_time(LOG_INFO,
+                         "Task %u leave csection, priority %u\n",
+                         (unsigned int)pid,
+                         (unsigned int)note->nc_priority);
                 }
 #endif
             }
@@ -566,8 +558,8 @@ static void dump_notes(size_t nread)
                 case NOTE_SPINLOCK_ABORT:
                   {
                     syslog_time(LOG_INFO,
-                           "Task %u CPU%u abort wait on spinlock=%p value=%u "
-                           "priority %u\n",
+                           "Task %u CPU%u abort wait on spinlock=%p "
+                           "value=%u priority %u\n",
                            (unsigned int)pid,
                            (unsigned int)note->nc_cpu,
                            spinlock,
@@ -637,7 +629,8 @@ static void dump_notes(size_t nread)
                     if (note->nc_length < SIZEOF_NOTE_SYSCALL_ENTER(0))
                       {
                         syslog(LOG_ERR,
-                               "Size incorrect for \"SYSCALL enter\" note: %d\n",
+                               "Size incorrect for \"SYSCALL enter\" note: "
+                               "%d\n",
                                note->nc_length);
                         return;
                       }
@@ -655,10 +648,12 @@ static void dump_notes(size_t nread)
                       (FAR struct note_syscall_leave_s *)note;
                     uintptr_t result;
 
-                    if (note->nc_length != sizeof(struct note_syscall_leave_s))
+                    if (note->nc_length !=
+                          sizeof(struct note_syscall_leave_s))
                       {
                         syslog(LOG_ERR,
-                               "Size incorrect for \"SYSCALL leave\" note: %d\n",
+                               "Size incorrect for \"SYSCALL leave\" note: "
+                               "%d\n",
                                note->nc_length);
                         return;
                       }
@@ -691,10 +686,10 @@ static void dump_notes(size_t nread)
                       }
 
                     syslog_time(LOG_INFO,
-                           "Task %u %s IRQ %d\n",
-                           (unsigned int)pid,
-                           note->nc_type == NOTE_IRQ_ENTER ? "Enter" : "Leave",
-                           note_irq->nih_irq);
+                         "Task %u %s IRQ %d\n",
+                         (unsigned int)pid,
+                         note->nc_type == NOTE_IRQ_ENTER ? "Enter" : "Leave",
+                         note_irq->nih_irq);
                   }
                   break;
 #endif
@@ -731,7 +726,8 @@ static void dump_notes(size_t nread)
                     int ret = 0;
                     int i;
 
-                    count = note->nc_length - sizeof(struct note_binary_s) + 1;
+                    count =
+                      note->nc_length - sizeof(struct note_binary_s) + 1;
 
                     if (count < 0)
                       {
@@ -743,7 +739,9 @@ static void dump_notes(size_t nread)
 
                     for (i = 0; i < count; i++)
                       {
-                        ret += sprintf(&out[ret], " 0x%x", note_binary->nbi_data[i]);
+                        snprintf(&out[ret], sizeof(out) - ret,
+                                 " 0x%x", note_binary->nbi_data[i]);
+                        ret += strlen(&out[ret]);
                       }
 
                     trace_dump_unflatten(&ip, note_binary->nbi_ip,
@@ -771,9 +769,9 @@ static void dump_notes(size_t nread)
     }
 }
 
-/************************************************************************************
+/****************************************************************************
  * Name: note_daemon
- ************************************************************************************/
+ ****************************************************************************/
 
 static int note_daemon(int argc, char *argv[])
 {
@@ -787,12 +785,13 @@ static int note_daemon(int argc, char *argv[])
 
   /* Open the note driver */
 
-  syslog(LOG_INFO, "note_daemon: Opening /dev/note\n");
-  fd = open("/dev/note", O_RDONLY);
+  syslog(LOG_INFO, "note_daemon: Opening /dev/note/ram\n");
+  fd = open("/dev/note/ram", O_RDONLY);
   if (fd < 0)
     {
       int errcode = errno;
-      syslog(LOG_ERR, "note_daemon: ERROR: Failed to open /dev/note: %d\n",
+      syslog(LOG_ERR, "note_daemon: ERROR: Failed to open /dev/note/ram: "
+            "%d\n",
              errcode);
       goto errout;
     }
@@ -819,13 +818,13 @@ errout:
   return EXIT_FAILURE;
 }
 
-/************************************************************************************
+/****************************************************************************
  * Public Functions
- ************************************************************************************/
+ ****************************************************************************/
 
-/************************************************************************************
+/****************************************************************************
  * Name: note_main
- ************************************************************************************/
+ ****************************************************************************/
 
 int main(int argc, FAR char *argv[])
 {

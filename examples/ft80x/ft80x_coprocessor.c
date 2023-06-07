@@ -30,6 +30,7 @@
 #include <nuttx/config.h>
 
 #include <errno.h>
+#include <unistd.h>
 
 #include <nuttx/lcd/ft80x.h>
 
@@ -2066,7 +2067,7 @@ int ft80x_coproc_interactive(int fd, FAR struct ft80x_dlbuffer_s *buffer)
       cmds.e.button.cmd         = FT80X_CMD_BUTTON;
       cmds.e.button.x           = ydist;
       cmds.e.button.y           = yoffset;
-      cmds.e.button.w           = 10  *width;
+      cmds.e.button.w           = 10 * width;
       cmds.e.button.h           = height;
       cmds.e.button.font        = fontid;
 
@@ -3907,7 +3908,8 @@ int ft80x_coproc_calibrate(int fd, FAR struct ft80x_dlbuffer_s *buffer)
       return ret;
     }
 
-  ft80x_info("Transform A-F: {%08lx, %08lx, %08lx, %08lx, %08lx, %08lx}\n",
+  ft80x_info("Transform A-F: {%08" PRIx32 ", %08" PRIx32 ", %08"
+             PRIx32 ", %08" PRIx32 ", %08" PRIx32 ", %08" PRIx32 "}\n",
              matrix[0], matrix[1], matrix[2],
              matrix[3], matrix[4], matrix[5]);
   return OK;

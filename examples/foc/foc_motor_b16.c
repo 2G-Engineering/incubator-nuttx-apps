@@ -25,15 +25,21 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-
-#include "foc_motor_b16.h"
+#include <string.h>
 
 #include "foc_cfg.h"
 #include "foc_debug.h"
+#include "foc_motor_b16.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define FOC_FLOAT_IDENT_RES_MIN ftob16(1e-6)
+#define FOC_FLOAT_IDENT_RES_MAX ftob16(2.0f)
+
+#define FOC_FLOAT_IDENT_IND_MIN ftob16(1e-9)
+#define FOC_FLOAT_IDENT_IND_MAX ftob16(2.0f)
 
 /****************************************************************************
  * Private Type Definition
@@ -132,6 +138,91 @@ errout:
 }
 #endif
 
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+/****************************************************************************
+ * Name: foc_motor_ident
+ ****************************************************************************/
+
+static int foc_motor_ident(FAR struct foc_motor_b16_s *motor, FAR bool *done)
+{
+  struct foc_routine_in_b16_s          in;
+  struct foc_routine_out_b16_s         out;
+  struct foc_routine_ident_final_b16_s final;
+  int                                  ret = OK;
+
+  /* Get input */
+
+  in.foc_state = &motor->foc_state;
+  in.angle     = motor->angle_now;
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
+  in.vel       = motor->vel.now;
+#endif
+  in.vbus      = motor->vbus;
+
+  /* Run ident procedure */
+
+  ret = foc_routine_run_b16(&motor->ident, &in, &out);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_routine_run_b16 failed %d!\n", ret);
+      goto errout;
+    }
+
+  if (ret == FOC_ROUTINE_RUN_DONE)
+    {
+      ret = foc_routine_final_b16(&motor->ident, &final);
+      if (ret < 0)
+        {
+          PRINTFV("ERROR: foc_routine_final_b16 failed %d!\n", ret);
+          goto errout;
+        }
+
+      PRINTF("Ident results:\n");
+      PRINTF("  res   = %.4f\n", b16tof(final.res));
+      PRINTF("  ind   = %.8f\n", b16tof(final.ind));
+
+      if (final.res < FOC_FLOAT_IDENT_RES_MIN ||
+          final.res > FOC_FLOAT_IDENT_RES_MAX)
+        {
+          PRINTF("ERROR: Motor resistance out of valid range res=%.4f!\n",
+                 b16tof(final.res));
+
+          ret = -EINVAL;
+          goto errout;
+        }
+
+      if (final.ind < FOC_FLOAT_IDENT_IND_MIN ||
+          final.ind > FOC_FLOAT_IDENT_IND_MAX)
+        {
+          PRINTF("ERROR: Motor inductance out of valid range ind=%.8f!\n",
+                 b16tof(final.ind));
+
+          ret = -EINVAL;
+          goto errout;
+        }
+
+      /* Store results */
+
+      motor->phy_ident.res = final.res;
+      motor->phy_ident.ind = final.ind;
+
+      *done = true;
+    }
+
+  /* Copy output */
+
+  motor->dq_ref.d   = out.dq_ref.d;
+  motor->dq_ref.q   = out.dq_ref.q;
+  motor->vdq_comp.d = out.vdq_comp.d;
+  motor->vdq_comp.q = out.vdq_comp.q;
+  motor->angle_now  = out.angle;
+  motor->foc_mode   = out.foc_mode;
+
+errout:
+  return ret;
+}
+#endif
+
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_RUN
 /****************************************************************************
  * Name: foc_runmode_init
@@ -141,7 +232,7 @@ static int foc_runmode_init(FAR struct foc_motor_b16_s *motor)
 {
   int ret = OK;
 
-  switch (motor->envp->fmode)
+  switch (motor->envp->cfg->fmode)
     {
       case FOC_FMODE_IDLE:
         {
@@ -163,7 +254,7 @@ static int foc_runmode_init(FAR struct foc_motor_b16_s *motor)
 
       default:
         {
-          PRINTF("ERROR: unsupported op mode %d\n", motor->envp->fmode);
+          PRINTF("ERROR: unsupported op mode %d\n", motor->envp->cfg->fmode);
           ret = -EINVAL;
           goto errout;
         }
@@ -255,10 +346,10 @@ static int foc_motor_configure(FAR struct foc_motor_b16_s *motor)
 #ifdef CONFIG_EXAMPLES_FOC_CONTROL_PI
   /* Get PI controller configuration */
 
-  ctrl_cfg.id_kp = ftob16(motor->envp->foc_pi_kp / 1000.0f);
-  ctrl_cfg.id_ki = ftob16(motor->envp->foc_pi_ki / 1000.0f);
-  ctrl_cfg.iq_kp = ftob16(motor->envp->foc_pi_kp / 1000.0f);
-  ctrl_cfg.iq_ki = ftob16(motor->envp->foc_pi_ki / 1000.0f);
+  ctrl_cfg.id_kp = ftob16(motor->envp->cfg->foc_pi_kp / 1000.0f);
+  ctrl_cfg.id_ki = ftob16(motor->envp->cfg->foc_pi_ki / 1000.0f);
+  ctrl_cfg.iq_kp = ftob16(motor->envp->cfg->foc_pi_kp / 1000.0f);
+  ctrl_cfg.iq_ki = ftob16(motor->envp->cfg->foc_pi_ki / 1000.0f);
 #endif
 
 #ifdef CONFIG_INDUSTRY_FOC_MODULATION_SVM3
@@ -340,7 +431,7 @@ static int foc_motor_torq(FAR struct foc_motor_b16_s *motor, uint32_t torq)
    * NOTE: torqmax may not fit in b16_t so we can't use b16idiv()
    */
 
-  tmp1 = itob16(motor->envp->torqmax / 1000);
+  tmp1 = itob16(motor->envp->cfg->torqmax / 1000);
   tmp2 = b16mulb16(ftob16(SETPOINT_ADC_SCALE), tmp1);
 
   motor->torq.des = b16muli(tmp2, torq);
@@ -365,7 +456,7 @@ static int foc_motor_vel(FAR struct foc_motor_b16_s *motor, uint32_t vel)
    * NOTE: velmax may not fit in b16_t so we can't use b16idiv()
    */
 
-  tmp1 = itob16(motor->envp->velmax / 1000);
+  tmp1 = itob16(motor->envp->cfg->velmax / 1000);
   tmp2 = b16mulb16(ftob16(SETPOINT_ADC_SCALE), tmp1);
 
   motor->vel.des = b16muli(tmp2, vel);
@@ -390,7 +481,7 @@ static int foc_motor_pos(FAR struct foc_motor_b16_s *motor, uint32_t pos)
    * NOTE: posmax may not fit in b16_t so we can't use b16idiv()
    */
 
-  tmp1 = itob16(motor->envp->posmax / 1000);
+  tmp1 = itob16(motor->envp->cfg->posmax / 1000);
   tmp2 = b16mulb16(ftob16(SETPOINT_ADC_SCALE), tmp1);
 
   motor->pos.des = b16muli(tmp2, pos);
@@ -407,7 +498,7 @@ static int foc_motor_setpoint(FAR struct foc_motor_b16_s *motor, uint32_t sp)
 {
   int ret = OK;
 
-  switch (motor->envp->mmode)
+  switch (motor->envp->cfg->mmode)
     {
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_TORQ
       case FOC_MMODE_TORQ:
@@ -457,9 +548,22 @@ static int foc_motor_setpoint(FAR struct foc_motor_b16_s *motor, uint32_t sp)
         }
 #endif
 
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
+      case FOC_MMODE_ALIGN_ONLY:
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+      case FOC_MMODE_IDENT_ONLY:
+#endif
+        {
+          /* Do nothing */
+
+          break;
+        }
+
       default:
         {
-          PRINTF("ERROR: unsupported ctrl mode %d\n", motor->envp->mmode);
+          PRINTF("ERROR: unsupported ctrl mode %d\n",
+                 motor->envp->cfg->mmode);
           ret = -EINVAL;
           goto errout;
         }
@@ -615,7 +719,7 @@ static int foc_motor_run(FAR struct foc_motor_b16_s *motor)
   if (motor->openloop_now == true)
     {
 #  ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
-      if (motor->envp->mmode != FOC_MMODE_VEL)
+      if (motor->envp->cfg->mmode != FOC_MMODE_VEL)
 #endif
         {
           PRINTF("ERROR: open-loop only with FOC_MMODE_VEL\n");
@@ -632,7 +736,7 @@ static int foc_motor_run(FAR struct foc_motor_b16_s *motor)
 
   /* Controller */
 
-  switch (motor->envp->mmode)
+  switch (motor->envp->cfg->mmode)
     {
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_TORQ
       case FOC_MMODE_TORQ:
@@ -679,8 +783,8 @@ static int foc_motor_run(FAR struct foc_motor_b16_s *motor)
        * NOTE: Id always set to 0
        */
 
-      motor->dq_ref.q = b16idiv(motor->envp->qparam, 1000);
-      motor->dq_ref.d = 0;
+      q_ref = b16idiv(motor->envp->cfg->qparam, 1000);
+      d_ref = 0;
     }
 #endif
 
@@ -721,6 +825,9 @@ int foc_motor_init(FAR struct foc_motor_b16_s *motor,
 #endif
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
   struct foc_routine_align_cfg_b16_s align_cfg;
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+  struct foc_routine_ident_cfg_b16_s ident_cfg;
 #endif
   int                                ret = OK;
 
@@ -780,10 +887,10 @@ int foc_motor_init(FAR struct foc_motor_b16_s *motor,
 
   /* Get qenco devpath */
 
-  sprintf(motor->qedpath,
-          "%s%d",
-          CONFIG_EXAMPLES_FOC_QENCO_DEVPATH,
-          motor->envp->id);
+  snprintf(motor->qedpath, sizeof(motor->qedpath),
+           "%s%d",
+           CONFIG_EXAMPLES_FOC_QENCO_DEVPATH,
+           motor->envp->id);
 
   /* Configure qenco angle handler */
 
@@ -811,10 +918,10 @@ int foc_motor_init(FAR struct foc_motor_b16_s *motor,
 
   /* Get hall devpath */
 
-  sprintf(motor->hldpath,
-          "%s%d",
-          CONFIG_EXAMPLES_FOC_HALL_DEVPATH,
-          motor->envp->id);
+  snprintf(motor->hldpath, sizeof(motor->hldpath),
+           "%s%d",
+           CONFIG_EXAMPLES_FOC_HALL_DEVPATH,
+           motor->envp->id);
 
   /* Configure hall angle handler */
 
@@ -842,7 +949,7 @@ int foc_motor_init(FAR struct foc_motor_b16_s *motor,
   /* Initialize motor alignment data */
 
   align_cfg.volt         = ftob16(CONFIG_EXAMPLES_FOC_ALIGN_VOLT / 1000.0f);
-  align_cfg.offset_steps = (CONFIG_EXAMPLES_FOC_NOTIFIER_FREQ *     \
+  align_cfg.offset_steps = (CONFIG_EXAMPLES_FOC_NOTIFIER_FREQ * \
                             CONFIG_EXAMPLES_FOC_ALIGN_SEC / 1000);
 
   /* Connect align callbacks */
@@ -867,11 +974,63 @@ int foc_motor_init(FAR struct foc_motor_b16_s *motor,
     }
 #endif
 
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+
+  /* Initialize motor identifiaction routine */
+
+  ret = foc_routine_init_b16(&motor->ident, &g_foc_routine_ident_b16);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_routine_init_b16 failed %d!\n", ret);
+      goto errout;
+    }
+
+  /* Initialize motor identification data */
+
+  ident_cfg.per         = motor->per;
+  ident_cfg.res_current = ftob16(motor->envp->cfg->ident_res_curr /
+                                 1000.0f);
+  ident_cfg.res_ki      = ftob16(motor->envp->cfg->ident_res_ki /
+                                 1000.0f);
+  ident_cfg.ind_volt    = ftob16(motor->envp->cfg->ident_ind_volt /
+                                 1000.0f);
+  ident_cfg.res_steps   = (CONFIG_EXAMPLES_FOC_NOTIFIER_FREQ *
+                           motor->envp->cfg->ident_res_sec / 1000);
+  ident_cfg.ind_steps   = (CONFIG_EXAMPLES_FOC_NOTIFIER_FREQ *
+                           motor->envp->cfg->ident_ind_sec / 1000);
+  ident_cfg.idle_steps  = CONFIG_EXAMPLES_FOC_IDENT_IDLE;
+
+  ret = foc_routine_cfg_b16(&motor->ident, &ident_cfg);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_ident_cfg_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
+
   /* Initialize controller state */
 
-  motor->ctrl_state = FOC_CTRL_STATE_INIT;
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
+  if (motor->envp->cfg->mmode == FOC_MMODE_ALIGN_ONLY)
+    {
+      motor->ctrl_state = FOC_CTRL_STATE_ALIGN;
+    }
+  else
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+  if (motor->envp->cfg->mmode == FOC_MMODE_IDENT_ONLY)
+    {
+      motor->ctrl_state = FOC_CTRL_STATE_IDENT;
+    }
+  else
+#endif
+    {
+      motor->ctrl_state = FOC_CTRL_STATE_INIT;
+    }
 
-#if defined(CONFIG_EXAMPLES_FOC_SENSORED) || defined(CONFIG_EXAMPLES_FOC_HAVE_RUN)
+#if defined(CONFIG_EXAMPLES_FOC_SENSORED) ||  \
+    defined(CONFIG_EXAMPLES_FOC_HAVE_RUN) ||  \
+    defined(CONFIG_EXAMPLES_FOC_HAVE_IDENT)
 errout:
 #endif
   return ret;
@@ -886,6 +1045,61 @@ int foc_motor_deinit(FAR struct foc_motor_b16_s *motor)
   int ret = OK;
 
   DEBUGASSERT(motor);
+
+  #ifdef CONFIG_EXAMPLES_FOC_HAVE_OPENLOOP
+  /* Deinitialzie open-loop handler */
+
+  ret = foc_angle_deinit_b16(&motor->openloop);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_angle_deinit_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
+
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_QENCO
+  /* Deinitialzie qenco handler */
+
+  ret = foc_angle_deinit_b16(&motor->qenco);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_angle_deinit_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
+
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_HALL
+  /* Deinitialzie hall handler */
+
+  ret = foc_angle_deinit_b16(&motor->hall);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_angle_deinit_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
+
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
+  /* Deinitialize motor alignment routine */
+
+  ret = foc_routine_deinit_b16(&motor->align);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_routine_deinit_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
+
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+  /* Deinitialize motor identification routine */
+
+  ret = foc_routine_deinit_b16(&motor->ident);
+  if (ret < 0)
+    {
+      PRINTFV("ERROR: foc_routine_deinit_b16 failed %d!\n", ret);
+      goto errout;
+    }
+#endif
 
 #ifdef CONFIG_EXAMPLES_FOC_STATE_USE_MODEL_PMSM
   /* Deinitialize PMSM model */
@@ -1030,9 +1244,6 @@ errout:
 int foc_motor_control(FAR struct foc_motor_b16_s *motor)
 {
   int ret = OK;
-#ifdef CONFIG_EXAMPLES_FOC_HAVE_ALIGN
-  bool align_done = false;
-#endif
 
   DEBUGASSERT(motor);
 
@@ -1055,19 +1266,53 @@ int foc_motor_control(FAR struct foc_motor_b16_s *motor)
         {
           /* Run motor align procedure */
 
-          ret = foc_motor_align(motor, &align_done);
+          ret = foc_motor_align(motor, &motor->align_done);
           if (ret < 0)
             {
               PRINTF("ERROR: foc_motor_align failed %d!\n", ret);
               goto errout;
             }
 
-          if (align_done == true)
+          if (motor->align_done == true)
             {
               /* Next state */
 
               motor->ctrl_state += 1;
               motor->foc_mode = FOC_HANDLER_MODE_IDLE;
+
+              if (motor->envp->cfg->mmode == FOC_MMODE_ALIGN_ONLY)
+                {
+                  motor->ctrl_state = FOC_CTRL_STATE_TERMINATE;
+                }
+            }
+
+          break;
+        }
+#endif
+
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
+      case FOC_CTRL_STATE_IDENT:
+        {
+          /* Run motor identification procedure */
+
+          ret = foc_motor_ident(motor, &motor->ident_done);
+          if (ret < 0)
+            {
+              PRINTF("ERROR: foc_motor_ident failed %d!\n", ret);
+              goto errout;
+            }
+
+          if (motor->ident_done == true)
+            {
+              /* Next state */
+
+              motor->ctrl_state += 1;
+              motor->foc_mode = FOC_HANDLER_MODE_IDLE;
+
+              if (motor->envp->cfg->mmode == FOC_MMODE_IDENT_ONLY)
+                {
+                  motor->ctrl_state = FOC_CTRL_STATE_TERMINATE;
+                }
             }
 
           break;
@@ -1116,6 +1361,13 @@ int foc_motor_control(FAR struct foc_motor_b16_s *motor)
       case FOC_CTRL_STATE_IDLE:
         {
           motor->foc_mode = FOC_HANDLER_MODE_IDLE;
+
+          break;
+        }
+
+      case FOC_CTRL_STATE_TERMINATE:
+        {
+          /* Do nothing */
 
           break;
         }

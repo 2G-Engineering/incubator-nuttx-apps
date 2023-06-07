@@ -24,7 +24,6 @@
 
 #include <nuttx/config.h>
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -44,11 +43,11 @@
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_PRINTF
-int cmd_printf(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_printf(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR char *fmt;
   char ch;
-  uint32_t value;
+  unsigned int value;
   int len;
   int i;
 

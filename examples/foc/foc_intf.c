@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <sys/ioctl.h>
 
@@ -588,7 +589,7 @@ int foc_intf_init(void)
 #endif
 
 #ifdef FOC_HAVE_INTF
-  errout:
+errout:
 #endif
 
   return ret;
@@ -636,7 +637,7 @@ int foc_intf_deinit(void)
 #endif
 
 #ifdef FOC_HAVE_INTF
-  errout:
+errout:
 #endif
 
   return ret;
@@ -686,7 +687,7 @@ int foc_intf_update(FAR struct foc_intf_data_s *data)
 #endif
 
 #ifdef FOC_HAVE_INTF
-  errout:
+errout:
 #endif
 
   return ret;

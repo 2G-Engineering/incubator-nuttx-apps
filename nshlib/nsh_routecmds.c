@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include <net/route.h>
 #include <netinet/in.h>
@@ -89,7 +90,7 @@ static int slash_notation(FAR char *arg)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_ADDROUTE
-int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   union
   {
@@ -99,6 +100,7 @@ int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifdef CONFIG_NET_IPv6
     struct sockaddr_in6 ipv6;
 #endif
+    struct sockaddr_storage ipx;
   } target;
 
   union
@@ -109,6 +111,7 @@ int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifdef CONFIG_NET_IPv6
     struct sockaddr_in6 ipv6;
 #endif
+    struct sockaddr_storage ipx;
   } netmask;
 
   union
@@ -119,6 +122,7 @@ int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifdef CONFIG_NET_IPv6
   struct sockaddr_in6 ipv6;
 #endif
+  struct sockaddr_storage ipx;
   } router;
 
   union
@@ -430,10 +434,7 @@ int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
   /* Then add the route */
 
-  ret = addroute(sockfd,
-                 (FAR struct sockaddr_storage *)&target,
-                 (FAR struct sockaddr_storage *)&netmask,
-                 (FAR struct sockaddr_storage *)&router);
+  ret = addroute(sockfd, &target.ipx, &netmask.ipx, &router.ipx);
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "addroute", NSH_ERRNO);
@@ -458,7 +459,7 @@ errout:
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_DELROUTE
-int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   union
   {
@@ -468,6 +469,7 @@ int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifdef CONFIG_NET_IPv6
     struct sockaddr_in6 ipv6;
 #endif
+    struct sockaddr_storage ipx;
   } target;
 
   union
@@ -478,6 +480,7 @@ int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #ifdef CONFIG_NET_IPv6
     struct sockaddr_in6 ipv6;
 #endif
+    struct sockaddr_storage ipx;
   } netmask;
 
   union
@@ -673,9 +676,7 @@ int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
   /* Then delete the route */
 
-  ret = delroute(sockfd,
-                 (FAR struct sockaddr_storage *)&target,
-                 (FAR struct sockaddr_storage *)&netmask);
+  ret = delroute(sockfd, &target.ipx, &netmask.ipx);
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "delroute", NSH_ERRNO);
@@ -700,7 +701,7 @@ errout:
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_ROUTE
-int cmd_route(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_route(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
 #if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
   bool ipv6 = false;

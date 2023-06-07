@@ -24,15 +24,15 @@
 
 #include <nuttx/config.h>
 
-#include <sys/types.h>
-#include <sys/ioctl.h>
-
+#include <debug.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <debug.h>
 
 #include <nuttx/timers/watchdog.h>
 
@@ -136,7 +136,8 @@ static void parse_args(FAR struct wdog_example_s *wdog, int argc,
   wdog->pingtime  = CONFIG_EXAMPLES_WATCHDOG_PINGTIME;
   wdog->pingdelay = CONFIG_EXAMPLES_WATCHDOG_PINGDELAY;
   wdog->timeout   = CONFIG_EXAMPLES_WATCHDOG_TIMEOUT;
-  strcpy(wdog->devname, CONFIG_EXAMPLES_WATCHDOG_DEVPATH);
+  strlcpy(wdog->devname, CONFIG_EXAMPLES_WATCHDOG_DEVPATH,
+          sizeof(wdog->devname));
 
   for (index = 1; index < argc; )
     {
@@ -163,7 +164,7 @@ static void parse_args(FAR struct wdog_example_s *wdog, int argc,
 
           case 'i':
             nargs = arg_string(&argv[index], &string);
-            strcpy(wdog->devname, string);
+            strlcpy(wdog->devname, string, sizeof(wdog->devname));
             index += nargs;
             break;
 

@@ -26,16 +26,9 @@ CSRCS  = nsh_init.c nsh_parse.c nsh_console.c nsh_script.c nsh_system.c
 CSRCS += nsh_command.c nsh_fscmds.c nsh_ddcmd.c nsh_proccmds.c nsh_mmcmds.c
 CSRCS += nsh_timcmds.c nsh_envcmds.c nsh_syscmds.c nsh_dbgcmds.c
 
-ifeq ($(CONFIG_FILE_STREAM),y)
 CSRCS += nsh_session.c
 ifeq ($(CONFIG_NSH_CONSOLE_LOGIN),y)
 CSRCS += nsh_login.c
-endif
-else
-CSRCS += nsh_stdsession.c
-ifeq ($(CONFIG_NSH_CONSOLE_LOGIN),y)
-CSRCS += nsh_stdlogin.c
-endif
 endif
 
 CSRCS += nsh_fsutils.c
@@ -111,6 +104,10 @@ endif
 
 ifeq ($(CONFIG_NSH_LOGIN_PASSWD),y)
 CSRCS += nsh_passwdcmds.c
+endif
+
+ifeq ($(CONFIG_NSH_ALIAS),y)
+CSRCS += nsh_alias.c
 endif
 
 include $(APPDIR)/Application.mk

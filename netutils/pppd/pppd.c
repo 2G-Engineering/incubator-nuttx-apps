@@ -52,6 +52,7 @@
 #include <poll.h>
 #include <time.h>
 #include <debug.h>
+#include <unistd.h>
 
 #include <netinet/in.h>
 #include <net/if.h>
@@ -122,7 +123,7 @@ static int tun_alloc(char *dev)
   ifr.ifr_flags = IFF_TUN;
   if (*dev)
     {
-      strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+      strlcpy(ifr.ifr_name, dev, IFNAMSIZ);
     }
 
   if ((errcode = ioctl(fd, TUNSETIFF, (unsigned long)&ifr)) < 0)
@@ -322,7 +323,7 @@ int pppd(const struct pppd_settings_s *pppd_settings)
 
   ctx = (struct ppp_context_s *)malloc(sizeof(struct ppp_context_s));
   memset(ctx, 0, sizeof(struct ppp_context_s));
-  strcpy((char *)ctx->ifname, "ppp%d");
+  strlcpy((char *)ctx->ifname, "ppp%d", sizeof(ctx->ifname));
 
   ctx->settings = pppd_settings;
   ctx->if_fd = tun_alloc((char *)ctx->ifname);

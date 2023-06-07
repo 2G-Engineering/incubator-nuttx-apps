@@ -33,6 +33,8 @@
 #include <dirent.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/sysinfo.h>
+#include <time.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -43,6 +45,26 @@
 
 #ifndef CONFIG_NSH_PROC_MOUNTPOINT
 #  define CONFIG_NSH_PROC_MOUNTPOINT "/proc"
+#endif
+
+#ifndef CONFIG_NSH_DISABLE_UPTIME
+  #ifndef FSHIFT
+    #  define FSHIFT SI_LOAD_SHIFT
+  #endif
+#  define FIXED_1      (1 << FSHIFT)     /* 1.0 as fixed-point */
+#  define LOAD_INT(x)  ((x) >> FSHIFT)
+#  define LOAD_FRAC(x) (LOAD_INT(((x) & (FIXED_1 - 1)) * 100))
+#endif
+
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+#  define PS_SHOW_HEAPSIZE
+#endif
+
+#ifndef CONFIG_NSH_DISABLE_PSSTACKUSAGE
+#  define PS_SHOW_STACKSIZE
+#  ifdef CONFIG_STACK_COLORATION
+#    define PS_SHOW_STACKUSAGE
+#  endif
 #endif
 
 /****************************************************************************
@@ -92,7 +114,7 @@ static const char g_priority[]  = "Priority:";
 static const char g_scheduler[] = "Scheduler:";
 static const char g_sigmask[]   = "SigMask:";
 
-#if defined(CONFIG_DEBUG_MM) && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
 static const char g_heapsize[]  = "AllocSize:";
 #endif /* CONFIG_DEBUG _MM && !CONFIG_NSH_DISABLE_PSHEAPUSAGE */
 
@@ -226,20 +248,22 @@ static void nsh_parse_statusline(FAR char *line,
 static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
                        FAR struct dirent *entryp, FAR void *pvarg)
 {
+  UNUSED(pvarg);
+
   struct nsh_taskstatus_s status;
   FAR char *filepath;
   FAR char *line;
   FAR char *nextline;
   int ret;
   int i;
-#if defined(CONFIG_DEBUG_MM) && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-  uint32_t heap_size;
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+  unsigned long heap_size = 0;
 #endif
 #if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-  uint32_t stack_size;
+  unsigned long stack_size = 0;
 #ifdef CONFIG_STACK_COLORATION
-  uint32_t stack_used;
-  uint32_t stack_filled;
+  unsigned long stack_used = 0;
+  unsigned long stack_filled = 0;
 #endif
 #endif
 
@@ -328,24 +352,25 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
 
   /* Finally, print the status information */
 
-  nsh_output(vtbl, "%5s ", entryp->d_name);
-  nsh_output(vtbl, "%5s ", status.td_groupid);
-
+  nsh_output(vtbl,
+             "%5s %5s "
 #ifdef CONFIG_SMP
-  nsh_output(vtbl, "%3s ", status.td_cpu);
+             "%3s "
 #endif
 
-  nsh_output(vtbl, "%3s %-8s %-7s %3s %-8s %-9s ",
+             "%3s %-8s %-7s %3s %-8s %-9s %-8s ",
+             entryp->d_name, status.td_groupid,
+#ifdef CONFIG_SMP
+             status.td_cpu,
+#endif
              status.td_priority, status.td_policy, status.td_type,
-             status.td_flags, status.td_state, status.td_event);
-  nsh_output(vtbl, "%-8s ", status.td_sigmask);
+             status.td_flags, status.td_state, status.td_event,
+             status.td_sigmask);
 
-#if defined(CONFIG_DEBUG_MM) && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
   /* Get the Heap AllocSize */
 
-  heap_size = 0;
   filepath  = NULL;
-
   ret = asprintf(&filepath, "%s/%s/heap", dirpath, entryp->d_name);
   if (ret < 0 || filepath == NULL)
     {
@@ -393,7 +418,7 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
 
               if (strncmp(line, g_heapsize, strlen(g_heapsize)) == 0)
                 {
-                  heap_size = (uint32_t)atoi(&line[12]);
+                  heap_size = strtoul(&line[12], NULL, 0);
                   break;
                 }
             }
@@ -401,18 +426,12 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
         }
     }
 
-  nsh_output(vtbl, "%08u ", (unsigned int)heap_size);
 #endif
 
 #if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
   /* Get the StackSize and StackUsed */
 
-  stack_size = 0;
-#ifdef CONFIG_STACK_COLORATION
-  stack_used = 0;
-#endif
   filepath   = NULL;
-
   ret = asprintf(&filepath, "%s/%s/stack", dirpath, entryp->d_name);
   if (ret < 0 || filepath == NULL)
     {
@@ -461,12 +480,12 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
 
               if (strncmp(line, g_stacksize, strlen(g_stacksize)) == 0)
                 {
-                  stack_size = (uint32_t)atoi(&line[12]);
+                  stack_size = strtoul(&line[12], NULL, 0);
                 }
 #ifdef CONFIG_STACK_COLORATION
               else if (strncmp(line, g_stackused, strlen(g_stackused)) == 0)
                 {
-                  stack_used = (uint32_t)atoi(&line[12]);
+                  stack_used = strtoul(&line[12], NULL, 0);
                 }
 #endif
             }
@@ -474,24 +493,14 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
         }
     }
 
-  nsh_output(vtbl, "%06u ", (unsigned int)stack_size);
-
 #ifdef CONFIG_STACK_COLORATION
-  nsh_output(vtbl, "%06u ", (unsigned int)stack_used);
 
-  stack_filled = 0;
   if (stack_size > 0 && stack_used > 0)
     {
       /* Use fixed-point math with one decimal place */
 
       stack_filled = 10 * 100 * stack_used / stack_size;
     }
-
-  /* Additionally print a '!' if the stack is filled more than 80% */
-
-  nsh_output(vtbl, "%3d.%1d%%%c ",
-             stack_filled / 10, stack_filled % 10,
-             (stack_filled >= 10 * 80 ? '!' : ' '));
 #endif
 #endif
 
@@ -515,8 +524,40 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
           vtbl->iobuffer[0] = '\0';
         }
     }
+#endif
 
-  nsh_output(vtbl, "%6s ", nsh_trimspaces(vtbl->iobuffer));
+#if defined(PS_SHOW_HEAPSIZE) || defined (PS_SHOW_STACKSIZE) || \
+    defined (PS_SHOW_STACKUSAGE) || defined (NSH_HAVE_CPULOAD)
+    nsh_output(vtbl,
+#ifdef PS_SHOW_HEAPSIZE
+               "%08lu "
+#endif
+#ifdef PS_SHOW_STACKSIZE
+               "%06lu "
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+               "%06lu "
+               "%3lu.%lu%%%c "
+#endif
+#ifdef NSH_HAVE_CPULOAD
+               "%6s "
+#endif
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+               , heap_size
+#endif
+#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
+               , stack_size
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+               , stack_used,
+               stack_filled / 10,
+               stack_filled % 10,
+               (stack_filled >= 10 * 80 ? '!' : ' ')
+#endif
+#ifdef NSH_HAVE_CPULOAD
+               , nsh_trimspaces(vtbl->iobuffer)
+#endif
+             );
 #endif
 
   /* Read the task/thread command line */
@@ -554,6 +595,8 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
 #ifndef CONFIG_NSH_DISABLE_EXEC
 int cmd_exec(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
+  UNUSED(argc);
+
   FAR char *endptr;
   uintptr_t addr;
 
@@ -564,7 +607,7 @@ int cmd_exec(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       return ERROR;
     }
 
-  nsh_output(vtbl, "Calling %p\n", (exec_t)addr);
+  nsh_output(vtbl, "Calling %p\n", (void *)addr);
   return ((exec_t)addr)();
 }
 #endif
@@ -574,35 +617,52 @@ int cmd_exec(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_PS
-int cmd_ps(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_ps(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  nsh_output(vtbl, "%5s ", "PID");
-  nsh_output(vtbl, "%5s ", "GROUP");
+  UNUSED(argc);
+  UNUSED(argv);
 
+  nsh_output(vtbl, "%5s %5s "
 #ifdef CONFIG_SMP
-  nsh_output(vtbl, "%3s ", "CPU");
+                   "%3s "
 #endif
-
-  nsh_output(vtbl, "%3s %-8s %-7s %3s %-8s %-9s ",
-             "PRI", "POLICY", "TYPE", "NPX", "STATE", "EVENT");
-  nsh_output(vtbl, "%-8s ", "SIGMASK");
-
-#if defined(CONFIG_DEBUG_MM) && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-  nsh_output(vtbl, "%8s ", "HEAP");
+                   "%3s %-8s %-7s %3s %-8s %-9s "
+                   "%-16s "
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+                   "%8s "
 #endif
-
 #if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-  nsh_output(vtbl, "%6s ", "STACK");
+                   "%6s "
 #ifdef CONFIG_STACK_COLORATION
-  nsh_output(vtbl, "%6s ", "USED");
-  nsh_output(vtbl, "%7s ", "FILLED");
+                   "%6s "
+                   "%7s "
 #endif
 #endif
-
 #ifdef NSH_HAVE_CPULOAD
-  nsh_output(vtbl, "%6s ", "CPU");
+                    "%6s "
 #endif
-  nsh_output(vtbl, "%s\n", "COMMAND");
+                    "%s\n",
+                    "PID", "GROUP",
+#ifdef CONFIG_SMP
+                    "CPU",
+#endif
+                    "PRI", "POLICY", "TYPE", "NPX", "STATE", "EVENT",
+                    "SIGMASK",
+#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
+                    "HEAP",
+#endif
+#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
+                    "STACK",
+#ifdef CONFIG_STACK_COLORATION
+                    "USED",
+                    "FILLED",
+#endif
+#endif
+#ifdef NSH_HAVE_CPULOAD
+                    "CPU",
+#endif
+                    "COMMAND"
+                    );
 
   return nsh_foreach_direntry(vtbl, "ps", CONFIG_NSH_PROC_MOUNTPOINT,
                               ps_callback, NULL);
@@ -614,10 +674,10 @@ int cmd_ps(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_KILL
-int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  char *ptr;
-  char *endptr;
+  FAR char *ptr;
+  FAR char *endptr;
   long signal;
   long pid;
 
@@ -717,9 +777,11 @@ invalid_arg:
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_SLEEP
-int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  char *endptr;
+  UNUSED(argc);
+
+  FAR char *endptr;
   long secs;
 
   secs = strtol(argv[1], &endptr, 0);
@@ -739,9 +801,11 @@ int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_USLEEP
-int cmd_usleep(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+int cmd_usleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  char *endptr;
+  UNUSED(argc);
+
+  FAR char *endptr;
   long usecs;
 
   usecs = strtol(argv[1], &endptr, 0);
@@ -752,6 +816,117 @@ int cmd_usleep(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
     }
 
   usleep(usecs);
+  return OK;
+}
+#endif
+
+/****************************************************************************
+ * Name: cmd_uptime
+ ****************************************************************************/
+
+#ifndef CONFIG_NSH_DISABLE_UPTIME
+int cmd_uptime(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  uint32_t updays;
+  uint32_t uphours;
+  uint32_t upminutes;
+
+  time_t current_time_seconds;
+  FAR struct tm *current_time;
+
+  struct sysinfo sys_info;
+
+  time_t uptime = 0;
+
+  bool pretty_format_opt = false;
+  bool system_load_opt = false;
+
+  if (argc < 2)
+    {
+      system_load_opt = true;
+
+      current_time_seconds = time(NULL);
+      current_time = localtime(&current_time_seconds);
+      nsh_output(vtbl, "%02u:%02u:%02u ", current_time->tm_hour,
+                 current_time->tm_min, current_time->tm_sec);
+    }
+  else if (strcmp(argv[1], "-p") == 0)
+    {
+      pretty_format_opt = true;
+    }
+  else if (strcmp(argv[1], "-s") == 0)
+    {
+      sysinfo(&sys_info);
+      time(&current_time_seconds);
+      current_time_seconds -= sys_info.uptime;
+      current_time = localtime(&current_time_seconds);
+      nsh_output(vtbl, "%04u-%02u-%02u %02u:%02u:%02u\n",
+                 current_time->tm_year + 1900, current_time->tm_mon + 1,
+                 current_time->tm_mday, current_time->tm_hour,
+                 current_time->tm_min, current_time->tm_sec);
+      return OK;
+    }
+  else
+    {
+      if (strcmp(argv[1], "-h") != 0)
+        {
+          nsh_output(vtbl, "uptime: invalid option -- %s\n", argv[1]);
+        }
+
+      nsh_output(vtbl, "Usage:\n");
+      nsh_output(vtbl, "uptime [options]\n");
+
+      nsh_output(vtbl, "Options:\n");
+      nsh_output(vtbl, "-p, show uptime in pretty format\n");
+      nsh_output(vtbl, "-h, display this help and exit\n");
+      nsh_output(vtbl, "-s, system up since\n");
+
+      return ERROR;
+    }
+
+  sysinfo(&sys_info);
+  uptime = sys_info.uptime;
+
+  updays = uptime / 86400;
+  uptime -= updays * 86400;
+  uphours = uptime / 3600;
+  uptime -= uphours * 3600;
+  upminutes = uptime / 60;
+
+  nsh_output(vtbl, "up ");
+
+  if (updays)
+    {
+      nsh_output(vtbl, "%" PRIu32 " day%s, ", updays,
+                 (updays > 1) ? "s" : "");
+    }
+
+  if (pretty_format_opt)
+    {
+      if (uphours)
+        {
+          nsh_output(vtbl, "%" PRIu32 " hour%s, ", uphours,
+                     (uphours > 1) ? "s" : "");
+        }
+
+      nsh_output(vtbl, "%" PRIu32 " minute%s", upminutes,
+                 (upminutes > 1) ? "s" : "");
+    }
+  else
+    {
+      nsh_output(vtbl, "%2" PRIu32 ":" "%02" PRIu32, uphours, upminutes);
+    }
+
+  if (system_load_opt)
+    {
+      nsh_output(vtbl, ", load average: %lu.%02lu, %lu.%02lu, %lu.%02lu",
+                 LOAD_INT(sys_info.loads[0]), LOAD_FRAC(sys_info.loads[0]),
+                 LOAD_INT(sys_info.loads[1]), LOAD_FRAC(sys_info.loads[1]),
+                 LOAD_INT(sys_info.loads[2]), LOAD_FRAC(sys_info.loads[2]));
+    }
+
+  nsh_output(vtbl, "\n");
+
   return OK;
 }
 #endif
