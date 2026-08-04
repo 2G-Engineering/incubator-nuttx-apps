@@ -15,7 +15,6 @@ config LVGL_VERSION
 	string "LVGL Version"
 	default "8.3.3"
 
-source "$APPSDIR/graphics/lvgl/lv_conf/Kconfig"
 
 config LV_PORT_USE_LCDDEV
 	bool "Enable LCD device port"
