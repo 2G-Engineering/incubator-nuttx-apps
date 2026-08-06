@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/ft80x/ft80x.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,7 +31,7 @@
 #include <nuttx/compiler.h>
 
 #include <stdio.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #ifdef CONFIG_EXAMPLES_FT80X
 

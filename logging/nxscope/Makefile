@@ -1,6 +1,8 @@
 ############################################################################
 # apps/logging/nxscope/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,10 @@ endif
 
 ifeq ($(CONFIG_LOGGING_NXSCOPE_INTF_DUMMY),y)
 CSRCS += nxscope_idummy.c
+endif
+
+ifeq ($(CONFIG_LOGGING_NXSCOPE_INTF_UDP),y)
+CSRCS += nxscope_iudp.c
 endif
 
 ifeq ($(CONFIG_LOGGING_NXSCOPE_PROTO_SER),y)

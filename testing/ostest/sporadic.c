@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/sporadic.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -63,13 +65,19 @@ static time_t g_start_time;
 
 static void my_mdelay(unsigned int milliseconds)
 {
-  volatile unsigned int i;
-  volatile unsigned int j;
+  struct timespec start;
+  struct timespec cur;
+  struct timespec diff;
 
-  for (i = 0; i < milliseconds; i++)
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
+  for (; ; )
     {
-      for (j = 0; j < CONFIG_BOARD_LOOPSPERMSEC; j++)
+      clock_gettime(CLOCK_MONOTONIC, &cur);
+      clock_timespec_subtract(&cur, &start, &diff);
+      if (diff.tv_sec * 1000 + diff.tv_nsec / 1000000 > milliseconds)
         {
+          break;
         }
     }
 }

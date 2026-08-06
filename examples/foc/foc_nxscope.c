@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/foc/foc_nxscope.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,7 +44,7 @@
 #  error CONFIG_LOGGING_NXSCOPE_DISABLE_PUTLOCK must be set to proper operation.
 #endif
 
-#ifdef CONFIG_LOGGING_NXSCOPE_INTF_SERIAL
+#if defined(CONFIG_LOGGING_NXSCOPE_INTF_SERIAL) && !defined(CONFIG_SERIAL_RTT)
 #  ifndef CONFIG_SERIAL_TERMIOS
 #    error CONFIG_SERIAL_TERMIOS must be set to proper operation.
 #  endif
@@ -158,7 +160,7 @@ int foc_nxscope_init(FAR struct foc_nxscope_s *nxs)
 
       switch (foc_thread_type(j))
         {
-#ifdef CONFIG_INDUSTRY_FOC_FLOAT
+#if CONFIG_EXAMPLES_FOC_FLOAT_INST > 0
           case FOC_NUMBER_TYPE_FLOAT:
             {
               u.s.dtype = NXSCOPE_TYPE_FLOAT;
@@ -166,7 +168,7 @@ int foc_nxscope_init(FAR struct foc_nxscope_s *nxs)
             }
 #endif
 
-#ifdef CONFIG_INDUSTRY_FOC_FIXED16
+#if CONFIG_EXAMPLES_FOC_FIXED16_INST > 0
           case FOC_NUMBER_TYPE_FIXED16:
             {
               u.s.dtype = NXSCOPE_TYPE_B16;
@@ -235,6 +237,15 @@ int foc_nxscope_init(FAR struct foc_nxscope_s *nxs)
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VDQCOMP)
       nxscope_chan_init(&nxs->nxs, i++, "vdqcomp", u.u8, 2, 0);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_SVM3)
+      nxscope_chan_init(&nxs->nxs, i++, "svm3", u.u8, 4, 0);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VOBS)
+      nxscope_chan_init(&nxs->nxs, i++, "vobs", u.u8, 1, 0);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_AOBS)
+      nxscope_chan_init(&nxs->nxs, i++, "aobs", u.u8, 1, 0);
 #endif
 
       if (i > CONFIG_EXAMPLES_FOC_NXSCOPE_CHANNELS)

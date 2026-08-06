@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/uORB/uORB.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,29 +27,40 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/sensors/ioctl.h>
-#include <nuttx/sensors/sensor.h>
+#ifdef __NuttX__
+#include <nuttx/uorb.h>
+#else
+#include <linux/uorb.h>
+#endif
 
 #include <sys/time.h>
-#include <debug.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <syslog.h>
+#include <inttypes.h>
+#include <unistd.h>
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#ifndef CONFIG_UORB_LOOP_MAX_EVENTS
+#  define CONFIG_UORB_LOOP_MAX_EVENTS 0
+#endif
 
 /****************************************************************************
  * Public Types
  ****************************************************************************/
-
-struct orb_metadata;
-typedef void (*orb_print_message)(FAR const struct orb_metadata *meta,
-                                  FAR const void *buffer);
 
 struct orb_metadata
 {
   FAR const char   *o_name;     /* Unique object name */
   uint16_t          o_size;     /* Object size */
 #ifdef CONFIG_DEBUG_UORB
-  orb_print_message o_cb;       /* Function pointer of output topic message */
+  FAR const char   *o_format;   /* Format string used for structure input and
+                                 * output.
+                                 */
 #endif
 };
 
@@ -71,71 +84,118 @@ struct orb_object
 };
 
 typedef uint64_t orb_abstime;
+typedef struct sensor_device_info_s orb_info_t;
+
+struct orb_handle_s;
+
+typedef CODE int (*orb_datain_cb_t)(FAR struct orb_handle_s *handle,
+                                    FAR void *arg);
+typedef CODE int (*orb_dataout_cb_t)(FAR struct orb_handle_s *handle,
+                                     FAR void *arg);
+typedef CODE int (*orb_eventpri_cb_t)(FAR struct orb_handle_s *handle,
+                                      FAR void *arg);
+typedef CODE int (*orb_eventerr_cb_t)(FAR struct orb_handle_s *handle,
+                                      FAR void *arg);
+
+#if CONFIG_UORB_LOOP_MAX_EVENTS
+enum orb_loop_type_e
+{
+  ORB_EPOLL_TYPE = 0,
+};
+
+struct orb_handle_s
+{
+  int                events;      /* Events of interest. */
+  int                fd;          /* Topic fd. */
+  FAR void          *arg;         /* Callback parameter. */
+  orb_datain_cb_t    datain_cb;   /* User EPOLLIN callback function. */
+  orb_dataout_cb_t   dataout_cb;  /* User EPOLLOUT callback function. */
+  orb_eventpri_cb_t  eventpri_cb; /* User EPOLLPRI callback function. */
+  orb_eventerr_cb_t  eventerr_cb; /* User EPOLLERR callback function. */
+};
+
+struct orb_loop_ops_s;
+struct orb_loop_s
+{
+  FAR const struct orb_loop_ops_s *ops;         /* Loop handle ops. */
+  int                              fd;          /* Loop fd. */
+  struct orb_handle_s              exit_handle; /* The exit handle */
+};
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
+#define ORB_EVENT_FLUSH_COMPLETE SENSOR_EVENT_FLUSH_COMPLETE
+
 #define ORB_SENSOR_PATH        "/dev/uorb/"
 #define ORB_USENSOR_PATH       "/dev/usensor"
 #define ORB_PATH_MAX           (NAME_MAX + 16)
 
-#ifdef CONFIG_UORB_ALERT
-#  define uorbpanic(fmt, ...)  _alert(fmt "\n", ##__VA_ARGS__)
+#ifdef CONFIG_UORB_STORAGE_DIR
+#define UORB_STORAGE_DIR       CONFIG_UORB_STORAGE_DIR
 #else
-#  define uorbpanic            _none
+#define UORB_STORAGE_DIR       "/data"
+#endif
+
+#define uorbnone(fmt, ...)     do { if (0) syslog(LOG_INFO, fmt, ##__VA_ARGS__); } while (0)
+
+#ifdef CONFIG_UORB_ALERT
+#  define uorbpanic(fmt, ...)  syslog(LOG_EMERGY, fmt "\n", ##__VA_ARGS__)
+#else
+#  define uorbpanic            uorbnone
 #endif
 
 #ifdef CONFIG_UORB_ERROR
-#  define uorberr(fmt, ...)    _err(fmt "\n", ##__VA_ARGS__)
+#  define uorberr(fmt, ...)    syslog(LOG_ERR, fmt "\n", ##__VA_ARGS__)
 #else
-#  define uorberr              _none
+#  define uorberr              uorbnone
 #endif
 
 #ifdef CONFIG_UORB_WARN
-#  define uorbwarn(fmt, ...)   _warn(fmt "\n", ##__VA_ARGS__)
+#  define uorbwarn(fmt, ...)   syslog(LOG_WARN, fmt "\n", ##__VA_ARGS__)
 #else
-#  define uorbwarn             _none
+#  define uorbwarn             uorbnone
 #endif
 
 #ifdef CONFIG_UORB_INFO
-#  define uorbinfo(fmt, ...)   _info(fmt "\n", ##__VA_ARGS__)
+#  define uorbinfo(fmt, ...)   syslog(LOG_INFO, fmt "\n", ##__VA_ARGS__)
 #else
-#  define uorbinfo             _none
+#  define uorbinfo             uorbnone
 #endif
 
 #ifdef CONFIG_DEBUG_UORB
 #  define uorbdebug(fmt, ...)  syslog(LOG_INFO, fmt "\n", ##__VA_ARGS__)
 #else
-#  define uorbdebug            _none
+#  define uorbdebug            uorbnone
 #endif
 
-#define uorbinfo_raw(fmt, ...) syslog(LOG_INFO, fmt "\n", ##__VA_ARGS__)
+#define uorbinfo_raw(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 
-/**
- * Generates a pointer to the uORB metadata structure for
+/* Generates a pointer to the uORB metadata structure for
  * a given topic.
  *
  * The topic must have been declared previously in scope
  * with ORB_DECLARE().
  *
- * @param name    The name of the topic.
+ * name    The name of the topic.
  */
+
 #define ORB_ID(name)  &g_orb_##name
 
-/**
- * Declare the uORB metadata for a topic (used by code generators).
+/* Declare the uORB metadata for a topic (used by code generators).
  *
- * @param name      The name of the topic.
+ * name      The name of the topic.
  */
+
 #if defined(__cplusplus)
 #  define ORB_DECLARE(name) extern "C" const struct orb_metadata g_orb_##name
 #else
 #  define ORB_DECLARE(name) extern const struct orb_metadata g_orb_##name
 #endif
 
-/**
- * Define (instantiate) the uORB metadata for a topic.
+/* Define (instantiate) the uORB metadata for a topic.
  *
  * The uORB metadata is used to help ensure that updates and
  * copies are accessing the right data.
@@ -143,20 +203,20 @@ typedef uint64_t orb_abstime;
  * Note that there must be no more than one instance of this macro
  * for each topic.
  *
- * @param name    The name of the topic.
- * @param struct  The structure the topic provides.
- * @param cb      The function pointer of output topic message.
+ * name    The name of the topic.
+ * struct  The structure the topic provides.
+ * cb      The function pointer of output topic message.
  */
 #ifdef CONFIG_DEBUG_UORB
-#define ORB_DEFINE(name, structure, cb) \
+#define ORB_DEFINE(name, structure, format) \
   const struct orb_metadata g_orb_##name = \
   { \
     #name, \
     sizeof(structure), \
-    cb, \
+    format, \
   };
 #else
-#define ORB_DEFINE(name, structure, cb) \
+#define ORB_DEFINE(name, structure, format) \
   const struct orb_metadata g_orb_##name = \
   { \
     #name, \
@@ -206,7 +266,7 @@ int orb_open(FAR const char *name, int instance, int flags);
 int orb_close(int fd);
 
 /****************************************************************************
- * Name: orb_advertise_multi_queue
+ * Name: orb_advertise_multi_queue_info
  *
  * Description:
  *   This performs the initial advertisement of a topic; it creates the topic
@@ -218,6 +278,7 @@ int orb_close(int fd);
  *   instance     Pointer to an integer which yield the instance ID,
  *                (has default 0 if pointer is NULL).
  *   queue_size   Maximum number of buffered elements.
+ *   info         A pointer to the orb_info_t.
  *
  * Returned Value:
  *   -1 on error, otherwise returns an file descriptor
@@ -227,10 +288,21 @@ int orb_close(int fd);
  *   this function will return -1 and set errno to ENOENT.
  ****************************************************************************/
 
+int orb_advertise_multi_queue_info(FAR const struct orb_metadata *meta,
+                                   FAR const void *data,
+                                   FAR int *instance,
+                                   unsigned int queue_size,
+                                   FAR orb_info_t *info);
+
+static inline
 int orb_advertise_multi_queue(FAR const struct orb_metadata *meta,
                               FAR const void *data,
                               FAR int *instance,
-                              unsigned int queue_size);
+                              unsigned int queue_size)
+{
+  return orb_advertise_multi_queue_info(meta, data, instance,
+                                        queue_size, NULL);
+}
 
 static inline int orb_advertise(FAR const struct orb_metadata *meta,
                                 FAR const void *data)
@@ -278,10 +350,22 @@ static inline int orb_advertise_multi(FAR const struct orb_metadata *meta,
  *   this function will return -1 and set errno to ENOENT.
  ****************************************************************************/
 
+int
+orb_advertise_multi_queue_persist_info(FAR const struct orb_metadata *meta,
+                                       FAR const void *data,
+                                       FAR int *instance,
+                                       unsigned int queue_size,
+                                       FAR orb_info_t *info);
+
+static inline
 int orb_advertise_multi_queue_persist(FAR const struct orb_metadata *meta,
                                       FAR const void *data,
                                       FAR int *instance,
-                                      unsigned int queue_size);
+                                      unsigned int queue_size)
+{
+  return orb_advertise_multi_queue_persist_info(meta, data, instance,
+                                                queue_size, NULL);
+}
 
 /****************************************************************************
  * Name: orb_unadvertise
@@ -401,6 +485,44 @@ static inline int orb_subscribe(FAR const struct orb_metadata *meta)
 }
 
 /****************************************************************************
+ * Name: orb_subscribe_multi_nonwakeup/orb_subscribe_nonwakeup
+ *
+ * Description:
+ *   Subscribe to a topic in a non-wakeup ways.
+ *
+ *   The usage of orb_subscribe_multi_nonwakeup is similar to that of
+ *   orb_subscribe_multi, with the key difference lying in whether the
+ *   system's wakeup status needs to be concerned. This distinction is
+ *   particularly beneficial for low-power consumption scenarios.
+ *   If the subscription is in a non-wakeup mode, the subscriber will not
+ *   receive data while the system is in sleep mode. In such cases, new data
+ *   will overwrite old data until the system is awakened, at which point
+ *   the subscriber will be notified. Typically, the subscriber and
+ *   publisher of a topic reside in two separate systems.
+ *
+ * Input Parameters:
+ *   meta       The uORB metadata (usually from the ORB_ID() macro)
+ *   instance   The instance of the topic. Instance 0 matches the topic of
+ *              the orb_subscribe() call.
+ *
+ * Returned Value:
+ *   -1 on error, otherwise returns a fd
+ *   that can be used to read and update the topic.
+ *   If the topic in question is not known (due to an
+ *   ORB_DEFINE_OPTIONAL with no corresponding ORB_DECLARE)
+ *   this function will return -1 and set errno to ENOENT.
+ ****************************************************************************/
+
+int orb_subscribe_multi_nonwakeup(FAR const struct orb_metadata *meta,
+                                  unsigned instance);
+
+static inline
+int orb_subscribe_nonwakeup(FAR const struct orb_metadata *meta)
+{
+  return orb_subscribe_multi_nonwakeup(meta, 0);
+}
+
+/****************************************************************************
  * Name: orb_unsubscribe
  *
  * Description:
@@ -477,6 +599,23 @@ static inline int orb_copy(FAR const struct orb_metadata *meta,
 int orb_get_state(int fd, FAR struct orb_state *state);
 
 /****************************************************************************
+ * Name: orb_get_events
+ *
+ * Description:
+ *   Get the events about the specify subscriber of topic.
+ *
+ * Input Parameters:
+ *   fd       The fd returned from orb_advertise / orb_subscribe.
+ *   events   Pointer to events, type is unsigned int pointer.
+ *            eg: ORB_EVENT_FLUSH_COMPLETE
+ *
+ * Returned Value:
+ *   -1 on error.
+ ****************************************************************************/
+
+int orb_get_events(int fd, FAR unsigned int *events);
+
+/****************************************************************************
  * Name: orb_check
  *
  * Description:
@@ -517,6 +656,27 @@ int orb_check(int fd, FAR bool *updated);
  ****************************************************************************/
 
 int orb_ioctl(int fd, int cmd, unsigned long arg);
+
+/****************************************************************************
+ * Name: orb_flush
+ *
+ * Description:
+ *   When topic data accumulates in the hardware buffer but does not reach
+ *   the watermark, you can mmediately read the fifo data through the flush
+ *   operation. You can call the flush operation at any time.
+ *
+ *   After you call flush, you can determine whether the flush is completed
+ *   by listening to the POLLPRI event of fd and getting the event in
+ *   orb_get_events
+ *
+ * Input Parameters:
+ *   fd       A fd returned from orb_advertise / orb_subscribe.
+ *
+ * Returned Value:
+ *   0 on success.
+ ****************************************************************************/
+
+int orb_flush(int fd);
 
 /****************************************************************************
  * Name: orb_set_batch_interval
@@ -594,6 +754,22 @@ int orb_set_interval(int fd, unsigned interval);
 int orb_get_interval(int fd, FAR unsigned *interval);
 
 /****************************************************************************
+ * Name: orb_get_info
+ *
+ * Description:
+ *   Get topic information.
+ *
+ * Input Parameters:
+ *   fd     A fd returned from orb_subscribe.
+ *   info   The returned topic info.
+ *
+ * Returned Value:
+ *   0 on success, -1 otherwise with ERRNO set accordingly.
+ ****************************************************************************/
+
+int orb_get_info(int fd, FAR orb_info_t *info);
+
+/****************************************************************************
  * Name:
  *   orb_set_frequency
  *
@@ -668,7 +844,7 @@ orb_abstime orb_absolute_time(void);
  *   then   Past system time.
  *
  * Returned Value:
- *   Bewteen time.
+ *   Between time.
  ****************************************************************************/
 
 static inline orb_abstime orb_elapsed_time(FAR const orb_abstime *then)
@@ -721,6 +897,186 @@ int orb_group_count(FAR const struct orb_metadata *meta);
  ****************************************************************************/
 
 FAR const struct orb_metadata *orb_get_meta(FAR const char *name);
+
+#ifdef CONFIG_DEBUG_UORB
+/****************************************************************************
+ * Name: orb_scanf
+ *
+ * Description:
+ *   Convert string value to structure buffer.
+ *
+ * Input Parameters:
+ *   buf    Input string value.
+ *   format The uORB metadata.o_format.
+ *   data   Structure buffer pointer.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_sscanf(FAR const char *buf, FAR const char *format, FAR void *data);
+
+/****************************************************************************
+ * Name: orb_info
+ *
+ * Description:
+ *   Print sensor data.
+ *
+ * Input Parameters:
+ *   format The uORB metadata.o_format.
+ *   name   The uORB metadata.o_name.
+ *   data   Topic data that needs to be print.
+ *
+ * Returned Value:
+ *   Format string length on success, otherwise returns negative value.
+ ****************************************************************************/
+
+void orb_info(FAR const char *format, FAR const char *name,
+              FAR const void *data);
+
+/****************************************************************************
+ * Name: orb_fprintf
+ *
+ * Description:
+ *   Print sensor data to file.
+ *
+ * Input Parameters:
+ *   stream  file handle.
+ *   format  The uORB metadata.o_format.
+ *   data    Topic data that needs to be print.
+ *
+ * Returned Value:
+ *   String length on success, otherwise returns negative value.
+ ****************************************************************************/
+
+int orb_fprintf(FAR FILE *stream, FAR const char *format,
+                FAR const void *data);
+#endif
+
+#if CONFIG_UORB_LOOP_MAX_EVENTS
+/****************************************************************************
+ * Name: orb_loop_init
+ *
+ * Description:
+ *   Initialize orb loop, release it with orb_loop_deinit function.
+ *
+ * Input Parameters:
+ *   loop   orb loop contains multiple handles.
+ *   type   orb loop type.
+ *
+ * Returned Value:
+ *   Returns the orb loop handle if successful, or NULL if an error occurs
+ ****************************************************************************/
+
+int orb_loop_init(FAR struct orb_loop_s *loop, enum orb_loop_type_e type);
+
+/****************************************************************************
+ * Name: orb_loop_run
+ *
+ * Description:
+ *   Start the loop. Users can dynamically open new fd(orb_handle_start)
+ *   and close fd(orb_handle_stop) that have been added to the loop after
+ *   the loop is started. after starting it will be in a blocked state.
+ *
+ * Input Parameters:
+ *   loop   orb loop contains multiple handles.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_loop_run(FAR struct orb_loop_s *loop);
+
+/****************************************************************************
+ * Name: orb_loop_deinit
+ *
+ * Description:
+ *   Unregister the current loop. To use it again, you need to reinitialize
+ *   it. The internally added handle needs to be closed by the user.
+ *
+ * Input Parameters:
+ *   loop   orb loop contains multiple handles.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_loop_deinit(FAR struct orb_loop_s *loop);
+
+/****************************************************************************
+ * Name: orb_loop_exit_async
+ *
+ * Description:
+ *   Send exit event to the current loop(not wait).
+ *
+ * Input Parameters:
+ *   loop   orb loop contains multiple handles.
+ *
+ * Returned Value:
+ *   Zero (OK) on success; a -1 (ERROR) or negated errno value on failure.
+ ****************************************************************************/
+
+int orb_loop_exit_async(FAR struct orb_loop_s *loop);
+
+/****************************************************************************
+ * Name: orb_handle_init
+ *
+ * Description:
+ *   Initialize the orb handle.
+ *
+ * Input Parameters:
+ *   handle       orb loop handle, need to be added to loop for use.
+ *   fd           orb fd, from orb_subscribe or orb_advertise.
+ *   events       Events of interest.
+ *   arg          Parameters passed in by the user.
+ *   data_in_cb   data in callback function.
+ *   data_out_cb  data out callback function.
+ *   pri_cb       pri callback function.
+ *   err_cb       err callback function.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_handle_init(FAR struct orb_handle_s *handle, int fd, int events,
+                    FAR void *arg, orb_datain_cb_t datain_cb,
+                    orb_dataout_cb_t dataout_cb, orb_eventpri_cb_t pri_cb,
+                    orb_eventerr_cb_t err_cb);
+
+/****************************************************************************
+ * Name: orb_handle_start
+ *
+ * Description:
+ *   Start the handle from the loop.
+ *
+ * Input Parameters:
+ *   loop     orb loop contains multiple handles.
+ *   handle   orb loop handle, need to be added to loop for use.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_handle_start(FAR struct orb_loop_s *loop,
+                     FAR struct orb_handle_s *handle);
+
+/****************************************************************************
+ * Name: orb_handle_stop
+ *
+ * Description:
+ *   Stop the handle from the loop.
+ *
+ * Input Parameters:
+ *   loop     orb loop contains multiple handles.
+ *   handle   orb loop handle, need to be added to loop for use.
+ *
+ * Returned Value:
+ *   Zero (OK) or positive on success; a negated errno value on failure.
+ ****************************************************************************/
+
+int orb_handle_stop(FAR struct orb_loop_s *loop,
+                    FAR struct orb_handle_s *handle);
+#endif
 
 #ifdef __cplusplus
 }

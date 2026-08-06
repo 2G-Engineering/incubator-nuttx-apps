@@ -1,6 +1,8 @@
 ############################################################################
 # apps/testing/ostest/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -29,9 +31,21 @@ MODULE = $(CONFIG_TESTING_OSTEST)
 
 # NuttX OS Test
 
-CSRCS   = getopt.c dev_null.c restart.c sigprocmask.c sighand.c signest.c
-CSRCS  += sighelper.c
+CSRCS  = getopt.c libc_memmem.c restart.c sighelper.c
+
+ifeq ($(CONFIG_ENABLE_ALL_SIGNALS),y)
+CSRCS += sighand.c signest.c
+endif
+
+ifneq ($(CONFIG_DISABLE_ALL_SIGNALS),y)
+CSRCS += sigprocmask.c
+endif
+
 MAINSRC = ostest_main.c
+
+ifeq ($(CONFIG_DEV_NULL),y)
+CSRCS += dev_null.c
+endif
 
 ifeq ($(CONFIG_SIG_SIGSTOP_ACTION),y)
 ifeq ($(CONFIG_SIG_SIGKILL_ACTION),y)
@@ -53,8 +67,16 @@ ifneq ($(CONFIG_TLS_NELEM),0)
 CSRCS += tls.c
 endif
 
+ifeq ($(CONFIG_SCHED_THREAD_LOCAL),y)
+CSRCS += sched_thread_local.c
+endif
+
 ifeq ($(CONFIG_TESTING_OSTEST_AIO),y)
 CSRCS += aio.c
+endif
+
+ifeq ($(CONFIG_TESTING_OSTEST_MULTIUSER),y)
+CSRCS += multiuser.c
 endif
 
 ifeq ($(CONFIG_SCHED_WAITPID),y)
@@ -63,14 +85,17 @@ endif
 
 ifneq ($(CONFIG_DISABLE_PTHREAD),y)
 CSRCS += cancel.c cond.c mutex.c timedmutex.c sem.c semtimed.c barrier.c
-CSRCS += timedwait.c
-CSRCS += pthread_rwlock.c pthread_rwlock_cancel.c
+CSRCS += timedwait.c pthread_rwlock.c pthread_rwlock_cancel.c schedlock.c
+
+ifeq ($(CONFIG_SCHED_WAITPID),y)
+CSRCS += pthread_exit.c
+endif
 
 ifneq ($(CONFIG_TLS_NELEM),0)
 CSRCS += specific.c
 endif
 
-ifeq ($(CONFIG_PTHREAD_CLEANUP),y)
+ifneq ($(CONFIG_TLS_NCLEANUP),0)
 CSRCS += pthread_cleanup.c
 endif
 
@@ -97,11 +122,18 @@ endif
 ifeq ($(CONFIG_SCHED_WORKQUEUE),y)
 CSRCS += wqueue.c
 endif
+
+ifeq ($(CONFIG_PRIORITY_INHERITANCE),y)
+CSRCS += prioinherit.c
+endif
 endif # CONFIG_DISABLE_PTHREAD
 
 ifneq ($(CONFIG_DISABLE_MQUEUE),y)
 ifneq ($(CONFIG_DISABLE_PTHREAD),y)
-CSRCS += mqueue.c timedmqueue.c
+CSRCS += timedmqueue.c
+ifneq ($(CONFIG_DISABLE_ALL_SIGNALS),y)
+CSRCS += mqueue.c
+endif
 endif # CONFIG_DISABLE_PTHREAD
 endif # CONFIG_DISABLE_MQUEUE
 
@@ -112,20 +144,36 @@ CSRCS += sigev_thread.c
 endif
 endif
 
-ifeq ($(CONFIG_ARCH_HAVE_VFORK),y)
+ifeq ($(CONFIG_ARCH_HAVE_FORK),y)
 ifeq ($(CONFIG_SCHED_WAITPID),y)
 CSRCS += vfork.c
 endif
 endif
 
-ifneq ($(CONFIG_DISABLE_PTHREAD),y)
-ifeq ($(CONFIG_PRIORITY_INHERITANCE),y)
-CSRCS += prioinherit.c
-endif # CONFIG_PRIORITY_INHERITANCE
-endif # CONFIG_DISABLE_PTHREAD
-
 ifeq ($(CONFIG_ARCH_SETJMP_H),y)
 CSRCS += setjmp.c
+endif
+
+ifeq ($(CONFIG_SMP),y)
+CSRCS += smp_call.c
+endif
+
+ifeq ($(CONFIG_SCHED_EVENTS),y)
+ifeq ($(CONFIG_BUILD_FLAT),y)
+CSRCS += nxevent.c
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_HAVE_PERF_EVENTS),y)
+CSRCS += perf_gettime.c
+endif
+
+ifeq ($(CONFIG_BUILD_FLAT),y)
+CSRCS += wdog.c spinlock.c
+
+ifeq ($(CONFIG_HRTIMER),y)
+CSRCS += hrtimer.c
+endif
 endif
 
 include $(APPDIR)/Application.mk

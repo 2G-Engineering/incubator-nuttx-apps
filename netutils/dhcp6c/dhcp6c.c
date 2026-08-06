@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/dhcp6c/dhcp6c.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
+#include <nuttx/clock.h>
 
 #include <time.h>
 #include <fcntl.h>
@@ -33,14 +36,14 @@
 #include <resolv.h>
 #include <string.h>
 #include <unistd.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <malloc.h>
 #include <pthread.h>
 #include <sys/time.h>
-#include <nuttx/clock.h>
+#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -48,6 +51,7 @@
 #include <net/if.h>
 #include <net/ethernet.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 
 #include "netutils/netlib.h"
 #include "netutils/dhcp6c.h"
@@ -62,8 +66,6 @@
 #define DHCPV6_SERVER_PORT 547
 #define DHCPV6_DUID_LLADDR 3
 #define DHCPV6_REQ_DELAY 1
-
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #define dhcpv6_for_each_option(_o, start, end, otype, olen, odata)\
     for ((_o) = (FAR uint8_t *)(start); (_o) + 4 <= (FAR uint8_t *)(end) &&\
@@ -360,11 +362,16 @@ static bool dhcp6c_commit_state(FAR void *handle, enum dhcpv6_state_e state,
   size_t new_len = pdhcp6c->state_len[state] - old_len;
   FAR uint8_t *old_data = pdhcp6c->state_data[state];
   FAR uint8_t *new_data = old_data + old_len;
-  bool upd = (new_len != old_len) ||
+  bool upd = false;
+
+  if (new_len != 0 || old_len != 0)
+    {
+       upd = (new_len != old_len) ||
              (memcmp(old_data, new_data, new_len) != 0);
 
-  memmove(old_data, new_data, new_len);
-  dhcp6c_resize_state(handle, state, -old_len);
+       memmove(old_data, new_data, new_len);
+       dhcp6c_resize_state(handle, state, -old_len);
+    }
 
   return upd;
 }
@@ -428,7 +435,7 @@ static void dhcp6c_get_result(FAR void *handle,
 
   presult->t1 = pdhcp6c->t1;
   presult->t2 = pdhcp6c->t2;
-  ninfo("T1:%d T2:%d for iface %i\n", presult->t1, presult->t2,
+  ninfo("T1:%"PRIu32" T2:%"PRIu32" for iface %i\n", presult->t1, presult->t2,
         pdhcp6c->ifindex);
 }
 
@@ -614,7 +621,7 @@ static void dhcp6c_send(FAR void *handle, enum dhcpv6_msg_e type,
   dhcp6c_set_iov(&iov[9], &hdr_ia_pd, sizeof(hdr_ia_pd));
   dhcp6c_set_iov(&iov[10], ia_pd, ia_pd_len);
 
-  cnt = ARRAY_SIZE(iov);
+  cnt = nitems(iov);
   if (type == DHCPV6_MSG_INFO_REQ)
     {
       cnt = 5;
@@ -789,7 +796,7 @@ static int dhcp6c_command(FAR void *handle, enum dhcpv6_msg_e type)
       goto end;
     }
 
-  ninfo("Sending %s (timeout %u s)\n", retx->name, timeout);
+  ninfo("Sending %s (timeout %"PRIu32" s)\n", retx->name, timeout);
   start = dhcp6c_get_milli_time();
   round_start = start;
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/powerled/powerled_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,30 +35,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <sys/ioctl.h>
+
+#ifndef CONFIG_NSH_ARCHINIT
+#include <sys/boardctl.h>
+#endif
 
 #include <nuttx/fs/fs.h>
 
 #include <nuttx/power/powerled.h>
 
-#if defined(CONFIG_EXAMPLES_POWERLED)
-
-#ifndef CONFIG_DRIVERS_POWERLED
-#  error "Powerled example requires powerled support"
-#endif
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_EXAMPLES_POWERLED_CURRENT_LIMIT
-#  error "LED current limit must be set!"
-#endif
-
-#ifndef CONFIG_LIBC_FLOATINGPOINT
-#  error "CONFIG_LIBC_FLOATINGPOINT must be set!"
-#endif
 
 #define DEMO_CONT_BRIGHTNESS_MAX   100.0
 #define DEMO_CONT_BRIGHTNESS_MIN   0.0
@@ -70,7 +62,7 @@
 #define DEMO_FLASH_BRIGHTNESS_SET  100.0
 
 /****************************************************************************
- * Private Type Definition
+ * Private Types
  ****************************************************************************/
 
 /* Example modes */
@@ -447,16 +439,10 @@ int main(int argc, char *argv[])
       goto errout;
     }
 
-#ifndef CONFIG_NSH_ARCHINIT
-  /* Perform architecture-specific initialization (if configured) */
-
-  boardctl(BOARDIOC_INIT, 0);
-
 #ifdef CONFIG_BOARDCTL_FINALINIT
   /* Perform architecture-specific final-initialization (if configured) */
 
   boardctl(BOARDIOC_FINALINIT, 0);
-#endif
 #endif
 
   /* Set LED current limit */
@@ -776,4 +762,3 @@ errout:
   return 0;
 }
 
-#endif /* CONFIG_EXAMPLE_POWERLED */

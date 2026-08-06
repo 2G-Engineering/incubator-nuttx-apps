@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/usrsocktest/usrsocktest_multi_thread.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,6 +24,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <assert.h>
 #include <netinet/in.h>
@@ -33,10 +36,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef ARRAY_SIZE
-#  define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#endif
 
 /****************************************************************************
  * Private Types
@@ -115,12 +114,12 @@ TEST_SETUP(multithread)
 {
   int i;
 
-  for (i = 0; i < ARRAY_SIZE(sds); i++)
+  for (i = 0; i < nitems(sds); i++)
     {
       sds[i] = -1;
     }
 
-  for (i = 0; i < ARRAY_SIZE(tids); i++)
+  for (i = 0; i < nitems(tids); i++)
     {
       tids[i] = -1;
     }
@@ -147,33 +146,33 @@ TEST_SETUP(multithread)
 
 TEST_TEAR_DOWN(multithread)
 {
-  int ret;
+  int unused_data ret;
   int i;
 
-  for (i = 0; i < ARRAY_SIZE(tids); i++)
+  for (i = 0; i < nitems(tids); i++)
     {
       if (tids[i] != -1)
         {
           ret = pthread_cancel(tids[i]);
-          assert(ret == OK);
+          TEST_ASSERT_EQUAL(ret, OK);
           ret = pthread_join(tids[i], NULL);
-          assert(ret == OK);
+          TEST_ASSERT_EQUAL(ret, OK);
         }
     }
 
-  for (i = 0; i < ARRAY_SIZE(sds); i++)
+  for (i = 0; i < nitems(sds); i++)
     {
       if (sds[i] != -1)
         {
           ret = close(sds[i]);
-          assert(ret >= 0);
+          TEST_ASSERT_TRUE(ret >= 0);
         }
     }
 
   if (started)
     {
       ret = usrsocktest_daemon_stop();
-      assert(ret == OK);
+      TEST_ASSERT_EQUAL(ret, OK);
     }
 }
 
@@ -213,7 +212,7 @@ TEST(multithread, open_close)
 
   /* Launch worker threads. */
 
-  for (i = 0; i < ARRAY_SIZE(tids); i++)
+  for (i = 0; i < nitems(tids); i++)
     {
       ret = pthread_create(&tids[i], NULL, usrsock_socket_multitask_thread,
                            sds + i);

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/smps/smps_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,26 +35,16 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <sys/ioctl.h>
 #include <sys/boardctl.h>
 
 #include <nuttx/fs/fs.h>
 #include <nuttx/power/smps.h>
 
-#if defined(CONFIG_EXAMPLES_SMPS)
-
-#ifndef CONFIG_DRIVERS_SMPS
-#  error "Smps example requires smps support"
-#endif
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_LIBC_FLOATINGPOINT
-#  error "CONFIG_LIBC_FLOATINGPOINT must be set!"
-#endif
 
 #ifndef CONFIG_EXAMPLES_SMPS_TIME_DEFAULT
 #  define CONFIG_EXAMPLES_SMPS_TIME_DEFAULT 10
@@ -87,7 +79,7 @@
 #endif
 
 /****************************************************************************
- * Private Type Definition
+ * Private Types
  ****************************************************************************/
 
 /* Application arguments */
@@ -484,16 +476,10 @@ int main(int argc, char *argv[])
       goto errout;
     }
 
-#ifndef CONFIG_NSH_ARCHINIT
-  /* Perform architecture-specific initialization (if configured) */
-
-  boardctl(BOARDIOC_INIT, 0);
-
 #ifdef CONFIG_BOARDCTL_FINALINIT
   /* Perform architecture-specific final-initialization (if configured) */
 
   boardctl(BOARDIOC_FINALINIT, 0);
-#endif
 #endif
 
   /* Set SMPS mode */
@@ -635,4 +621,3 @@ errout:
   return 0;
 }
 
-#endif /* CONFIG_EXAMPLE_SMPS */

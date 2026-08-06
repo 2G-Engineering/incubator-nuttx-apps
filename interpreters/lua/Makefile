@@ -1,6 +1,8 @@
 ############################################################################
 # apps/interpreters/lua/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -23,13 +25,13 @@ include $(APPDIR)/Make.defs
 # Lua built-in application info
 
 PROGNAME  = lua
-PRIORITY  = $(CONFIG_INTERPRETER_LUA_PRIORITY)
-STACKSIZE = $(CONFIG_INTERPRETER_LUA_STACKSIZE)
+PRIORITY  = $(CONFIG_INTERPRETERS_LUA_PRIORITY)
+STACKSIZE = $(CONFIG_INTERPRETERS_LUA_STACKSIZE)
 MODULE    = $(CONFIG_INTERPRETERS_LUA)
 
 # Lua library
 
-LUA_VERSION  = $(patsubst "%",%,$(strip $(CONFIG_INTERPRETER_LUA_VERSION)))
+LUA_VERSION  = $(patsubst "%",%,$(strip $(CONFIG_INTERPRETERS_LUA_VERSION)))
 LUA_TARBALL  = v$(LUA_VERSION).tar.gz
 LUA_UNPACK   = lua
 LUA_URL_BASE = https://github.com/lua/lua/archive/refs/tags/
@@ -42,25 +44,25 @@ EXCLUDE_SRCS  = $(MAINSRC) $(CORELIBS_SRCS) $(LUA_SRC)$(DELIM)onelua.c $(LUA_SRC
 CSRCS         = $(filter-out $(EXCLUDE_SRCS),$(wildcard $(LUA_SRC)$(DELIM)*.c))
 CSRCS        += nuttx_linit.c
 
-CFLAGS += -DLUA_MAXINPUT=$(CONFIG_INTERPRETER_LUA_IOBUFSIZE)
+CFLAGS += -DLUA_MAXINPUT=$(CONFIG_INTERPRETERS_LUA_IOBUFSIZE)
 CFLAGS += -DLUA_PROGNAME=\"$(PROGNAME)\"
 
-ifeq ($(CONFIG_INTERPRETER_LUA_32BITS),y)
+ifeq ($(CONFIG_INTERPRETERS_LUA_32BITS),y)
 CFLAGS += -DLUA_32BITS
 endif
 
-ifneq ($(CONFIG_INTERPRETER_LUA_PATH),"")
-CFLAGS += -DLUA_PATH_DEFAULT=\"$(CONFIG_INTERPRETER_LUA_PATH)\"
+ifneq ($(CONFIG_INTERPRETERS_LUA_PATH),"")
+CFLAGS += -DLUA_PATH_DEFAULT=\"$(CONFIG_INTERPRETERS_LUA_PATH)\"
 endif
 
-ifneq ($(CONFIG_INTERPRETER_LUA_CPATH),"")
-CFLAGS += -DLUA_CPATH_DEFAULT=\"$(CONFIG_INTERPRETER_LUA_CPATH)\"
+ifneq ($(CONFIG_INTERPRETERS_LUA_CPATH),"")
+CFLAGS += -DLUA_CPATH_DEFAULT=\"$(CONFIG_INTERPRETERS_LUA_CPATH)\"
 endif
 
 ifeq ($(CONFIG_SYSTEM_READLINE),y)
 CFLAGS += -include "system/readline.h"
 CFLAGS += -D'lua_initreadline(L)=((void)L)'
-CFLAGS += -D'lua_readline(L,b,p)=((void)L,fputs(p,stdout),fflush(stdout),readline(b,LUA_MAXINPUT,stdin,stdout))'
+CFLAGS += -D'lua_readline(L,b,p)=((void)L,fputs(p,stdout),fflush(stdout),readline_stream(b,LUA_MAXINPUT,stdin,stdout))'
 CFLAGS += -D'lua_saveline(L,line)={(void)L;(void)line;}'
 CFLAGS += -D'lua_freeline(L,line)={(void)L;(void)b;}'
 endif
@@ -81,7 +83,7 @@ endif
 
 # Register core modules
 
-ifeq ($(CONFIG_INTERPRETER_LUA_CORELIBS),y)
+ifeq ($(CONFIG_INTERPRETERS_LUA_CORELIBS),y)
 CSRCS += $(CORELIBS_SRCS)
 
 register::

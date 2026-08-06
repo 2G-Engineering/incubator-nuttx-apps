@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/fsutils/flash_eraseall/flash_eraseall.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,7 +30,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/mtd/mtd.h>
 #include "fsutils/flash_eraseall.h"
@@ -69,13 +71,14 @@ int flash_eraseall(FAR const char *driver)
       if (ret < 0)
         {
           errcode = errno;
-          ferr("ERROR: MTD ioctl(%04x) failed: %d\n", MTDIOC_BULKERASE, errcode);
+          ferr("ERROR: MTD ioctl(%04x) failed: %d\n",
+               MTDIOC_BULKERASE, errcode);
           ret = -errcode;
         }
 
       /* Close the block driver */
 
-     close(fd);
+      close(fd);
     }
 
   return ret;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/interpreters/lua/nuttx_linit.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -46,7 +48,7 @@
 
 static const luaL_Reg g_loadedlibs[] =
 {
-#ifdef CONFIG_INTERPRETER_LUA_CORELIBS
+#ifdef CONFIG_INTERPRETERS_LUA_CORELIBS
   {LUA_GNAME, luaopen_base},
 #endif
 #include "luamod_list.h"

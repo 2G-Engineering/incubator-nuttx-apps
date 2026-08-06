@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/ostest.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -91,6 +93,10 @@
 
 int getopt_test(void);
 
+/* libc_memmem.c ************************************************************/
+
+int memmem_test(void);
+
 /* setvbuf.c ****************************************************************/
 
 #ifndef CONFIG_STDIO_DISABLE_BUFFERING
@@ -99,7 +105,15 @@ int setvbuf_test(void);
 
 /* dev_null.c ***************************************************************/
 
-int dev_null(void);
+#ifdef CONFIG_DEV_NULL
+int dev_null_test(void);
+#endif
+
+/* multiuser.c **************************************************************/
+
+#if defined(CONFIG_TESTING_OSTEST_MULTIUSER) && defined(CONFIG_SCHED_USER_IDENTITY)
+int multiuser_test(void);
+#endif
 
 /* fpu.c ********************************************************************/
 
@@ -113,7 +127,9 @@ void aio_test(void);
 
 /* restart.c ****************************************************************/
 
+#ifndef CONFIG_BUILD_KERNEL
 void restart_test(void);
+#endif
 
 /* waitpid.c ****************************************************************/
 
@@ -201,6 +217,16 @@ void signest_test(void);
 
 void suspend_test(void);
 
+/* wdog.c *******************************************************************/
+
+void wdog_test(void);
+
+/* hrtimer.c ****************************************************************/
+
+#ifdef CONFIG_HRTIMER
+void hrtimer_test(void);
+#endif
+
 /* posixtimers.c ************************************************************/
 
 void timer_test(void);
@@ -222,6 +248,10 @@ void sporadic2_test(void);
 
 void tls_test(void);
 
+/* sched_thread_local.c *****************************************************/
+
+void sched_thread_local_test(void);
+
 /* pthread_rwlock.c *********************************************************/
 
 void pthread_rwlock_test(void);
@@ -229,6 +259,12 @@ void pthread_rwlock_test(void);
 /* pthread_rwlock_cancel.c **************************************************/
 
 void pthread_rwlock_cancel_test(void);
+
+/* pthread_exit.c ***********************************************************/
+
+#ifdef CONFIG_SCHED_WAITPID
+void pthread_exit_test(void);
+#endif
 
 /* pthread_cleanup.c ********************************************************/
 
@@ -242,15 +278,35 @@ void barrier_test(void);
 
 void priority_inheritance(void);
 
+/* schedlock.c **************************************************************/
+
+void sched_lock_test(void);
+
 /* vfork.c ******************************************************************/
 
-#if defined(CONFIG_ARCH_HAVE_VFORK) && defined(CONFIG_SCHED_WAITPID)
+#if defined(CONFIG_ARCH_HAVE_FORK) && defined(CONFIG_SCHED_WAITPID)
 int vfork_test(void);
 #endif
 
 /* setjmp.c *****************************************************************/
 
 void setjmp_test(void);
+
+/* smp_call.c ***************************************************************/
+
+#ifdef CONFIG_SMP
+void smp_call_test(void);
+#endif
+
+/* spinlock.c ***************************************************************/
+
+void spinlock_test(void);
+
+/* perf_gettime.c ***********************************************************/
+
+#ifdef CONFIG_ARCH_HAVE_PERF_EVENTS
+void perf_gettime_test(void);
+#endif
 
 /* APIs exported (conditionally) by the OS specifically for testing of
  * priority inheritance
@@ -262,6 +318,12 @@ int sem_nfreeholders(void);
 #else
 #  define sem_enumholders(sem)
 #  define sem_nfreeholders()
+#endif
+
+/* nxevent.c ****************************************************************/
+
+#if defined(CONFIG_SCHED_EVENTS) && defined(CONFIG_BUILD_FLAT)
+void nxevent_test(void);
 #endif
 
 #endif /* __APPS_TESTING_OSTEST_OSTEST_H */

@@ -1,14 +1,11 @@
 /****************************************************************************
  * apps/examples/telnetd/telnetd.c
  *
- *   Copyright (C) 2012, 2017 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * This is a leverage of similar logic from uIP:
- *
- *   Author: Adam Dunkels <adam@sics.se>
- *   Copyright (c) 2003, Adam Dunkels.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2012, 2017 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2003, Adam Dunkels. All rights reserved.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@sics.se>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +45,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#ifdef CONFIG_BOARDCTL_RESET
+#  include <sys/boardctl.h>
+#  include <sys/ioctl.h>
+#endif
+
 #include "netutils/telnetd.h"
 #include "netutils/netlib.h"
 
@@ -68,6 +70,11 @@ struct ptentry_s
  ****************************************************************************/
 
 static void telnetd_help(int argc, char **argv);
+
+#ifdef CONFIG_BOARDCTL_RESET
+static void telnetd_reset(int argc, char **argv);
+#endif
+
 static void telnetd_quit(int argc, char **argv);
 static void telnetd_unknown(int argc, char **argv);
 static void telnetd_parse(FAR char *line, int len);
@@ -79,6 +86,9 @@ static void telnetd_parse(FAR char *line, int len);
 static const struct ptentry_s g_parsetab[] =
 {
   {"help",  telnetd_help},
+  #ifdef CONFIG_BOARDCTL_RESET
+  {"reset", telnetd_reset},
+  #endif
   {"exit",  telnetd_quit},
   {"?",     telnetd_help},
   {NULL,    telnetd_unknown}
@@ -96,6 +106,9 @@ static void telnetd_help(int argc, char **argv)
 {
   printf("Available commands:\n");
   printf("  help, ? - show help\n");
+  #ifdef CONFIG_BOARDCTL_RESET
+  printf("  reset   - reset the board\n");
+  #endif
   printf("  exit    - exit shell\n");
 }
 
@@ -120,6 +133,18 @@ static void telnetd_quit(int argc, char **argv)
   printf("Bye!\n");
   exit(0);
 }
+
+/****************************************************************************
+ * Name: telnetd_reset
+ ****************************************************************************/
+#ifdef CONFIG_BOARDCTL_RESET
+static void telnetd_reset(int argc, char **argv)
+{
+  printf("Reset!\n");
+  boardctl(BOARDIOC_RESET, 0);
+  exit(0);
+}
+#endif
 
 /****************************************************************************
  * Name: telnetd_parse
@@ -159,8 +184,9 @@ int telnetd_session(int argc, char *argv[])
 {
   char line[128];
 
-  printf("uIP command shell -- NuttX style\n");
-  printf("Type '?' and return for help\n");
+  printf("Device Configuration over Telnet\n");
+  printf("You can add functions to setup your device\n");
+  printf("Type '?' and press <enter> for help\n");
 
   for (; ; )
     {

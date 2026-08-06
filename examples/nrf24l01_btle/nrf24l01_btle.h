@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/nrf24l01_btle/nrf24l01_btle.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,7 +31,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -37,7 +39,7 @@
 
 /* Service UUIDs used on the nRF8001 and nRF51822 platforms */
 
-#define NRF_TEMPERATURE_SERVICE_UUID		0x1809
+#define NRF_TEMPERATURE_SERVICE_UUID        0x1809
 #define NRF_ENVIRONMENTAL_SERVICE_UUID      0x181A
 
 /****************************************************************************
@@ -56,7 +58,7 @@ struct nrf_service_data
 
 struct btle_adv_pdu
   {
-    /* PDU type, most of it 0x42  */
+    /* PDU type, most of it 0x42 */
 
     uint8_t pdu_type;
 
@@ -96,4 +98,4 @@ int nrf24_open(void);
 
 int nrf24_send(int wl_fd, uint8_t * buf, uint8_t len);
 
-#endif /* __APPS_EXAMPLES_NRF24L01_BTLE_NRF24L01_BTLE_H  */
+#endif /* __APPS_EXAMPLES_NRF24L01_BTLE_NRF24L01_BTLE_H */

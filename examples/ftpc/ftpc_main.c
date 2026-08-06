@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/ftpc/ftpc_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -560,7 +562,8 @@ do_connect:
           return 1;
         }
 #else
-      ret = readline(g_line, CONFIG_FTPC_LINELEN, stdin, stdout);
+      ret = readline_stream(g_line, CONFIG_FTPC_LINELEN,
+                            stdin, stdout);
 
       /* Readline normally returns the number of characters read,
        * but will return EOF on end of file or if an error occurs.

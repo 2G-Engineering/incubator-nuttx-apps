@@ -7,6 +7,7 @@ menuconfig SYSTEM_ADBD
 	tristate "ADB daemon application"
 	default n
 	depends on LIBUV
+	select LIBC_PRINT_EXTENSION
 	---help---
 		Enable support for adb daemon.
 
@@ -94,7 +95,7 @@ config ADBD_FRAME_MAX
 
 config ADBD_TCP_SERVER
 	bool "Network socket transport support"
-	depends on NET_TCP
+	depends on NET_TCP_NO_STACK || NET_TCPBACKLOG
 	default n
 	---help---
 		Run adb daemon on network socket.
@@ -113,8 +114,42 @@ config ADBD_USB_SERVER
 	---help---
 		Run adb daemon on USB bus
 
+choice
+	prompt "Check usb hotplug"
+	default ADBD_USB_HOTPLUG_BYTIMER
+
+config ADBD_USB_HOTPLUG_BYTIMER
+	bool "Using 1s timer to check usb hotplug"
+	depends on ADBD_USB_SERVER
+	---help---
+		Using 1s timer to check usb hotplug
+
+config ADBD_USB_HOTPLUG_BYNOTIFY
+	bool "Using fs notify to check usb hotplug"
+	depends on ADBD_USB_SERVER
+	depends on FS_NOTIFY
+	---help---
+		Using fs notify to monitor usb hotplug
+
+endchoice # Check usb hotplug
+
+config ADBD_QEMU_SERVER
+	bool "QEMU pipe transport support"
+	depends on GOLDFISH_PIPE
+	default n
+	---help---
+		Run adb daemon on qemu pipe
+
+config ADBD_QEMU_SERVER_PORT
+	int "QEMU pipe transport port"
+	depends on ADBD_QEMU_SERVER
+	default 5555
+	---help---
+		Port used by adb daemon qemu pipe server
+
 config ADBD_LOGCAT_SERVICE
 	bool "ADB logcat support"
+	select LIBC_PRINT_EXTENSION
 	depends on RAMLOG_SYSLOG
 	default n
 	---help---
@@ -128,17 +163,18 @@ config ADBD_FILE_SERVICE
 
 config ADBD_FILE_SYMLINK
 	bool "File service symlink support"
-	default n
 	depends on ADBD_FILE_SERVICE
 	depends on PSEUDOFS_SOFTLINKS
+	default PSEUDOFS_SOFTLINKS
 	---help---
 		Enable fs symlink support.
 
 config ADBD_SHELL_SERVICE
 	bool "ADB shell support"
 	depends on SYSTEM_NSH
-	select LIBC_EXECFUNCS
-	select PSEUDOTERM
+	depends on LIBC_EXECFUNCS
+	depends on PSEUDOTERM
+	depends on SCHED_CHILD_STATUS
 	default n
 	---help---
 		Enable "adb shell" feature.
@@ -164,12 +200,14 @@ config ADBD_SOCKET_SERVICE
 	---help---
 		Enable "adb forward|reverse" feature.
 
-config ADBD_BOARD_INIT
-	bool "Board initialization"
+config ADBD_USB_BOARDCTL
+	bool "USB Board Control"
 	depends on BOARDCTL
-	default n
+	depends on ADBD_USB_SERVER
+	select BOARDCTL_USBDEVCTRL
+	default y
 	---help---
-		Setup board before running adb daemon.
+		Connect usbdev before running adb daemon.
 
 config ADBD_NET_INIT
 	bool "Network initialization"

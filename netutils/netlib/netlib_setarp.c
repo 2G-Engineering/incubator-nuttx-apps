@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_setarp.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -76,10 +78,10 @@ int netlib_set_arpmapping(FAR const struct sockaddr_in *inaddr,
 
           req.arp_ha.sa_family = ARPHRD_ETHER;
           memcpy(&req.arp_ha.sa_data, macaddr, ETHER_ADDR_LEN);
+          req.arp_flags = ATF_PERM;
           if (ifname != NULL)
             {
-               strlcpy((FAR char *)&req.arp_dev, ifname,
-                       sizeof(req.arp_dev));
+               strlcpy(req.arp_dev, ifname, sizeof(req.arp_dev));
             }
           else
             {

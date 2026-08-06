@@ -1,6 +1,8 @@
 ############################################################################
 # apps/testing/cmocka/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -23,14 +25,18 @@ include $(APPDIR)/Make.defs
 CSRCS += $(wildcard cmocka/src/*.c)
 CFLAGS += -Dprint_error=nx_print_error
 CFLAGS += -DCMOCKA_PLATFORM_INCLUDE
+CFLAGS += -DHAVE_CLOCK_REALTIME=1
+CFLAGS += -DHAVE_STRUCT_TIMESPEC=1
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/testing/cmocka
 
+MODULE = $(CONFIG_TESTING_CMOCKA_PROG)
+
+ifneq ($(CONFIG_TESTING_CMOCKA_PROG),)
 PROGNAME  = $(CONFIG_TESTING_CMOCKA_PROGNAME)
 PRIORITY  = $(CONFIG_TESTING_CMOCKA_PRIORITY)
 STACKSIZE = $(CONFIG_TESTING_CMOCKA_STACKSIZE)
-MODULE    = $(CONFIG_TESTING_CMOCKA)
-
-MAINSRC = $(CURDIR)/cmocka_main.c
+MAINSRC   = $(CURDIR)/cmocka_main.c
+endif
 
 # Download and unpack tarball if no git repo found
 ifeq ($(wildcard cmocka/.git),)
@@ -41,6 +47,10 @@ cmocka.zip:
 	$(Q) mv cmocka-$(VERSION) cmocka
 	$(Q) patch -p0 < 0001-cmocka.c-Reduce-the-call-stack-consumption-of-printf.patch
 	$(Q) patch -p0 < 0002-cmocka-feature-to-forwarding-cmocka-log-message-to-c.patch
+	$(Q) patch -p0 < 0003-cmocka-update-method-for-strmatch-to-regex-and-add-list-all-testcases-function.patch
+	$(Q) patch -p0 < 0004-cmocka-xml-report.patch
+	$(Q) patch -p0 < 0005-cmocka-cmocka_private-fix-warning-in-cmocka_private.patch
+	$(Q) patch -p0 < 0006-fix-linux-risc-v-compile-error-list_initialize.patch
 
 context:: cmocka.zip
 

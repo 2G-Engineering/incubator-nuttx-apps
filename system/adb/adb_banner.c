@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/adb/adb_banner.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -50,14 +52,15 @@ int adb_fill_connect_data(char *buf, size_t bufsize)
     {
       /* Failed to get board id */
 
-      adb_log("failed to get board id\n");
+      adb_err("failed to get board id\n");
       len = snprintf(buf, remaining, "device::");
     }
   else
     {
       /* FIXME only keep first 4 bytes */
 
-      len = snprintf(buf, remaining, "device:%x:", *(uint32_t *)board_id);
+      len = snprintf(buf, remaining,
+                     "device:%" PRIx32 ":", *(uint32_t *)board_id);
     }
 #else
   len = snprintf(buf, remaining, "device:" CONFIG_ADBD_DEVICE_ID ":");

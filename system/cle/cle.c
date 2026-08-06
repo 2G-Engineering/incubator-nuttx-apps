@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/cle/cle.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,7 +36,8 @@
 #include <ctype.h>
 #include <syslog.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
+#include <termios.h>
 
 #include <nuttx/ascii.h>
 #include <nuttx/vt100.h>
@@ -313,7 +316,7 @@ static int cle_getch(FAR struct cle_s *priv)
           if (nread == 0 || errcode != EINTR)
             {
               cledbg("ERROR: read from stdin failed: %d\n", errcode);
-              return -EIO;
+              return EOF;
             }
         }
     }
@@ -369,13 +372,13 @@ static void cle_setcursor(FAR struct cle_s *priv, int16_t column)
   int len;
   int off;
 
-  /* Sub prompt offset from real postion to get correct offset to execute */
+  /* Sub prompt offset from real position to get correct offset to execute */
 
   off = column - (priv->realpos - priv->coloffs);
 
   cleinfo("column=%d offset=%d\n", column, off);
 
-  /* If cursor not move, retrun directly */
+  /* If cursor not move, return directly */
 
   if (off == 0)
     {
@@ -700,9 +703,9 @@ static int cle_editloop(FAR struct cle_s *priv)
       for (; ; )
         {
           ch = cle_getch(priv);
-          if (ch < 0)
+          if (ch == EOF)
             {
-              return -EIO;
+              return EOF;
             }
           else if (state != 0)
             {
@@ -1050,7 +1053,19 @@ int cle_fd(FAR char *line, FAR const char *prompt, uint16_t linelen,
            int infd, int outfd)
 {
   FAR struct cle_s priv;
+  struct termios cfg;
   int ret;
+
+  if (isatty(infd))
+    {
+      tcgetattr(infd, &cfg);
+      if (cfg.c_lflag & ICANON)
+        {
+          cfg.c_lflag &= ~ICANON;
+          tcsetattr(infd, TCSANOW, &cfg);
+          cfg.c_lflag |= ICANON;
+        }
+    }
 
   /* Initialize the CLE state structure */
 
@@ -1116,6 +1131,11 @@ int cle_fd(FAR char *line, FAR const char *prompt, uint16_t linelen,
     }
 #endif /* CONFIG_SYSTEM_CLE_CMD_HISTORY */
 
+  if (isatty(infd) && (cfg.c_lflag & ICANON))
+    {
+      tcsetattr(infd, TCSANOW, &cfg);
+    }
+
   return ret;
 }
 
@@ -1123,6 +1143,12 @@ int cle_fd(FAR char *line, FAR const char *prompt, uint16_t linelen,
 int cle(FAR char *line, FAR const char *prompt, uint16_t linelen,
         FAR FILE *instream, FAR FILE *outstream)
 {
-  return cle_fd(line, prompt, linelen, instream->fs_fd, outstream->fs_fd);
+  int instream_fd;
+  int outstream_fd;
+
+  instream_fd  = fileno(instream);
+  outstream_fd = fileno(outstream);
+
+  return cle_fd(line, prompt, linelen, instream_fd, outstream_fd);
 }
 #endif

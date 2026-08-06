@@ -1,8 +1,9 @@
 /****************************************************************************
  * apps/system/ubloxmodem/ubloxmodem_main.c
  *
- *   Copyright (C) 2016 Vladimir Komendantskiy. All rights reserved.
- *   Author: Vladimir Komendantskiy <vladimir@moixaenergy.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2016 Vladimir Komendantskiy. All rights reserved.
+ * SPDX-FileContributor: Vladimir Komendantskiy <vladimir@moixaenergy.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,8 +43,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -247,9 +249,7 @@ static int ubloxmodem_help(FAR struct ubloxmodem_cxt *cxt)
 
   printf("Usage: ubloxmodem <cmd> [arguments]\n"
          "  where <cmd> is one of\n");
-  for (i = 0;
-       i < sizeof(cmdmap) / sizeof(struct cmdinfo);
-       i++)
+  for (i = 0; i < nitems(cmdmap); i++)
     {
       printf("%s\n  %s\n  %s\n",
              cmdmap[i].name,
@@ -375,8 +375,7 @@ static int ubloxmodem_parse(FAR struct ubloxmodem_cxt *cxt)
 {
   int i;
 
-  for (i = 0;
-       i < sizeof(cmdmap) / sizeof(struct cmdinfo) &&
+  for (i = 0; i < nitems(cmdmap) &&
          cxt->cmd == UBLOXMODEM_CMD_UNKNOWN;
        i++)
     {

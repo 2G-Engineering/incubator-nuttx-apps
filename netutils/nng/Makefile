@@ -1,6 +1,8 @@
 ############################################################################
 # apps/netutils/nng/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -26,6 +28,8 @@ NNG_UNPACK   = nng
 NNG_SRCDIR   = $(NNG_UNPACK)$(DELIM)src
 
 CFLAGS += -I$(NNG_UNPACK)/src
+CFLAGS += -Wno-unused-value -Wno-shadow
+
 CFLAGS += -DNNG_PLATFORM_POSIX
 CFLAGS += -DNNG_HAVE_GETRANDOM
 CFLAGS += -DNNG_TRANSPORT_INPROC
@@ -34,6 +38,14 @@ CFLAGS += -DNNG_TRANSPORT_TCP
 CFLAGS += -DNNG_TRANSPORT_TLS
 CFLAGS += -DNNG_TRANSPORT_WS
 CFLAGS += -DNNG_TRANSPORT_WSS
+CFLAGS += -DNNG_SETSTACKSIZE
+CFLAGS += -DNNG_HAVE_PTHREAD_SETNAME_NP
+
+ifneq ($(CONFIG_SMP_NCPUS),)
+CFLAGS += -DNNG_MAX_TASKQ_THREADS=$(CONFIG_SMP_NCPUS)
+else
+CFLAGS += -DNNG_MAX_TASKQ_THREADS=2
+endif
 
 CFLAGS += -DNNG_USE_EVENTFD
 ifeq ($(CONFIG_NETUTILS_NNG_HAVE_EPOLL),y)
@@ -50,7 +62,7 @@ endif
 DEPPATH += --dep-path $(NNG_SRCDIR)
 VPATH   += :$(NNG_SRCDIR)
 
-CSRCS  = $(NNG_SRCDIR)/nng.c 
+CSRCS  = $(NNG_SRCDIR)/nng.c
 CSRCS += $(NNG_SRCDIR)/nng_legacy.c
 CSRCS += $(NNG_SRCDIR)/core/aio.c
 CSRCS += $(NNG_SRCDIR)/core/device.c
@@ -149,6 +161,8 @@ $(NNG_TARBALL):
 $(NNG_UNPACK): $(NNG_TARBALL)
 	$(Q) tar zxf $(NNG_TARBALL)
 	$(Q) mv nng-$(NNG_VERSION) $(NNG_UNPACK)
+	$(Q) echo "Patching $(NNG_UNPACK)"
+	$(Q) patch -p0 < nng_porting_for_nuttx.patch
 	$(Q) touch $(NNG_UNPACK)
 
 # Download and unpack tarball if no git repo found

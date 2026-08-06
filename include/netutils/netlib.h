@@ -1,17 +1,11 @@
 /****************************************************************************
  * apps/include/netutils/netlib.h
- * Various non-standard APIs to support netutils.  All non-standard and
- * intended only for internal use.
  *
- *   Copyright (C) 2007, 2009, 2011, 2015, 2017 Gregory Nutt. All rights
- *   reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Some of these APIs derive from uIP.  uIP also has a BSD style license:
- *
- *   Author: Adam Dunkels <adam@sics.se>
- *   Copyright (c) 2002, Adam Dunkels.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2007, 2009, 2011, 2015, 2017 Gregory Nutt.
+ * SPDX-FileCopyrightText: 2002 Adam Dunkels.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@sics.se>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,7 +52,14 @@
 
 #include <net/if.h>
 #include <netinet/in.h>
+#include <nuttx/mm/iob.h>
+#include <nuttx/net/netdev.h>
 #include <nuttx/net/netconfig.h>
+
+#ifdef CONFIG_NET_IPTABLES
+#  include <nuttx/net/netfilter/ip_tables.h>
+#  include <nuttx/net/netfilter/ip6_tables.h>
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -123,6 +124,60 @@ struct netlib_device_s
 };
 #endif /* CONFIG_NETLINK_ROUTE*/
 
+#ifdef CONFIG_NETLINK_NETFILTER
+/* Describes one connection returned by netlib_get_conntrack() */
+
+union netlib_conntrack_addr_u
+{
+#ifdef CONFIG_NET_IPv4
+  struct in_addr ipv4;
+#endif
+#ifdef CONFIG_NET_IPv6
+  struct in6_addr ipv6;
+#endif
+};
+
+struct netlib_conntrack_tuple_s
+{
+  union netlib_conntrack_addr_u src;
+  union netlib_conntrack_addr_u dst;
+
+  union
+  {
+    struct
+    {
+      uint16_t sport;
+      uint16_t dport;
+    } tcp; /* and udp */
+
+    struct
+    {
+      uint16_t id;
+      uint8_t  type;
+      uint8_t  code;
+    } icmp; /* and icmp6 */
+  } l4;
+
+  uint8_t l4proto;
+};
+
+struct netlib_conntrack_s
+{
+  struct netlib_conntrack_tuple_s orig;
+  struct netlib_conntrack_tuple_s reply;
+
+  sa_family_t family; /* AF_INET or AF_INET6 */
+  uint8_t     type;   /* IPCTNL_MSG_CT_* */
+};
+
+/* There might be many conntrack entries, so we don't use array of data, but
+ * use callback instead.
+ */
+
+typedef CODE int (*netlib_conntrack_cb_t)(FAR struct netlib_conntrack_s *ct);
+
+#endif /* CONFIG_NETLINK_NETFILTER */
+
 #ifdef CONFIG_NETUTILS_NETLIB_GENERICURLPARSER
 struct url_s
 {
@@ -146,6 +201,11 @@ struct url_s
   int       bookmarklen;
 #endif
 };
+#endif
+
+#ifdef CONFIG_NETUTILS_DHCPC
+typedef CODE void (*netlib_dhcp_ntp_callback_t)
+  (FAR const char *ntp_server_list, FAR void *arg);
 #endif
 
 /****************************************************************************
@@ -191,6 +251,44 @@ ssize_t netlib_get_devices(FAR struct netlib_device_s *devlist,
 
 bool netlib_ipv4addrconv(FAR const char *addrstr, FAR uint8_t *addr);
 bool netlib_ethaddrconv(FAR const char *hwstr, FAR uint8_t *hw);
+
+#ifdef CONFIG_NETUTILS_DHCPC
+/****************************************************************************
+ * Name: netlib_set_ntp_servers_from_dhcp
+ *
+ * Description:
+ *   Update the currently active DHCP option 42 NTP server list. The list
+ *   contains semicolon-separated hostnames or addresses. Passing NULL or
+ *   an empty string clears the DHCP-provided list.
+ *
+ ****************************************************************************/
+
+int netlib_set_ntp_servers_from_dhcp(FAR const char *ntp_server_list);
+
+/****************************************************************************
+ * Name: netlib_register_dhcp_ntp_callback
+ *
+ * Description:
+ *   Register a callback to receive DHCP option 42 NTP server list updates.
+ *   The current list, if any, is replayed immediately after registration.
+ *   Only one callback may be registered at a time.
+ *
+ ****************************************************************************/
+
+int netlib_register_dhcp_ntp_callback(netlib_dhcp_ntp_callback_t callback,
+                                      FAR void *arg);
+
+/****************************************************************************
+ * Name: netlib_unregister_dhcp_ntp_callback
+ *
+ * Description:
+ *   Unregister a previously registered DHCP option 42 NTP update callback.
+ *
+ ****************************************************************************/
+
+int netlib_unregister_dhcp_ntp_callback(netlib_dhcp_ntp_callback_t callback,
+                                        FAR void *arg);
+#endif
 
 #ifdef CONFIG_NET_ETHERNET
 /* Get and set IP/MAC addresses (Ethernet L2 only) */
@@ -239,7 +337,21 @@ int netlib_get_ipv4netmask(FAR const char *ifname, FAR struct in_addr *addr);
 int netlib_ipv4adaptor(in_addr_t destipaddr, FAR in_addr_t *srcipaddr);
 #endif
 
+/* We support multiple IPv6 addresses on a single interface.
+ * Recommend to use netlib_add/del_ipv6addr to manage them, by which you
+ * don't need to care about the slot it stored.
+ *
+ * Previous interfaces can still work, the ifname can be <eth>:<num>,
+ * e.g. eth0:0 stands for managing the secondary address on eth0
+ */
+
 #ifdef CONFIG_NET_IPv6
+#  ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+int netlib_add_ipv6addr(FAR const char *ifname,
+                        FAR const struct in6_addr *addr, uint8_t preflen);
+int netlib_del_ipv6addr(FAR const char *ifname,
+                        FAR const struct in6_addr *addr, uint8_t preflen);
+#  endif
 int netlib_get_ipv6addr(FAR const char *ifname, FAR struct in6_addr *addr);
 int netlib_set_ipv6addr(FAR const char *ifname,
                         FAR const struct in6_addr *addr);
@@ -263,6 +375,11 @@ ssize_t netlib_get_nbtable(FAR struct neighbor_entry_s *nbtab,
 #ifdef CONFIG_NETDEV_WIRELESS_IOCTL
 int netlib_getessid(FAR const char *ifname, FAR char *essid, size_t idlen);
 int netlib_setessid(FAR const char *ifname, FAR const char *essid);
+#endif
+
+#ifdef CONFIG_NET_VLAN
+int netlib_add_vlan(FAR const char *ifname, int vlanid, int prio);
+int netlib_del_vlan(FAR const char *vlanif);
 #endif
 
 #ifdef CONFIG_NET_ARP
@@ -307,10 +424,20 @@ ssize_t netlib_get_route(FAR struct rtentry *rtelist,
                          unsigned int nentries, sa_family_t family);
 #endif
 
+#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NETUTILS_DHCPC)
+/* DHCP */
+
+int netlib_obtain_ipv4addr(FAR const char *ifname);
+#endif
+
 #ifdef CONFIG_NET_ICMPv6_AUTOCONF
 /* ICMPv6 Autoconfiguration */
 
 int netlib_icmpv6_autoconfiguration(FAR const char *ifname);
+
+/* DHCPv6 */
+
+int netlib_obtain_ipv6addr(FAR const char *ifname);
 #endif
 
 #ifdef CONFIG_NET_IPTABLES
@@ -318,11 +445,16 @@ int netlib_icmpv6_autoconfiguration(FAR const char *ifname);
 
 struct ipt_replace;  /* Forward reference */
 struct ipt_entry;    /* Forward reference */
+struct ip6t_replace; /* Forward reference */
+struct ip6t_entry;   /* Forward reference */
 enum nf_inet_hooks;  /* Forward reference */
 
+#  ifdef CONFIG_NET_IPv4
 FAR struct ipt_replace *netlib_ipt_prepare(FAR const char *table);
 int netlib_ipt_commit(FAR const struct ipt_replace *repl);
 int netlib_ipt_flush(FAR const char *table, enum nf_inet_hooks hook);
+int netlib_ipt_policy(FAR const char *table, enum nf_inet_hooks hook,
+                      int verdict);
 int netlib_ipt_append(FAR struct ipt_replace **repl,
                       FAR const struct ipt_entry *entry,
                       enum nf_inet_hooks hook);
@@ -332,9 +464,52 @@ int netlib_ipt_insert(FAR struct ipt_replace **repl,
 int netlib_ipt_delete(FAR struct ipt_replace *repl,
                       FAR const struct ipt_entry *entry,
                       enum nf_inet_hooks hook, int rulenum);
-#  ifdef CONFIG_NET_NAT
+int netlib_ipt_fillifname(FAR struct ipt_entry *entry,
+                          FAR const char *inifname,
+                          FAR const char *outifname);
+#    ifdef CONFIG_NET_NAT
 FAR struct ipt_entry *netlib_ipt_masquerade_entry(FAR const char *ifname);
-#  endif
+#    endif
+#    ifdef CONFIG_NET_IPFILTER
+FAR struct ipt_entry *netlib_ipt_filter_entry(FAR const char *target,
+                                              int verdict,
+                                              uint8_t match_proto);
+#    endif
+#  endif /* CONFIG_NET_IPv4 */
+#  ifdef CONFIG_NET_IPv6
+FAR struct ip6t_replace *netlib_ip6t_prepare(FAR const char *table);
+int netlib_ip6t_commit(FAR const struct ip6t_replace *repl);
+int netlib_ip6t_flush(FAR const char *table, enum nf_inet_hooks hook);
+int netlib_ip6t_policy(FAR const char *table, enum nf_inet_hooks hook,
+                       int verdict);
+int netlib_ip6t_append(FAR struct ip6t_replace **repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook);
+int netlib_ip6t_insert(FAR struct ip6t_replace **repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook, int rulenum);
+int netlib_ip6t_delete(FAR struct ip6t_replace *repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook, int rulenum);
+int netlib_ip6t_fillifname(FAR struct ip6t_entry *entry,
+                           FAR const char *inifname,
+                           FAR const char *outifname);
+#    ifdef CONFIG_NET_IPFILTER
+FAR struct ip6t_entry *netlib_ip6t_filter_entry(FAR const char *target,
+                                                int verdict,
+                                                uint8_t match_proto);
+#    endif
+#  endif /* CONFIG_NET_IPv6 */
+#endif /* CONFIG_NET_IPTABLES */
+
+#ifdef CONFIG_NETLINK_NETFILTER
+/* Netfilter connection tracking support */
+
+struct nlmsghdr;  /* Forward reference */
+
+int netlib_parse_conntrack(FAR const struct nlmsghdr *nlh, size_t len,
+                           FAR struct netlib_conntrack_s *ct);
+int netlib_get_conntrack(sa_family_t family, netlib_conntrack_cb_t cb);
 #endif
 
 /* HTTP support */
@@ -356,18 +531,89 @@ void netlib_server(uint16_t portno, pthread_startroutine_t handler,
 int netlib_getifstatus(FAR const char *ifname, FAR uint8_t *flags);
 int netlib_ifup(FAR const char *ifname);
 int netlib_ifdown(FAR const char *ifname);
+int netlib_ifarp(const char *ifname);
+int netlib_ifnoarp(const char *ifname);
 
 /* DNS server addressing */
 
 #if defined(CONFIG_NET_IPv4) && defined(CONFIG_NETDB_DNSCLIENT)
 int netlib_set_ipv4dnsaddr(FAR const struct in_addr *inaddr);
+int netlib_del_ipv4dnsaddr(FAR const struct in_addr *inaddr);
+int netlib_del_ipv4dnsaddr_by_index(int index);
 #endif
 
 #if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDB_DNSCLIENT)
 int netlib_set_ipv6dnsaddr(FAR const struct in6_addr *inaddr);
+int netlib_del_ipv6dnsaddr(FAR const struct in6_addr *inaddr);
+int netlib_del_ipv6dnsaddr_by_index(int index);
 #endif
 
 int netlib_set_mtu(FAR const char *ifname, int mtu);
+
+#if defined(CONFIG_NETDEV_STATISTICS)
+int netlib_getifstatistics(FAR const char *ifname,
+                           FAR struct netdev_statistics_s *stat);
+#endif
+
+/* Network check support */
+
+#ifdef CONFIG_NET_ARP_ACD
+int netlib_check_ifconflict(FAR const char *ifname);
+#endif
+
+/****************************************************************************
+ * Name: netlib_check_ipconnectivity
+ *
+ * Description:
+ *   Check network connectivity by pinging a remote IP address.
+ *   If ip is NULL, ping the gateway of each network interface,
+ *   and optionally the routers from the routing table. If ping
+ *   is disabled, just check the status of the IP network card.
+ *
+ * Parameters:
+ *   ip       The ipv4 address to check, or NULL to ping gateways
+ *   timeout  The max timeout of each ping
+ *   retry    The retry times of ping
+ *
+ * Return:
+ *   nums of remote reply of ping; a negative or ZERO on failure
+ *
+ ****************************************************************************/
+
+int netlib_check_ipconnectivity(FAR const char *ip, int timeout, int retry);
+
+#ifdef CONFIG_NETUTILS_PING
+
+/****************************************************************************
+ * Name: netlib_check_ifconnectivity
+ *
+ * Description:
+ *   Check network connectivity by pinging the default gateway
+ *   of the specified network interface.
+ *
+ * Parameters:
+ *   ifname   The name of the interface to use
+ *   timeout  The timeout of ping
+ *   retry    The retry times of ping
+ *
+ * Return:
+ *   nums of gateway reply of ping; a negative on failure.
+ *
+ ****************************************************************************/
+
+int netlib_check_ifconnectivity(FAR const char *ifname,
+                                int timeout, int retry);
+#else
+#define netlib_check_ifconnectivity(i, t, r) 1
+#endif
+
+#ifdef CONFIG_MM_IOB
+int netlib_get_iobinfo(FAR struct iob_stats_s *iob);
+#endif
+
+int netlib_check_httpconnectivity(FAR const char *host,
+                                  FAR const char *getmsg,
+                                  int port, int expect_code);
 
 #undef EXTERN
 #ifdef __cplusplus

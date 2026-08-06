@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/logging/nxscope/nxscope_intf.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,6 +36,14 @@
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
+#ifdef __cplusplus
+#define EXTERN extern "C"
+extern "C"
+{
+#else
+#define EXTERN extern
+#endif
 
 /* Forward declaration */
 
@@ -85,7 +95,17 @@ struct nxscope_ser_cfg_s
 {
   FAR char *path;               /* Device path */
   bool      nonblock;           /* Nonblocking operation */
-  speed_t   baud;               /* Baud rate */
+  speed_t   baud;               /* Baud rate. Ignored if set to 0 */
+};
+#endif
+
+#ifdef CONFIG_LOGGING_NXSCOPE_INTF_UDP
+/* Nxscope UDP interface configuration */
+
+struct nxscope_udp_cfg_s
+{
+  uint16_t  port;               /* Local UDP port */
+  bool      nonblock;           /* Nonblocking operation */
 };
 #endif
 
@@ -121,6 +141,26 @@ int nxscope_ser_init(FAR struct nxscope_intf_s *intf,
  ****************************************************************************/
 
 void nxscope_ser_deinit(FAR struct nxscope_intf_s *intf);
+#endif
+
+#ifdef CONFIG_LOGGING_NXSCOPE_INTF_UDP
+/****************************************************************************
+ * Name: nxscope_udp_init
+ ****************************************************************************/
+
+int nxscope_udp_init(FAR struct nxscope_intf_s *intf,
+                     FAR struct nxscope_udp_cfg_s *cfg);
+
+/****************************************************************************
+ * Name: nxscope_udp_deinit
+ ****************************************************************************/
+
+void nxscope_udp_deinit(FAR struct nxscope_intf_s *intf);
+#endif
+
+#undef EXTERN
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __APPS_INCLUDE_LOGGING_NXSCOPE_NXSCOPE_INTF_H */

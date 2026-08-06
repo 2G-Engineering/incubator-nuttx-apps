@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/chrono/chrono_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -163,9 +165,11 @@ static int chrono_daemon(int argc, char *argv[])
       goto errout_with_fd;
     }
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   /* Ignore the default signal action */
 
   signal(BUTTON_SIGNO, SIG_IGN);
+#endif
 
   /* Now loop forever, waiting BUTTONs events */
 

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/boot/mcuboot/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -20,10 +22,11 @@
 
 include $(APPDIR)/Make.defs
 
-MCUBOOT_VERSION := $(patsubst "%",%,$(CONFIG_MCUBOOT_VERSION))
-MCUBOOT_TARBALL  = $(MCUBOOT_VERSION).tar.gz
-MCUBOOT_UNPACK   = mcuboot
-MCUBOOT_SRCDIR   = $(MCUBOOT_UNPACK)$(DELIM)boot$(DELIM)bootutil$(DELIM)src
+MCUBOOT_VERSION    := $(patsubst "%",%,$(CONFIG_MCUBOOT_VERSION))
+MCUBOOT_REPOSITORY := $(patsubst "%",%,$(CONFIG_MCUBOOT_REPOSITORY))
+MCUBOOT_TARBALL     = $(MCUBOOT_VERSION).tar.gz
+MCUBOOT_UNPACK      = mcuboot
+MCUBOOT_SRCDIR      = $(MCUBOOT_UNPACK)$(DELIM)boot$(DELIM)bootutil$(DELIM)src
 
 DEPPATH += --dep-path $(MCUBOOT_UNPACK)$(DELIM)src
 DEPPATH += --dep-path $(MCUBOOT_SRCDIR)
@@ -38,17 +41,18 @@ PRIORITY  += SCHED_PRIORITY_DEFAULT
 STACKSIZE += $(CONFIG_DEFAULT_TASK_STACKSIZE)
 endif
 
-CFLAGS += -Wno-undef
+CFLAGS += -Wno-undef -Wno-unused-but-set-variable
 
 CSRCS := $(MCUBOOT_UNPACK)/boot/bootutil/src/boot_record.c \
+         $(MCUBOOT_UNPACK)/boot/bootutil/src/bootutil_area.c \
+         $(MCUBOOT_UNPACK)/boot/bootutil/src/bootutil_img_hash.c \
+         $(MCUBOOT_UNPACK)/boot/bootutil/src/bootutil_loader.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/bootutil_misc.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/bootutil_public.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/caps.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/encrypted.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/fault_injection_hardening.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/fault_injection_hardening_delay_rng_mbedtls.c \
-         $(MCUBOOT_UNPACK)/boot/bootutil/src/image_ec.c \
-         $(MCUBOOT_UNPACK)/boot/bootutil/src/image_ec256.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/image_ed25519.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/image_rsa.c \
          $(MCUBOOT_UNPACK)/boot/bootutil/src/image_validate.c \
@@ -77,8 +81,8 @@ CXXFLAGS += ${INCDIR_PREFIX}mcuboot/ext/tinycrypt/lib/include
 endif
 
 $(MCUBOOT_TARBALL):
-	$(Q) echo "Downloading MCUboot-$(MCUBOOT_VERSION)"
-	$(Q) curl -O -L https://github.com/mcu-tools/mcuboot/archive/$(MCUBOOT_TARBALL)
+	$(Q) echo "Downloading MCUboot-$(MCUBOOT_VERSION) from $(MCUBOOT_REPOSITORY)"
+	$(Q) curl -O -L --proto-default https $(MCUBOOT_REPOSITORY)/archive/$(MCUBOOT_TARBALL)
 
 $(MCUBOOT_UNPACK): $(MCUBOOT_TARBALL)
 	$(Q) echo "Unpacking: $(MCUBOOT_TARBALL) -> $(MCUBOOT_UNPACK)"

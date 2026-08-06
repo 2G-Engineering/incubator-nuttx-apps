@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/pwfb/pwfb_events.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,7 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 
 #include <nuttx/nx/nx.h>
@@ -170,8 +172,6 @@ static void pwfb_tb_position(NXTKWINDOW hwnd,
                              FAR void *arg)
 {
 #ifdef CONFIG_EXAMPLES_PWFB_VERBOSE
-  FAR struct nxeg_state_s *st = (FAR struct nxeg_state_s *)arg;
-
   /* Report the position */
 
   printf("pwfb_tb_position: hwnd=%p size=(%d,%d) pos=(%d,%d) "

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/canlib/canlib_getsilent.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,16 +24,10 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
-
 #include <sys/ioctl.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <fcntl.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
+
 #include <nuttx/can/can.h>
 
 /****************************************************************************
@@ -45,8 +41,8 @@
  *   Wrapper for CANIOC_GET_CONNMODES.
  *
  * Input Parameter:
- *   fd       - file descriptor of an opened can device
- *   loopback - pointer to a buffer to store the current silent mode state.
+ *   fd     - file descriptor of an opened can device
+ *   silent - pointer to a buffer to store the current silent mode state.
  *
  * Returned Value:
  *   Zero (OK) is returned on success.  Otherwise -1 (ERROR)
@@ -64,10 +60,9 @@ int canlib_getsilent(int fd, FAR bool *silent)
   if (ret != OK)
     {
       canerr("CANIOC_GET_CONNMODES failed, errno=%d\n", errno);
-      return FALSE;
+      return ret;
     }
 
-  *silent = (bool)connmodes.bm_silent;
-
+  *silent = connmodes.bm_silent;
   return ret;
 }

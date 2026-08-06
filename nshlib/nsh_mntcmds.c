@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_mntcmds.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <netdb.h>
 
 #include <netinet/in.h>
@@ -361,16 +363,37 @@ int cmd_nfsmount(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #if !defined(CONFIG_DISABLE_MOUNTPOINT) && !defined(CONFIG_NSH_DISABLE_UMOUNT)
 int cmd_umount(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  UNUSED(argc);
-
-  FAR char *fullpath = nsh_getfullpath(vtbl, argv[1]);
+  unsigned int flags = 0;
+  FAR char *fullpath;
   int ret = ERROR;
+  int option;
 
+  while ((option = getopt(argc, argv, "f")) != ERROR)
+    {
+      switch (option)
+        {
+          case 'f':
+            flags |= MNT_FORCE;
+            break;
+
+          default:
+            nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+            return ERROR;
+        }
+    }
+
+  if (optind >= argc)
+    {
+      nsh_error(vtbl, g_fmtargrequired, argv[0]);
+      return ret;
+    }
+
+  fullpath = nsh_getfullpath(vtbl, argv[optind]);
   if (fullpath)
     {
       /* Perform the umount */
 
-      ret = umount(fullpath);
+      ret = umount2(fullpath, flags);
       if (ret < 0)
         {
           nsh_error(vtbl, g_fmtcmdfailed, argv[0], "umount", NSH_ERRNO);

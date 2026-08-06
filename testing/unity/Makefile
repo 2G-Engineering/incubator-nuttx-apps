@@ -1,6 +1,8 @@
 ############################################################################
 # apps/testing/unity/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -32,7 +34,7 @@ UNITY_VERSION = $(patsubst "%",%,$(strip $(CONFIG_TESTING_UNITY_VERSION)))
 
 UNITY_TARBALL = v$(UNITY_VERSION).tar.gz
 
-UNITY_UNPACKNAME = Unity-$(UNITY_VERSION)
+UNITY_UNPACKNAME = Unity
 UNPACK ?= tar -zxf
 
 UNITY_UNPACKDIR =  $(WD)/$(UNITY_UNPACKNAME)
@@ -55,6 +57,7 @@ $(UNITY_TARBALL):
 $(UNITY_UNPACKNAME): $(UNITY_TARBALL)
 	@echo "Unpacking: $(UNITY_TARBALL) -> $(UNITY_UNPACKNAME)"
 	$(Q) $(UNPACK) $(UNITY_TARBALL)
+	$(Q) mv Unity-$(UNITY_VERSION) $(UNITY_UNPACKNAME)
 	$(Q) touch $(UNITY_UNPACKNAME)
 endif
 

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/system/nxdiag/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -20,7 +22,8 @@
 
 include $(APPDIR)/Make.defs
 
-NXTOOLSDIR = $(APPDIR)/tools
+NXTOOLSDIR = $(realpath $(TOPDIR))$(DELIM)tools
+NXDIAGDIR = $(APPDIR)$(DELIM)system$(DELIM)nxdiag
 
 # Sysinfo application info
 
@@ -56,14 +59,17 @@ ifeq ($(CONFIG_SYSTEM_NXDIAG_HOST_PATH),y)
 NXDIAG_FLAGS += --path
 endif
 
+ifeq ($(CONFIG_SYSTEM_NXDIAG_VERBOSE),y)
+NXDIAG_FLAGS += --verbose
+endif
+
 # Vendor-specific checks
 
+# Espressif
+
 ifeq ($(CONFIG_SYSTEM_NXDIAG_ESPRESSIF),y)
-ifdef ESPTOOL_BINDIR
-NXDIAG_FLAGS += --espressif "$(ESPTOOL_BINDIR)"
-else
-NXDIAG_FLAGS += --espressif "$(TOPDIR)"
-endif
+NXDIAG_FLAGS += "--target_info"
+PY_FLAGS += "-B"
 endif
 
 # Common build
@@ -77,10 +83,14 @@ checkpython3:
 		exit 1; \
 	fi
 
-sysinfo.h : checkpython3
-	@python3 $(NXTOOLSDIR)$(DELIM)host_sysinfo.py $(NXDIAG_FLAGS) > sysinfo.h || (echo "host_sysinfo.py failed $$?"; exit 1)
+sysinfo.h : checkpython3 $(INFO_DEPS)
+	@python3 $(PY_FLAGS) $(NXTOOLSDIR)$(DELIM)host_info_dump.py $(NXDIAG_FLAGS) > sysinfo.h
+	if ([ $$? -ne 0 ]); then \
+		echo "ERROR: Failed to generate sysinfo.h"; \
+		exit 1; \
+	fi
 
-context:: sysinfo.h
+depend:: sysinfo.h
 
 distclean::
 	$(call DELFILE, sysinfo.h)

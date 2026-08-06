@@ -28,4 +28,12 @@ config EXAMPLES_MQTTC_RXSIZE
 	int "RX Buffer size"
 	default 256
 
+config EXAMPLES_MQTTC_ALLOW_UNVERIFIED_TLS
+	bool "Allow unverified TLS"
+	default n
+	---help---
+		Do not fail TLS connection if certificate verification fails. Usually
+		this is useful during development when connection to server with
+		self-signed certificates
+
 endif

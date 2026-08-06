@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/lapi/src/lapi_dbg.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,16 +27,16 @@
  * Included Files
  ****************************************************************************/
 
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 #ifdef CONFIG_LTE_LAPI_DEBUG_MSG
-# define lapi_printf nerr
+#  define lapi_printf nerr
 #else
-# define lapi_printf(v, ...)
+#  define lapi_printf(v, ...)
 #endif
 
-#endif  /* __APPS_LTE_LAPI_LAPI_DBG_H */
+#endif /* __APPS_LTE_LAPI_LAPI_DBG_H */

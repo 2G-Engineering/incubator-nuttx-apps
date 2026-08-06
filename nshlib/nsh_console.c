@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_console.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,7 +36,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -45,6 +47,11 @@
 
 struct serialsave_s
 {
+#ifdef CONFIG_NSH_ALTCONDEV
+  int   cn_confd;     /* Console I/O file descriptor */
+#else
+  int   cn_infd;      /* Re-directed input file descriptor */
+#endif
   int   cn_errfd;     /* Re-directed error output file descriptor */
   int   cn_outfd;     /* Re-directed output file descriptor */
 };
@@ -63,11 +70,13 @@ static int nsh_consoleioctl(FAR struct nsh_vtbl_s *vtbl,
                             int cmd, unsigned long arg);
 static int nsh_consoleoutput(FAR struct nsh_vtbl_s *vtbl,
                              FAR const char *fmt, ...) printf_like(2, 3);
+#ifndef CONFIG_NSH_DISABLE_ERROR_PRINT
 static int nsh_erroroutput(FAR struct nsh_vtbl_s *vtbl,
                            FAR const char *fmt, ...) printf_like(2, 3);
+#endif
 static FAR char *nsh_consolelinebuffer(FAR struct nsh_vtbl_s *vtbl);
-static void nsh_consoleredirect(FAR struct nsh_vtbl_s *vtbl, int fd,
-                                FAR uint8_t *save);
+static void nsh_consoleredirect(FAR struct nsh_vtbl_s *vtbl, int fd_in,
+                                int fd_out, int fd_err, FAR uint8_t *save);
 static void nsh_consoleundirect(FAR struct nsh_vtbl_s *vtbl,
                                 FAR uint8_t *save);
 static void nsh_consoleexit(FAR struct nsh_vtbl_s *vtbl,
@@ -98,8 +107,14 @@ static void nsh_closeifnotclosed(struct console_stdio_s *pstate)
       close(ERRFD(pstate));
     }
 
+  if (INFD(pstate) >= 0 && INFD(pstate) != STDIN_FILENO)
+    {
+      close(INFD(pstate));
+    }
+
   ERRFD(pstate) = -1;
   OUTFD(pstate) = -1;
+  INFD(pstate) = -1;
 }
 
 /****************************************************************************
@@ -116,15 +131,44 @@ static ssize_t nsh_consolewrite(FAR struct nsh_vtbl_s *vtbl,
                                 FAR const void *buffer, size_t nbytes)
 {
   FAR struct console_stdio_s *pstate = (FAR struct console_stdio_s *)vtbl;
+
+  /* Write the data to the output stream.
+   *
+   * Errors are reported to the caller via the negative return value and
+   * errno; do NOT _err() here.  OUTFD may itself be wired to the syslog
+   * backend (e.g. nsh_catfile dumping /dev/log on dmesg), in which case
+   * logging on write failure would produce new bytes, get picked up by
+   * the next read(), and lock the shell into an infinite loop at the
+   * highest priority — independent of which errno (EPIPE/EIO/ENOSPC/...)
+   * the underlying device returns.
+   */
+
+  return write(OUTFD(pstate), buffer, nbytes);
+}
+
+/****************************************************************************
+ * Name: nsh_consoleread
+ *
+ * Description:
+ *   read a buffer to the remote shell window.
+ *
+ *   Currently only used by cat.
+ *
+ ****************************************************************************/
+
+static ssize_t nsh_consoleread(FAR struct nsh_vtbl_s *vtbl,
+                                FAR void *buffer, size_t nbytes)
+{
+  FAR struct console_stdio_s *pstate = (FAR struct console_stdio_s *)vtbl;
   ssize_t ret;
 
-  /* Write the data to the output stream */
+  /* Read the data to the output stream */
 
-  ret = write(OUTFD(pstate), buffer, nbytes);
+  ret = read(INFD(pstate), buffer, nbytes);
   if (ret < 0)
     {
-      _err("ERROR: [%d] Failed to send buffer: %d\n",
-          OUTFD(pstate), errno);
+      _err("ERROR: [%d] Failed to read buffer: %d\n",
+          INFD(pstate), errno);
     }
 
   return ret;
@@ -176,6 +220,7 @@ static int nsh_consoleoutput(FAR struct nsh_vtbl_s *vtbl,
  *
  ****************************************************************************/
 
+#ifndef CONFIG_NSH_DISABLE_ERROR_PRINT
 static int nsh_erroroutput(FAR struct nsh_vtbl_s *vtbl,
                            FAR const char *fmt, ...)
 {
@@ -189,6 +234,7 @@ static int nsh_erroroutput(FAR struct nsh_vtbl_s *vtbl,
 
   return ret;
 }
+#endif
 
 /****************************************************************************
  * Name: nsh_consolelinebuffer
@@ -286,8 +332,8 @@ static void nsh_consolerelease(FAR struct nsh_vtbl_s *vtbl)
  *
  ****************************************************************************/
 
-static void nsh_consoleredirect(FAR struct nsh_vtbl_s *vtbl, int fd,
-                                FAR uint8_t *save)
+static void nsh_consoleredirect(FAR struct nsh_vtbl_s *vtbl, int fd_in,
+                                int fd_out, int fd_err, FAR uint8_t *save)
 {
   FAR struct console_stdio_s *pstate = (FAR struct console_stdio_s *)vtbl;
   FAR struct serialsave_s *ssave  = (FAR struct serialsave_s *)save;
@@ -302,11 +348,14 @@ static void nsh_consoleredirect(FAR struct nsh_vtbl_s *vtbl, int fd,
 
       ERRFD(ssave) = ERRFD(pstate);
       OUTFD(ssave) = OUTFD(pstate);
+      INFD(ssave) = INFD(pstate);
     }
 
   /* Set the fd of the new. */
 
-  OUTFD(pstate) = fd;
+  OUTFD(pstate) = fd_out;
+  INFD(pstate) = fd_in;
+  ERRFD(pstate) = fd_err;
 }
 
 /****************************************************************************
@@ -326,6 +375,7 @@ static void nsh_consoleundirect(FAR struct nsh_vtbl_s *vtbl,
   nsh_closeifnotclosed(pstate);
   ERRFD(pstate) = ERRFD(ssave);
   OUTFD(pstate) = OUTFD(ssave);
+  INFD(pstate) = INFD(ssave);
 }
 
 /****************************************************************************
@@ -366,9 +416,12 @@ FAR struct console_stdio_s *nsh_newconsole(bool isctty)
 #endif
       pstate->cn_vtbl.release     = nsh_consolerelease;
       pstate->cn_vtbl.write       = nsh_consolewrite;
+      pstate->cn_vtbl.read        = nsh_consoleread;
       pstate->cn_vtbl.ioctl       = nsh_consoleioctl;
       pstate->cn_vtbl.output      = nsh_consoleoutput;
+#ifndef CONFIG_NSH_DISABLE_ERROR_PRINT
       pstate->cn_vtbl.error       = nsh_erroroutput;
+#endif
       pstate->cn_vtbl.linebuffer  = nsh_consolelinebuffer;
       pstate->cn_vtbl.exit        = nsh_consoleexit;
       pstate->cn_vtbl.isctty      = isctty;
@@ -389,6 +442,17 @@ FAR struct console_stdio_s *nsh_newconsole(bool isctty)
       /* Initialize the output stream */
 
       OUTFD(pstate)               = STDOUT_FILENO;
+
+      /* Initialize the input stream */
+
+      INFD(pstate)               = STDIN_FILENO;
+
+      /* Initialize current working directory */
+
+#ifdef CONFIG_DISABLE_ENVIRON
+      strlcpy(pstate->cn_vtbl.cwd, CONFIG_LIBC_HOMEDIR,
+              sizeof(pstate->cn_vtbl.cwd));
+#endif
     }
 
   return pstate;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/cdcacm/cdcacm.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -90,24 +92,6 @@
 
 #define TRACE_BITSET            (TRACE_INIT_BITS|TRACE_ERROR_BITS|TRACE_CLASS_BITS|\
                                  TRACE_TRANSFER_BITS|TRACE_CONTROLLER_BITS|TRACE_INTERRUPT_BITS)
-
-/****************************************************************************
- * Public Types
- ****************************************************************************/
-
-/* All global variables used by this add-on are packed into a structure in
- * order to avoid name collisions.
- */
-
-struct cdcacm_state_s
-{
-  /* This is the handle that references to this particular USB CDC/ACM driver
-   * instance. The value of the driver handle must be remembered between the
-   * 'sercon' and 'msdis' commands.
-   */
-
-  FAR void *handle;
-};
 
 /****************************************************************************
  * Public Data

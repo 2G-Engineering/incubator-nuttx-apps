@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/gpio/gpio_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -67,6 +69,12 @@ static void show_usage(FAR const char *progname)
   fprintf(stderr, "\t 8: GPIO_INTERRUPT_RISING_PIN\n");
   fprintf(stderr, "\t 9: GPIO_INTERRUPT_FALLING_PIN\n");
   fprintf(stderr, "\t10: GPIO_INTERRUPT_BOTH_PIN\n");
+  fprintf(stderr, "\t11: GPIO_INTERRUPT_PIN_WAKEUP\n");
+  fprintf(stderr, "\t12: GPIO_INTERRUPT_HIGH_PIN_WAKEUP\n");
+  fprintf(stderr, "\t13: GPIO_INTERRUPT_LOW_PIN_WAKEUP\n");
+  fprintf(stderr, "\t14: GPIO_INTERRUPT_RISING_PIN_WAKEUP\n");
+  fprintf(stderr, "\t15: GPIO_INTERRUPT_FALLING_PIN_WAKEUP\n");
+  fprintf(stderr, "\t16: GPIO_INTERRUPT_BOTH_PIN_WAKEUP\n");
 }
 
 /****************************************************************************
@@ -308,6 +316,12 @@ int main(int argc, FAR char *argv[])
       case GPIO_INTERRUPT_RISING_PIN:
       case GPIO_INTERRUPT_FALLING_PIN:
       case GPIO_INTERRUPT_BOTH_PIN:
+      case GPIO_INTERRUPT_PIN_WAKEUP:
+      case GPIO_INTERRUPT_HIGH_PIN_WAKEUP:
+      case GPIO_INTERRUPT_LOW_PIN_WAKEUP:
+      case GPIO_INTERRUPT_RISING_PIN_WAKEUP:
+      case GPIO_INTERRUPT_FALLING_PIN_WAKEUP:
+      case GPIO_INTERRUPT_BOTH_PIN_WAKEUP:
         {
           printf("  Interrupt pin: Value=%u\n", invalue);
 

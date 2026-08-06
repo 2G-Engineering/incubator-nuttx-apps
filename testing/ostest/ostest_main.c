@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/ostest_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -260,6 +262,12 @@ static int user_main(int argc, char *argv[])
   getopt_test();
   check_test_memory_usage();
 
+  /* Test misc libc functions. */
+
+  printf("\nuser_main: libc tests\n");
+  memmem_test();
+  check_test_memory_usage();
+
   /* If retention of child status is enable, then suppress it for this task.
    * This task may produce many, many children (especially if
    * CONFIG_TESTING_OSTEST_LOOPS) and it does not harvest their exit status.
@@ -270,7 +278,8 @@ static int user_main(int argc, char *argv[])
    * verify that status is retained correctly.
    */
 
-#if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_SCHED_CHILD_STATUS)
+#if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_SCHED_CHILD_STATUS) && \
+    defined(CONFIG_ENABLE_ALL_SIGNALS)
     {
       struct sigaction sa;
       int ret;
@@ -300,10 +309,18 @@ static int user_main(int argc, char *argv[])
   check_test_memory_usage();
 #endif
 
-#if CONFIG_TLS_NELEM > 0
+#if defined(CONFIG_TLS_NELEM) && CONFIG_TLS_NELEM > 0
   /* Test TLS */
 
   tls_test();
+  check_test_memory_usage();
+#endif
+
+#ifdef CONFIG_SCHED_THREAD_LOCAL
+  /* Test __thread/thread_local keyword */
+
+  printf("\nuser_main: sched_thread_local test\n");
+  sched_thread_local_test();
   check_test_memory_usage();
 #endif
 
@@ -325,9 +342,11 @@ static int user_main(int argc, char *argv[])
 
       /* Checkout /dev/null */
 
+#ifdef CONFIG_DEV_NULL
       printf("\nuser_main: /dev/null test\n");
-      dev_null();
+      dev_null_test();
       check_test_memory_usage();
+#endif
 
 #ifdef CONFIG_TESTING_OSTEST_AIO
       /* Check asynchronous I/O */
@@ -337,7 +356,8 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
-#if defined(CONFIG_ARCH_FPU) && !defined(CONFIG_TESTING_OSTEST_FPUTESTDISABLE)
+#if defined(CONFIG_ARCH_FPU) && !defined(CONFIG_TESTING_OSTEST_FPUTESTDISABLE) && \
+    defined(CONFIG_BUILD_FLAT)
       /* Check that the FPU is properly supported during context switching */
 
       printf("\nuser_main: FPU test\n");
@@ -345,13 +365,15 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
+#ifndef CONFIG_BUILD_KERNEL
       /* Checkout task_restart() */
 
       printf("\nuser_main: task_restart test\n");
       restart_test();
       check_test_memory_usage();
+#endif
 
-#ifdef CONFIG_SCHED_WAITPID
+#if defined(CONFIG_SCHED_WAITPID) && !defined(CONFIG_BUILD_KERNEL)
       /* Check waitpid() and friends */
 
       printf("\nuser_main: waitpid test\n");
@@ -359,8 +381,21 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
-#if !defined(CONFIG_DISABLE_PTHREAD) && \
-    (defined(CONFIG_SCHED_LPWORK) || defined(CONFIG_SCHED_HPWORK))
+#if defined(CONFIG_TESTING_OSTEST_MULTIUSER) && defined(CONFIG_SCHED_USER_IDENTITY)
+      /* Multi-user identity and file permission regression tests */
+
+      printf("\nuser_main: multi-user test\n");
+      if (multiuser_test() != 0)
+        {
+          printf("user_main: ERROR multi-user test failed\n");
+          ASSERT(false);
+        }
+
+      check_test_memory_usage();
+#endif
+
+#if !defined(CONFIG_DISABLE_PTHREAD) && defined(CONFIG_BUILD_FLAT) && \
+    defined(CONFIG_SCHED_WORKQUEUE)
       /* Check work queues */
 
       printf("\nuser_main: wqueue test\n");
@@ -441,6 +476,14 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
+#ifdef CONFIG_SCHED_WAITPID
+      /* Verify pthread_exit() and pthread_self() */
+
+      printf("\nuser_main: pthread_exit() test\n");
+      pthread_exit_test();
+      check_test_memory_usage();
+#endif
+
       /* Verify pthreads rwlock interfaces */
 
       printf("\nuser_main: pthread_rwlock test\n");
@@ -451,7 +494,7 @@ static int user_main(int argc, char *argv[])
       pthread_rwlock_cancel_test();
       check_test_memory_usage();
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
       /* Verify pthread cancellation cleanup handlers */
 
       printf("\nuser_main: pthread_cleanup test\n");
@@ -469,25 +512,35 @@ static int user_main(int argc, char *argv[])
 #if !defined(CONFIG_DISABLE_MQUEUE) && !defined(CONFIG_DISABLE_PTHREAD)
       /* Verify pthreads and message queues */
 
-      printf("\nuser_main: message queue test\n");
-      mqueue_test();
-      check_test_memory_usage();
-#endif
-
-#if !defined(CONFIG_DISABLE_MQUEUE) && !defined(CONFIG_DISABLE_PTHREAD)
-      /* Verify pthreads and message queues */
-
       printf("\nuser_main: timed message queue test\n");
       timedmqueue_test();
       check_test_memory_usage();
 #endif
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
       /* Verify that we can modify the signal mask */
 
       printf("\nuser_main: sigprocmask test\n");
       sigprocmask_test();
       check_test_memory_usage();
 
+#if !defined(CONFIG_DISABLE_MQUEUE) && !defined(CONFIG_DISABLE_PTHREAD)
+      /* Verify pthreads and message queues */
+
+      printf("\nuser_main: message queue test\n");
+      mqueue_test();
+      check_test_memory_usage();
+#endif
+
+#if defined(CONFIG_SIG_SIGSTOP_ACTION) && defined(CONFIG_SIG_SIGKILL_ACTION) && \
+    !defined(CONFIG_BUILD_KERNEL)
+      printf("\nuser_main: signal action test\n");
+      suspend_test();
+      check_test_memory_usage();
+#endif
+#endif /* !CONFIG_DISABLE_ALL_SIGNALS */
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
       /* Verify signal handlers */
 
       printf("\nuser_main: signal handler test\n");
@@ -498,26 +551,40 @@ static int user_main(int argc, char *argv[])
       signest_test();
       check_test_memory_usage();
 
-#if defined(CONFIG_SIG_SIGSTOP_ACTION) && defined(CONFIG_SIG_SIGKILL_ACTION)
-      printf("\nuser_main: signal action test\n");
-      suspend_test();
-      check_test_memory_usage();
-#endif
-
 #ifndef CONFIG_DISABLE_POSIX_TIMERS
       /* Verify posix timers (with SIGEV_SIGNAL) */
 
       printf("\nuser_main: POSIX timer test\n");
       timer_test();
       check_test_memory_usage();
+#endif
+#endif
 
-#ifdef CONFIG_SIG_EVTHREAD
+#ifdef CONFIG_BUILD_FLAT
+      printf("\nuser_main: spinlock test\n");
+      spinlock_test();
+      check_test_memory_usage();
+
+      printf("\nuser_main: wdog test\n");
+      wdog_test();
+      check_test_memory_usage();
+
+      /* Verify hrtimer */
+
+#  ifdef CONFIG_HRTIMER
+      printf("\nuser_main: hrtimer test\n");
+      hrtimer_test();
+      check_test_memory_usage();
+#  endif
+#endif
+
+#if !defined(CONFIG_DISABLE_POSIX_TIMERS) && \
+    defined(CONFIG_SIG_EVTHREAD)
       /* Verify posix timers (with SIGEV_THREAD) */
 
       printf("\nuser_main: SIGEV_THREAD timer test\n");
       sigev_thread_test();
       check_test_memory_usage();
-#endif
 #endif
 
 #if !defined(CONFIG_DISABLE_PTHREAD) && CONFIG_RR_INTERVAL > 0
@@ -564,9 +631,37 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif /* CONFIG_PRIORITY_INHERITANCE && !CONFIG_DISABLE_PTHREAD */
 
-#if defined(CONFIG_ARCH_HAVE_VFORK) && defined(CONFIG_SCHED_WAITPID)
+#ifndef CONFIG_DISABLE_PTHREAD
+      printf("\nuser_main: scheduler lock test\n");
+      sched_lock_test();
+      check_test_memory_usage();
+#endif
+
+#if defined(CONFIG_ARCH_HAVE_FORK) && defined(CONFIG_SCHED_WAITPID) && \
+   !defined(CONFIG_ARCH_SIM)
       printf("\nuser_main: vfork() test\n");
       vfork_test();
+#endif
+
+#if defined(CONFIG_SMP) && defined(CONFIG_BUILD_FLAT)
+      printf("\nuser_main: smp call test\n");
+      smp_call_test();
+#endif
+
+#if defined(CONFIG_SCHED_EVENTS) && defined(CONFIG_BUILD_FLAT)
+      /* Verify nxevent */
+
+      printf("\nuser_main: nxevent test\n");
+      nxevent_test();
+      check_test_memory_usage();
+#endif
+
+#if defined(CONFIG_ARCH_PERF_EVENTS) && !defined(CONFIG_ARCH_PERF_EVENTS_USER_ACCESS)
+      /* Verify performance event time counter */
+
+      printf("\nuser_main: performance event time counter test\n");
+      perf_gettime_test();
+      check_test_memory_usage();
 #endif
 
       /* Compare memory usage at time ostest_main started until
@@ -614,11 +709,34 @@ static void stdio_test(void)
 
 int main(int argc, FAR char **argv)
 {
-  int result;
 #ifdef CONFIG_TESTING_OSTEST_WAITRESULT
   int ostest_result = ERROR;
 #else
   int ostest_result = OK;
+#endif
+
+#ifndef CONFIG_BUILD_KERNEL
+  int result;
+#else
+  struct sched_param param;
+  posix_spawnattr_t attr;
+  FAR const char * const arg[7] =
+  {
+    argv[0], "user_main", arg1, arg2, arg3, arg4, NULL
+  };
+
+  pid_t result;
+  int status;
+
+  /* Use posix_spawn API to spawn the new task for tests, should re-enter
+   * the main entry in new task, the second arg as to identify the real
+   * entry point of the test tasks.
+   */
+
+  if (argc >= 2 && strcmp(argv[1], "user_main") == 0)
+    {
+      return user_main(argc - 1 , &argv[1]);
+    }
 #endif
 
   /* Verify that stdio works first */
@@ -626,7 +744,7 @@ int main(int argc, FAR char **argv)
   stdio_test();
 
 #ifdef SDCC
-  /* I am not yet certain why SDCC does not like the following initilizers.
+  /* I am not yet certain why SDCC does not like the following initializers.
    * It involves some issues with 2- vs 3-byte pointer types.
    */
 
@@ -659,9 +777,19 @@ int main(int argc, FAR char **argv)
 
   /* Verify that we can spawn a new task */
 
+#ifdef CONFIG_BUILD_KERNEL
+  posix_spawnattr_init(&attr);
+  param.sched_priority = PRIORITY;
+  posix_spawnattr_setschedparam(&attr, &param);
+  posix_spawnattr_setstacksize(&attr, STACKSIZE);
+  status = posix_spawn(&result, arg[0], NULL, &attr,
+                       (char * const *)arg, NULL);
+  if (status != 0)
+#else
   result = task_create("ostest", PRIORITY, STACKSIZE, user_main,
                        (FAR char * const *)g_argv);
   if (result == ERROR)
+#endif
     {
       printf("ostest_main: ERROR Failed to start user_main\n");
       ASSERT(false);

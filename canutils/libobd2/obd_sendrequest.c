@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/libobd2/obd_sendrequest.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -96,7 +98,7 @@ int obd_send_request(FAR struct obd_dev_s *dev, uint8_t opmode, uint8_t pid)
 #ifdef CONFIG_CAN_EXTID
   dev->can_txmsg.cm_hdr.ch_extid  = extended;            /* Standard/Extend mode   */
 #endif
-  dev->can_txmsg.cm_hdr.ch_unused = 0;                   /* Unused                 */
+  dev->can_txmsg.cm_hdr.ch_tcf = 0;                   /* Unused                 */
 
   /* Single Frame with two bytes data */
 

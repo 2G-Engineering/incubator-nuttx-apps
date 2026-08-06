@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_proccmds.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -23,6 +25,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <nuttx/sched.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +36,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <sys/sysinfo.h>
+#include <sys/param.h>
 #include <time.h>
 
 #include "nsh.h"
@@ -48,9 +53,9 @@
 #endif
 
 #ifndef CONFIG_NSH_DISABLE_UPTIME
-  #ifndef FSHIFT
-    #  define FSHIFT SI_LOAD_SHIFT
-  #endif
+#  ifndef FSHIFT
+#    define FSHIFT SI_LOAD_SHIFT
+#  endif
 #  define FIXED_1      (1 << FSHIFT)     /* 1.0 as fixed-point */
 #  define LOAD_INT(x)  ((x) >> FSHIFT)
 #  define LOAD_FRAC(x) (LOAD_INT(((x) & (FIXED_1 - 1)) * 100))
@@ -81,49 +86,73 @@ typedef int (*exec_t)(void);
 
 struct nsh_taskstatus_s
 {
-  FAR const char *td_type;       /* Thread type */
-  FAR const char *td_groupid;    /* Group ID */
+  FAR const char *td_type;         /* Thread type */
+  FAR const char *td_groupid;      /* Group ID */
 #ifdef CONFIG_SMP
-  FAR const char *td_cpu;        /* CPU */
+  FAR const char *td_cpu;          /* CPU */
 #endif
-  FAR const char *td_state;      /* Thread state */
-  FAR const char *td_event;      /* Thread wait event */
-  FAR const char *td_flags;      /* Thread flags */
-  FAR const char *td_priority;   /* Thread priority */
-  FAR const char *td_policy;     /* Thread scheduler */
-  FAR const char *td_sigmask;    /* Signal mask */
+  FAR const char *td_state;        /* Thread state */
+  FAR const char *td_event;        /* Thread wait event */
+  FAR const char *td_flags;        /* Thread flags */
+  FAR const char *td_priority;     /* Thread priority */
+  FAR const char *td_policy;       /* Thread scheduler */
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+  FAR const char *td_sigmask;      /* Signal mask */
+#endif
+  FAR char       *td_cmdline;      /* Command line */
+  int             td_tid;          /* Task ID */
+  int             td_ppid;         /* Parent task ID */
+#ifdef NSH_HAVE_CPULOAD
+  FAR const char *td_cpuload;      /* CPU load */
+#endif
+#ifdef PS_SHOW_HEAPSIZE
+  unsigned long   td_heapsize;     /* Heap size */
+#endif
+#ifndef CONFIG_NSH_DISABLE_PSSTACKUSAGE
+  unsigned long   td_stack_size;   /* Stack size */
+#  ifdef CONFIG_STACK_COLORATION
+  unsigned long   td_stack_used;   /* Stack used */
+  unsigned long   td_stack_filled; /* Stack filled percentage */
+#  endif
+#endif
+  FAR char       *td_buf;          /* Buffer for reading files */
+  size_t          td_bufsize;      /* Size of the buffer */
+  size_t          td_bufpos;       /* Position in the buffer */
+};
+
+struct nsh_topstatus_s
+{
+  FAR struct nsh_taskstatus_s **status;
+  bool heap;
+  size_t size;
+  size_t index;
 };
 
 /* Status strings */
 
 #ifndef CONFIG_NSH_DISABLE_PS
-#if 0 /* Not used */
-static const char g_name[]      = "Name:";
-#endif
-
 static const char g_type[]      = "Type:";
 static const char g_groupid[]   = "Group:";
-
-#ifdef CONFIG_SMP
+#  ifdef CONFIG_SMP
 static const char g_cpu[]       = "CPU:";
-#endif
-
+#  endif
 static const char g_state[]     = "State:";
 static const char g_flags[]     = "Flags:";
 static const char g_priority[]  = "Priority:";
 static const char g_scheduler[] = "Scheduler:";
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
 static const char g_sigmask[]   = "SigMask:";
-
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-static const char g_heapsize[]  = "AllocSize:";
-#endif /* CONFIG_DEBUG _MM && !CONFIG_NSH_DISABLE_PSHEAPUSAGE */
-
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-static const char g_stacksize[] = "StackSize:";
-#ifdef CONFIG_STACK_COLORATION
-static const char g_stackused[] = "StackUsed:";
 #endif
-#endif /* !CONFIG_NSH_DISABLE_PSSTACKUSAGE */
+static const char g_ppid[]      = "Parent:";
+#  ifdef PS_SHOW_HEAPSIZE
+static const char g_heapsize[]  = "AllocSize:";
+#  endif /* PS_SHOW_HEAPSIZE */
+#  ifndef CONFIG_NSH_DISABLE_PSSTACKUSAGE
+static const char g_stacksize[] = "StackSize:";
+#    ifdef CONFIG_STACK_COLORATION
+static const char g_stackused[] = "StackUsed:";
+#    endif
+#  endif /* !CONFIG_NSH_DISABLE_PSSTACKUSAGE */
 #endif /* !CONFIG_NSH_DISABLE_PS */
 
 /****************************************************************************
@@ -159,15 +188,6 @@ static void nsh_parse_statusline(FAR char *line,
    *   Sigmask:    nnnnnnnn           Hexadecimal, 32-bit
    */
 
-#if 0 /* Not used */
-  /* Task name */
-
-  if (strncmp(line, g_name, strlen(g_name)) == 0)
-    {
-      /* Not used */
-    }
-  else
-#endif
   /* Task/thread type */
 
   if (strncmp(line, g_type, strlen(g_type)) == 0)
@@ -233,39 +253,45 @@ static void nsh_parse_statusline(FAR char *line,
 
       status->td_policy = nsh_trimspaces(&line[12 + 6]);
     }
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
   else if (strncmp(line, g_sigmask, strlen(g_sigmask)) == 0)
     {
       status->td_sigmask = nsh_trimspaces(&line[12]);
+    }
+#endif
+}
+
+static void nsh_parse_gstatusline(FAR char *line,
+                                  FAR struct nsh_taskstatus_s *status)
+{
+  /* Parse the group status.
+   *
+   *   Format:
+   *
+   *            111111111122222222223
+   *   123456789012345678901234567890
+   *   Main task:  nnnnn              PID
+   *   Parent:     nnnnn              Parent PID
+   *   Flags:      0x**               Group flags, See GROUP_FLAG_*
+   *   Members:    nnnn...            Count of members
+   *   Member IDs: nnnnn,nnnnn,...    List of members{PID0, PID1, ...)
+   */
+
+  if (strncmp(line, g_ppid, strlen(g_ppid)) == 0)
+    {
+      status->td_ppid = atoi(&line[12]);
     }
 }
 #endif
 
 /****************************************************************************
- * Name: ps_callback
+ * Name: ps_skipfile
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_PS
-static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
-                       FAR struct dirent *entryp, FAR void *pvarg)
+static bool ps_skipfile(FAR const struct dirent *entryp)
 {
-  UNUSED(pvarg);
-
-  struct nsh_taskstatus_s status;
-  FAR char *filepath;
-  FAR char *line;
-  FAR char *nextline;
-  int ret;
   int i;
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-  unsigned long heap_size = 0;
-#endif
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-  unsigned long stack_size = 0;
-#ifdef CONFIG_STACK_COLORATION
-  unsigned long stack_used = 0;
-  unsigned long stack_filled = 0;
-#endif
-#endif
 
   /* Task/thread entries in the /proc directory will all be (1) directories
    * with (2) all numeric names.
@@ -275,7 +301,7 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
     {
       /* Not a directory... skip this entry */
 
-      return OK;
+      return true;
     }
 
   /* Check each character in the name */
@@ -286,110 +312,161 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
         {
           /* Name contains something other than a numeric character */
 
-          return OK;
+          return true;
         }
     }
 
-  /* Set all pointers to the empty string. */
+  return false;
+}
 
-  status.td_type     = "";
-  status.td_groupid  = "";
+/****************************************************************************
+ * Name: ps_readprocfs
+ ****************************************************************************/
+
+ssize_t ps_readprocfs(FAR struct nsh_vtbl_s *vtbl, FAR const char *basepath,
+                      FAR const char *dirpath,
+                      FAR const struct dirent *entryp,
+                      FAR struct nsh_taskstatus_s *status)
+{
+  FAR char *filepath = NULL;
+  int ret;
+
+  ret = asprintf(&filepath, "%s/%s/%s", dirpath, entryp->d_name, basepath);
+  if (ret < 0 || filepath == NULL)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
+      status->td_buf[status->td_bufpos] = '\0';
+    }
+  else
+    {
+      ret = nsh_readfile(vtbl, "ps", filepath,
+                         status->td_buf + status->td_bufpos,
+                         status->td_bufsize - status->td_bufpos);
+      if (ret >= 0)
+        {
+          ret = strlen(status->td_buf + status->td_bufpos) + 1;
+        }
+
+      free(filepath);
+    }
+
+  return ret;
+}
+
+/****************************************************************************
+ * Name: ps_record
+ ****************************************************************************/
+
+static int ps_record(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
+                     FAR const struct dirent *entryp, bool heap,
+                     FAR struct nsh_taskstatus_s *status)
+{
+  FAR char *nextline;
+  FAR char *line;
+  int ret;
+
+  status->td_type = "";
+  status->td_groupid = "";
 #ifdef CONFIG_SMP
-  status.td_cpu      = "";
+  status->td_cpu = "";
 #endif
-  status.td_state    = "";
-  status.td_event    = "";
-  status.td_flags    = "";
-  status.td_priority = "";
-  status.td_policy   = "";
-  status.td_sigmask  = "";
+  status->td_state = "";
+  status->td_event = "";
+  status->td_flags = "";
+  status->td_priority = "";
+  status->td_policy = "";
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+  status->td_sigmask = "";
+#endif
+  status->td_cmdline = "";
+  status->td_tid = atoi(entryp->d_name);
+  status->td_ppid = INVALID_PROCESS_ID;
+#ifdef NSH_HAVE_CPULOAD
+  status->td_cpuload = "";
+#endif
 
   /* Read the task status */
 
-  filepath = NULL;
-  ret = asprintf(&filepath, "%s/%s/status", dirpath, entryp->d_name);
-  if (ret < 0 || filepath == NULL)
+  ret = ps_readprocfs(vtbl, "status", dirpath, entryp, status);
+  if (ret >= 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
-    }
-  else
-    {
-      ret = nsh_readfile(vtbl, "ps", filepath, vtbl->iobuffer, IOBUFFERSIZE);
-      free(filepath);
+      /* Parse the task status. */
 
-      if (ret >= 0)
+      nextline = status->td_buf + status->td_bufpos;
+      status->td_bufpos += ret;
+      do
         {
-          /* Parse the task status. */
+          /* Find the beginning of the next line and NUL-terminate the
+           * current line.
+           */
 
-          nextline = vtbl->iobuffer;
-          do
+          line = nextline;
+          for (nextline++;
+               *nextline != '\n' && *nextline != '\0';
+               nextline++);
+
+          if (*nextline == '\n')
             {
-              /* Find the beginning of the next line and NUL-terminate the
-               * current line.
-               */
-
-              line = nextline;
-              for (nextline++;
-                   *nextline != '\n' && *nextline != '\0';
-                   nextline++);
-
-              if (*nextline == '\n')
-                {
-                  *nextline++ = '\0';
-                }
-              else
-                {
-                  nextline = NULL;
-                }
-
-              /* Parse the current line */
-
-              nsh_parse_statusline(line, &status);
+              *nextline++ = '\0';
             }
-          while (nextline != NULL);
+          else
+            {
+              nextline = NULL;
+            }
+
+          /* Parse the current line */
+
+          nsh_parse_statusline(line, status);
         }
+      while (nextline != NULL);
     }
 
-  /* Finally, print the status information */
-
-  nsh_output(vtbl,
-             "%5s %5s "
-#ifdef CONFIG_SMP
-             "%3s "
-#endif
-
-             "%3s %-8s %-7s %3s %-8s %-9s %-8s ",
-             entryp->d_name, status.td_groupid,
-#ifdef CONFIG_SMP
-             status.td_cpu,
-#endif
-             status.td_priority, status.td_policy, status.td_type,
-             status.td_flags, status.td_state, status.td_event,
-             status.td_sigmask);
-
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-  /* Get the Heap AllocSize */
-
-  filepath  = NULL;
-  ret = asprintf(&filepath, "%s/%s/heap", dirpath, entryp->d_name);
-  if (ret < 0 || filepath == NULL)
+  ret = ps_readprocfs(vtbl, "group/status", dirpath, entryp, status);
+  if (ret >= 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
-      vtbl->iobuffer[0] = '\0';
+      /* Parse the group status. */
+
+      nextline = status->td_buf + status->td_bufpos;
+      do
+        {
+          /* Find the beginning of the next line and NUL-terminate the
+           * current line.
+           */
+
+          line = nextline;
+          for (nextline++;
+               *nextline != '\n' && *nextline != '\0';
+               nextline++);
+
+          if (*nextline == '\n')
+            {
+              *nextline++ = '\0';
+            }
+          else
+            {
+              nextline = NULL;
+            }
+
+          /* Parse the current line */
+
+          nsh_parse_gstatusline(line, status);
+        }
+      while (nextline != NULL);
     }
-  else
-    {
-      ret = nsh_readfile(vtbl, "ps", filepath, vtbl->iobuffer,
-                         IOBUFFERSIZE);
-      free(filepath);
 
+#ifdef PS_SHOW_HEAPSIZE
+  if (heap)
+    {
+      /* Get the Heap AllocSize */
+
+      ret = ps_readprocfs(vtbl, "heap", dirpath, entryp, status);
       if (ret >= 0)
         {
-          nextline = vtbl->iobuffer;
+          nextline = status->td_buf + status->td_bufpos;
           do
             {
-              /* Find the beginning of the next line and NUL-terminate the
-               * current line.
+              /* Find the beginning of the next line and NUL-terminate
+               * the current line.
                */
 
               line = nextline;
@@ -418,170 +495,395 @@ static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
 
               if (strncmp(line, g_heapsize, strlen(g_heapsize)) == 0)
                 {
-                  heap_size = strtoul(&line[12], NULL, 0);
+                  status->td_heapsize = strtoul(&line[12], NULL, 0);
                   break;
                 }
             }
           while (nextline != NULL);
         }
     }
-
 #endif
 
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
+#ifdef PS_SHOW_STACKSIZE
   /* Get the StackSize and StackUsed */
 
-  filepath   = NULL;
-  ret = asprintf(&filepath, "%s/%s/stack", dirpath, entryp->d_name);
-  if (ret < 0 || filepath == NULL)
+  ret = ps_readprocfs(vtbl, "stack", dirpath, entryp, status);
+  if (ret >= 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
-      vtbl->iobuffer[0] = '\0';
-    }
-  else
-    {
-      ret = nsh_readfile(vtbl, "ps", filepath, vtbl->iobuffer,
-                         IOBUFFERSIZE);
-      free(filepath);
-
-      if (ret >= 0)
+      nextline = status->td_buf + status->td_bufpos;
+      do
         {
-          nextline = vtbl->iobuffer;
-          do
+          /* Find the beginning of the next line and NUL-terminate the
+           * current line.
+           */
+
+          line = nextline;
+          for (nextline++;
+              *nextline != '\n' && *nextline != '\0';
+              nextline++);
+
+          if (*nextline == '\n')
             {
-              /* Find the beginning of the next line and NUL-terminate the
-               * current line.
-               */
-
-              line = nextline;
-              for (nextline++;
-                  *nextline != '\n' && *nextline != '\0';
-                  nextline++);
-
-              if (*nextline == '\n')
-                {
-                  *nextline++ = '\0';
-                }
-              else
-                {
-                  nextline = NULL;
-                }
-
-              /* Parse the current line
-               *
-               *   Format:
-               *
-               *            111111111122222222223
-               *   123456789012345678901234567890
-               *   StackBase:  xxxxxxxxxx
-               *   StackSize:  xxxx
-               *   StackUsed:  xxxx
-               */
-
-              if (strncmp(line, g_stacksize, strlen(g_stacksize)) == 0)
-                {
-                  stack_size = strtoul(&line[12], NULL, 0);
-                }
-#ifdef CONFIG_STACK_COLORATION
-              else if (strncmp(line, g_stackused, strlen(g_stackused)) == 0)
-                {
-                  stack_used = strtoul(&line[12], NULL, 0);
-                }
-#endif
+              *nextline++ = '\0';
             }
-          while (nextline != NULL);
+          else
+            {
+              nextline = NULL;
+            }
+
+          /* Parse the current line
+           *
+           *   Format:
+           *
+           *            111111111122222222223
+           *   123456789012345678901234567890
+           *   StackBase:  xxxxxxxxxx
+           *   StackSize:  xxxx
+           *   StackUsed:  xxxx
+           */
+
+          if (strncmp(line, g_stacksize, strlen(g_stacksize)) == 0)
+            {
+              status->td_stack_size = strtoul(&line[12], NULL, 0);
+            }
+#  ifdef PS_SHOW_STACKUSAGE
+          else if (strncmp(line, g_stackused, strlen(g_stackused)) == 0)
+            {
+              status->td_stack_used = strtoul(&line[12], NULL, 0);
+            }
+#  endif
         }
+      while (nextline != NULL);
     }
 
-#ifdef CONFIG_STACK_COLORATION
-
-  if (stack_size > 0 && stack_used > 0)
+#  ifdef PS_SHOW_STACKUSAGE
+  if (status->td_stack_size > 0 && status->td_stack_used > 0)
     {
       /* Use fixed-point math with one decimal place */
 
-      stack_filled = 10 * 100 * stack_used / stack_size;
+      status->td_stack_filled = 10 * 100 * status->td_stack_used /
+                                status->td_stack_size;
     }
-#endif
+#  endif
 #endif
 
 #ifdef NSH_HAVE_CPULOAD
   /* Get the CPU load */
 
-  filepath          = NULL;
-  ret = asprintf(&filepath, "%s/%s/loadavg", dirpath, entryp->d_name);
-  if (ret < 0 || filepath == NULL)
+  ret = ps_readprocfs(vtbl, "loadavg", dirpath, entryp, status);
+  if (ret >= 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
-      vtbl->iobuffer[0] = '\0';
+      status->td_cpuload = nsh_trimspaces(status->td_buf +
+                                          status->td_bufpos);
+      status->td_bufpos += ret;
     }
-  else
-    {
-      ret = nsh_readfile(vtbl, "ps", filepath, vtbl->iobuffer, IOBUFFERSIZE);
-      free(filepath);
-
-      if (ret < 0)
-        {
-          vtbl->iobuffer[0] = '\0';
-        }
-    }
-#endif
-
-#if defined(PS_SHOW_HEAPSIZE) || defined (PS_SHOW_STACKSIZE) || \
-    defined (PS_SHOW_STACKUSAGE) || defined (NSH_HAVE_CPULOAD)
-    nsh_output(vtbl,
-#ifdef PS_SHOW_HEAPSIZE
-               "%08lu "
-#endif
-#ifdef PS_SHOW_STACKSIZE
-               "%06lu "
-#endif
-#ifdef PS_SHOW_STACKUSAGE
-               "%06lu "
-               "%3lu.%lu%%%c "
-#endif
-#ifdef NSH_HAVE_CPULOAD
-               "%6s "
-#endif
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-               , heap_size
-#endif
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-               , stack_size
-#endif
-#ifdef PS_SHOW_STACKUSAGE
-               , stack_used,
-               stack_filled / 10,
-               stack_filled % 10,
-               (stack_filled >= 10 * 80 ? '!' : ' ')
-#endif
-#ifdef NSH_HAVE_CPULOAD
-               , nsh_trimspaces(vtbl->iobuffer)
-#endif
-             );
 #endif
 
   /* Read the task/thread command line */
 
-  filepath = NULL;
-  ret = asprintf(&filepath, "%s/%s/cmdline", dirpath, entryp->d_name);
-
-  if (ret < 0 || filepath == NULL)
+  ret = ps_readprocfs(vtbl, "cmdline", dirpath, entryp, status);
+  if (ret >= 0)
     {
-      nsh_error(vtbl, g_fmtcmdfailed, "ps", "asprintf", NSH_ERRNO);
-      return ERROR;
+      status->td_cmdline = nsh_trimspaces(status->td_buf +
+                                          status->td_bufpos);
+      status->td_bufpos += ret;
     }
 
-  ret = nsh_readfile(vtbl, "ps", filepath, vtbl->iobuffer, IOBUFFERSIZE);
-  free(filepath);
+  return ret;
+}
 
+/****************************************************************************
+ * Name: ps_title
+ ****************************************************************************/
+
+static void ps_title(FAR struct nsh_vtbl_s *vtbl, bool heap)
+{
+#ifdef PS_SHOW_HEAPSIZE
+  char heapsize[16];
+
+  if (heap)
+    {
+      snprintf(heapsize, sizeof(heapsize), "%8s", "HEAP");
+    }
+  else
+    {
+      heapsize[0] = '\0';
+    }
+#endif
+
+  nsh_output(vtbl,
+             "%5s %5s %5s "
+#ifdef CONFIG_SMP
+              "%3s "
+#endif
+              "%3s %-8s %-7s %3s %-8s %-9s "
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+              "%-16s "
+#endif
+#ifdef PS_SHOW_HEAPSIZE
+              "%s "
+#endif
+#ifdef PS_SHOW_STACKSIZE
+              "%7s "
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+              "%7s %6s "
+#endif
+#ifdef NSH_HAVE_CPULOAD
+              "%6s "
+#endif
+              "%s\n"
+              , "TID", "PID", "PPID"
+#ifdef CONFIG_SMP
+              , "CPU"
+#endif
+              , "PRI", "POLICY", "TYPE", "NPX", "STATE", "EVENT"
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+              , "SIGMASK"
+#endif
+#ifdef PS_SHOW_HEAPSIZE
+              , heapsize
+#endif
+#ifdef PS_SHOW_STACKSIZE
+              , "STACK"
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+              , "USED", "FILLED"
+#endif
+#ifdef NSH_HAVE_CPULOAD
+              , "CPU"
+#endif
+              , "COMMAND");
+}
+
+/****************************************************************************
+ * Name: ps_output
+ ****************************************************************************/
+
+static void ps_output(FAR struct nsh_vtbl_s *vtbl, bool heap,
+                      FAR const struct nsh_taskstatus_s *status)
+{
+  /* Finally, print the status information */
+
+#ifdef PS_SHOW_HEAPSIZE
+  char heapsize[16];
+
+  if (heap)
+    {
+      snprintf(heapsize, sizeof(heapsize), "%08lu", status->td_heapsize);
+    }
+  else
+    {
+      heapsize[0] = '\0';
+    }
+#endif
+
+  nsh_output(vtbl,
+             "%5d %5s %5d "
+#ifdef CONFIG_SMP
+             "%3s "
+#endif
+             "%3s %-8s %-7s %3s %-8s %-9s "
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+             "%-8s "
+#endif
+#ifdef PS_SHOW_HEAPSIZE
+             "%s "
+#endif
+#ifdef PS_SHOW_STACKSIZE
+             "%07lu "
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+             "%07lu %3lu.%lu%%%c "
+#endif
+#ifdef NSH_HAVE_CPULOAD
+             "%5s "
+#endif
+             "%s\n"
+           , status->td_tid, status->td_groupid, status->td_ppid
+#ifdef CONFIG_SMP
+           , status->td_cpu
+#endif
+           , status->td_priority, status->td_policy , status->td_type
+           , status->td_flags , status->td_state, status->td_event
+#ifndef CONFIG_NSH_DISABLE_PSSIGMASK
+           , status->td_sigmask
+#endif
+#ifdef PS_SHOW_HEAPSIZE
+           , heapsize
+#endif
+#ifndef CONFIG_NSH_DISABLE_PSSTACKUSAGE
+           , status->td_stack_size
+#endif
+#ifdef PS_SHOW_STACKUSAGE
+           , status->td_stack_used
+           , status->td_stack_filled / 10 , status->td_stack_filled % 10
+           , (status->td_stack_filled >= 10 * 80 ? '!' : ' ')
+#endif
+#ifdef NSH_HAVE_CPULOAD
+           , status->td_cpuload
+#endif
+           , status->td_cmdline);
+}
+
+/****************************************************************************
+ * Name: ps_callback
+ ****************************************************************************/
+
+static int ps_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
+                       FAR struct dirent *entryp, FAR void *pvarg)
+{
+  FAR struct nsh_taskstatus_s status;
+  bool heap = *(FAR bool *)pvarg;
+  int ret;
+
+  if (ps_skipfile(entryp))
+    {
+      return OK;
+    }
+
+  memset(&status, 0, sizeof(status));
+  status.td_buf = vtbl->iobuffer;
+  status.td_bufsize = IOBUFFERSIZE;
+
+  ret = ps_record(vtbl, dirpath, entryp, heap, &status);
   if (ret < 0)
     {
-      return ERROR;
+      return ret;
     }
 
-  nsh_output(vtbl, "%s\n", nsh_trimspaces(vtbl->iobuffer));
-  return OK;
+  ps_output(vtbl, heap, &status);
+  return ret;
 }
+#endif
+
+#if !defined(CONFIG_NSH_DISABLE_TOP) && defined(NSH_HAVE_CPULOAD)
+
+/****************************************************************************
+ * Name: top_callback
+ ****************************************************************************/
+
+static int top_callback(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
+                        FAR struct dirent *entryp, FAR void *pvarg)
+{
+  FAR struct nsh_topstatus_s *topstatus = pvarg;
+  FAR struct nsh_taskstatus_s *status;
+  int index = topstatus->index;
+  int ret;
+
+  if (ps_skipfile(entryp))
+    {
+      return OK;
+    }
+
+  if (topstatus->size == 0)
+    {
+      topstatus->status = zalloc(sizeof(FAR struct nsh_taskstatus_s *) * 4);
+      if (topstatus->status == NULL)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "top", "zalloc", NSH_ERRNO);
+          return -ENOMEM;
+        }
+
+      topstatus->size = 4;
+    }
+  else if (topstatus->index >= topstatus->size)
+    {
+      topstatus->status =
+        realloc(topstatus->status,
+                sizeof(topstatus->status[0]) * topstatus->size * 2);
+      if (topstatus->status == NULL)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "top", "realloc", NSH_ERRNO);
+          return -ENOMEM;
+        }
+
+      memset(&topstatus->status[topstatus->index], 0,
+             sizeof(topstatus->status[0]) * topstatus->size);
+      topstatus->size *= 2;
+    }
+
+  if (topstatus->status[index] != NULL)
+    {
+      status = topstatus->status[index];
+      status->td_bufpos = 0;
+    }
+  else
+    {
+      status = zalloc(sizeof(struct nsh_taskstatus_s));
+      if (status == NULL)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "top", "zalloc", NSH_ERRNO);
+          return -ENOMEM;
+        }
+
+      topstatus->status[index] = status;
+      status->td_buf = zalloc(IOBUFFERSIZE);
+      if (status->td_buf == NULL)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "top", "zalloc", NSH_ERRNO);
+          return -ENOMEM;
+        }
+
+      status->td_bufsize = IOBUFFERSIZE;
+    }
+
+  ret = ps_record(vtbl, dirpath, entryp, topstatus->heap, status);
+  if (ret < 0)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "top", "ps_record", NSH_ERRNO);
+      return ret;
+    }
+
+  topstatus->index++;
+  return ret;
+}
+
+/****************************************************************************
+ * Name: top_cmpcpuload
+ ****************************************************************************/
+
+static int top_cmpcpuload(FAR const void *item1, FAR const void *item2)
+{
+  FAR const struct nsh_taskstatus_s *status1 =
+    (FAR const struct nsh_taskstatus_s *)(*(FAR uintptr_t *)item1);
+  FAR const struct nsh_taskstatus_s *status2 =
+    (FAR const struct nsh_taskstatus_s *)(*(FAR uintptr_t *)item2);
+  int load1 = atoi(status1->td_cpuload);
+  int load2 = atoi(status2->td_cpuload);
+  FAR const char *s1;
+  FAR const char *s2;
+
+  if (load1 == load2)
+    {
+      s1 = status1->td_cpuload;
+      s2 = status2->td_cpuload;
+      while (*s1++ != '.');
+      while (*s2++ != '.');
+      if (*s2 == *s1)
+        {
+          return 0;
+        }
+
+      return *s2 > *s1 ? 1 : -1;
+    }
+  else
+    {
+      return load2 > load1 ? 1 : -1;
+    }
+}
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+/****************************************************************************
+ * Name: top_exit
+ ****************************************************************************/
+
+static void top_exit(int signo, FAR siginfo_t *siginfo, FAR void *context)
+{
+  *(FAR bool *)siginfo->si_user = true;
+}
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
+
 #endif
 
 /****************************************************************************
@@ -619,53 +921,73 @@ int cmd_exec(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifndef CONFIG_NSH_DISABLE_PS
 int cmd_ps(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
-  UNUSED(argc);
-  UNUSED(argv);
+  bool heap = false;
+  int i;
 
-  nsh_output(vtbl, "%5s %5s "
-#ifdef CONFIG_SMP
-                   "%3s "
+#ifdef PS_SHOW_HEAPSIZE
+  for (i = 1; i < argc; i++)
+    {
+      if (strcmp(argv[i], "-heap") == 0)
+        {
+          heap = true;
+        }
+    }
 #endif
-                   "%3s %-8s %-7s %3s %-8s %-9s "
-                   "%-16s "
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-                   "%8s "
-#endif
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-                   "%6s "
-#ifdef CONFIG_STACK_COLORATION
-                   "%6s "
-                   "%7s "
-#endif
-#endif
-#ifdef NSH_HAVE_CPULOAD
-                    "%6s "
-#endif
-                    "%s\n",
-                    "PID", "GROUP",
-#ifdef CONFIG_SMP
-                    "CPU",
-#endif
-                    "PRI", "POLICY", "TYPE", "NPX", "STATE", "EVENT",
-                    "SIGMASK",
-#if CONFIG_MM_BACKTRACE >= 0 && !defined(CONFIG_NSH_DISABLE_PSHEAPUSAGE)
-                    "HEAP",
-#endif
-#if !defined(CONFIG_NSH_DISABLE_PSSTACKUSAGE)
-                    "STACK",
-#ifdef CONFIG_STACK_COLORATION
-                    "USED",
-                    "FILLED",
-#endif
-#endif
-#ifdef NSH_HAVE_CPULOAD
-                    "CPU",
-#endif
-                    "COMMAND"
-                    );
 
-  return nsh_foreach_direntry(vtbl, "ps", CONFIG_NSH_PROC_MOUNTPOINT,
-                              ps_callback, NULL);
+  ps_title(vtbl, heap);
+
+  if (argc - heap > 1)
+    {
+      for (i = 1; i < argc; i++)
+        {
+          struct dirent entry;
+          if (!isdigit(*argv[i]))
+            {
+              continue;
+            }
+
+          entry.d_type = DT_DIR;
+          strcpy(entry.d_name, argv[i]);
+          ps_callback(vtbl, CONFIG_NSH_PROC_MOUNTPOINT, &entry, &heap);
+        }
+
+      return 0;
+    }
+  else
+    {
+      return nsh_foreach_direntry(vtbl, "ps", CONFIG_NSH_PROC_MOUNTPOINT,
+                                  ps_callback, &heap);
+    }
+}
+#endif
+
+/****************************************************************************
+ * Name: cmd_pidof
+ ****************************************************************************/
+
+#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PIDOF)
+int cmd_pidof(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  FAR const char *name = argv[argc - 1];
+  pid_t pids[8];
+  ssize_t ret;
+  int i;
+
+  ret = nsh_getpid(vtbl, name, pids, nitems(pids));
+  if (ret <= 0)
+    {
+      nsh_error(vtbl, g_fmtnosuch, argv[0], "task",  name);
+      return ERROR;
+    }
+
+  for (i = 0; i < ret; i++)
+    {
+      nsh_output(vtbl, "%d ", pids[i]);
+    }
+
+  nsh_output(vtbl, "\n");
+
+  return OK;
 }
 #endif
 
@@ -673,7 +995,8 @@ int cmd_ps(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
  * Name: cmd_kill
  ****************************************************************************/
 
-#ifndef CONFIG_NSH_DISABLE_KILL
+#if !defined(CONFIG_NSH_DISABLE_KILL) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR char *ptr;
@@ -685,7 +1008,7 @@ int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
    * -<signal> option
    */
 
-  if (argc == 3)  /* kill -<signal> <pid> */
+  if (argc == 3) /* kill -<signal> <pid> */
     {
       /* Check incoming parameters.
        * The first parameter should be "-<signal>"
@@ -710,11 +1033,11 @@ int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           goto invalid_arg;
         }
     }
-  else if (argc == 2)           /* kill <pid> */
+  else if (argc == 2) /* kill <pid> */
     {
-      /* uses default signal number as SIGTERM */
+      /* Uses default signal number as SIGTERM */
 
-      signal = (long) SIGTERM;  /* SIGTERM is always defined in signal.h */
+      signal = SIGTERM; /* SIGTERM is always defined in signal.h */
 
       /* The first parameter should be <pid>  */
 
@@ -727,7 +1050,7 @@ int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
   else
     {
-      /* invalid number of arguments */
+      /* Invalid number of arguments */
 
       goto invalid_arg;
     }
@@ -773,10 +1096,113 @@ invalid_arg:
 #endif
 
 /****************************************************************************
+ * Name: cmd_pkill
+ ****************************************************************************/
+
+#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PKILL) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
+int cmd_pkill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  FAR const char *name;
+  FAR char *ptr;
+  pid_t pids[8];
+  int signal;
+  ssize_t ret;
+  int i;
+
+  /* pkill will send SIGTERM to the task in case no signal is selected by
+   * -<signal> option
+   */
+
+  if (argc == 3)  /* pkill -<signal> <name> */
+    {
+      /* Check incoming parameters.
+       * The first parameter should be "-<signal>"
+       */
+
+      ptr = argv[1];
+      if (*ptr != '-' || ptr[1] < '0' || ptr[1] > '9')
+        {
+          goto invalid_arg;
+        }
+
+      /* Extract the signal number */
+
+      signal = atoi(&ptr[1]);
+
+      /* The second parameter should be <pid>  */
+
+      name = argv[2];
+    }
+  else if (argc == 2)           /* kill <pid> */
+    {
+      /* uses default signal number as SIGTERM */
+
+      signal = SIGTERM;  /* SIGTERM is always defined in signal.h */
+
+      /* The first parameter should be name  */
+
+      name = argv[1];
+    }
+  else
+    {
+      /* invalid number of arguments */
+
+      goto invalid_arg;
+    }
+
+  ret = nsh_getpid(vtbl, name, pids, nitems(pids));
+  if (ret <= 0)
+    {
+      nsh_error(vtbl, g_fmtnosuch, argv[0], "task",  name);
+      return ERROR;
+    }
+
+  /* Send the signal.  Kill return values:
+   *
+   *   EINVAL An invalid signal was specified.
+   *   EPERM  The process does not have permission to send the signal to any
+   *          of the target processes.
+   *   ESRCH  The pid or process group does not exist.
+   *   ENOSYS Do not support sending signals to process groups.
+   */
+
+  for (i = 0; i < ret; i++)
+    {
+      if (kill(pids[i], signal) != 0)
+        {
+          switch (errno)
+            {
+            case EINVAL:
+              goto invalid_arg;
+
+            case ESRCH:
+              nsh_error(vtbl, g_fmtnosuch, argv[0], "task", argv[2]);
+              return ERROR;
+
+            case EPERM:
+            case ENOSYS:
+            default:
+              nsh_error(vtbl, g_fmtcmdfailed, argv[0], "kill", NSH_ERRNO);
+              return ERROR;
+            }
+        }
+    }
+
+  return OK;
+
+invalid_arg:
+  nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+  return ERROR;
+}
+#endif
+
+/****************************************************************************
  * Name: cmd_sleep
  ****************************************************************************/
 
-#ifndef CONFIG_NSH_DISABLE_SLEEP
+#if !defined(CONFIG_NSH_DISABLE_SLEEP) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(argc);
@@ -799,8 +1225,8 @@ int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 /****************************************************************************
  * Name: cmd_usleep
  ****************************************************************************/
-
-#ifndef CONFIG_NSH_DISABLE_USLEEP
+#if !defined(CONFIG_NSH_DISABLE_USLEEP) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_usleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(argc);
@@ -830,14 +1256,10 @@ int cmd_uptime(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   uint32_t updays;
   uint32_t uphours;
   uint32_t upminutes;
-
   time_t current_time_seconds;
   FAR struct tm *current_time;
-
   struct sysinfo sys_info;
-
   time_t uptime = 0;
-
   bool pretty_format_opt = false;
   bool system_load_opt = false;
 
@@ -926,7 +1348,145 @@ int cmd_uptime(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
 
   nsh_output(vtbl, "\n");
-
   return OK;
+}
+#endif
+
+/****************************************************************************
+ * Name: cmd_top
+ ****************************************************************************/
+
+#if !defined(CONFIG_NSH_DISABLE_TOP) && defined(NSH_HAVE_CPULOAD)
+int cmd_top(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  FAR char *pidlist = NULL;
+  size_t num = SIZE_MAX;
+  size_t i;
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+  struct sigaction act;
+#endif
+  bool quit = false;
+  int delay = 3;
+  int ret = 0;
+  int tc = 0;
+  int opt;
+  struct nsh_topstatus_s topstatus =
+    {
+      0
+    };
+
+  while ((opt = getopt(argc, argv, "d:p:n:h")) != ERROR)
+    {
+      switch (opt)
+        {
+          case 'd':
+            delay = atoi(optarg);
+            break;
+          case 'p':
+            pidlist = optarg;
+            break;
+          case 'h':
+            topstatus.heap = true;
+            break;
+          case 'n':
+            num = atoi(optarg);
+            break;
+
+          default:
+            nsh_output(vtbl, "Usage: top"
+                             "[ -n <num>] [ -d <delay>]"
+                             "[ -p <pidlist>] [ -h ]\n");
+            return ERROR;
+        }
+    }
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+  act.sa_user = &quit;
+  act.sa_sigaction = top_exit;
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
+  if (sigaction(SIGINT, &act, NULL) < 0)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, "top", "sigaction", NSH_ERRNO);
+      return ERROR;
+    }
+#endif
+
+  if (vtbl->isctty)
+    {
+      tc = nsh_ioctl(vtbl, TIOCSCTTY, getpid());
+    }
+
+  while (!quit)
+    {
+      topstatus.index = 0;
+      nsh_output(vtbl, "\033[2J\033[1;1H");
+      ps_title(vtbl, topstatus.heap);
+
+      if (pidlist)
+        {
+          FAR char *save = NULL;
+          FAR char *pid = strtok_r(pidlist, ",", &save);
+
+          while (pid != NULL && ret >= 0)
+            {
+              struct dirent entry;
+              entry.d_type = DT_DIR;
+              strlcpy(entry.d_name, pid, sizeof(entry.d_name));
+              ret = top_callback(vtbl, CONFIG_NSH_PROC_MOUNTPOINT,
+                                 &entry, &topstatus);
+              *--pid = ',';
+              pid = strtok_r(NULL, ",", &save);
+            }
+        }
+      else
+        {
+          ret = nsh_foreach_direntry(vtbl, "top", CONFIG_NSH_PROC_MOUNTPOINT,
+                                     top_callback, &topstatus);
+        }
+
+      if (ret < 0)
+        {
+          nsh_error(vtbl, g_fmtcmdfailed, "top", "nsh_foreach_direntry",
+                    NSH_ERRNO);
+          break;
+        }
+
+      qsort(topstatus.status, topstatus.index,
+            sizeof(topstatus.status[0]), top_cmpcpuload);
+
+      for (i = 0; i < MIN(topstatus.index, num); i++)
+        {
+          ps_output(vtbl, topstatus.heap, topstatus.status[i]);
+        }
+
+      if (vtbl->isctty && tc == 0)
+        {
+          nsh_output(vtbl, "use Ctrl+c' to quit\n");
+        }
+
+      sleep(delay);
+    }
+
+  if (topstatus.status != NULL)
+    {
+      for (i = 0; i < topstatus.size; i++)
+        {
+          if (topstatus.status[i] != NULL)
+            {
+              free(topstatus.status[i]->td_buf);
+              free(topstatus.status[i]);
+            }
+        }
+
+      free(topstatus.status);
+    }
+
+  if (vtbl->isctty && tc == 0)
+    {
+      nsh_ioctl(vtbl, TIOCNOTTY, 0);
+    }
+
+  return ret;
 }
 #endif

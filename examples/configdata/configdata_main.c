@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/configdata/configdata_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/crc32.h>
 #include <nuttx/mtd/mtd.h>
@@ -399,11 +401,9 @@ static int configdata_verifyconfig(void)
   int ret;
   int errcode = OK;
   int i;
-  static int iteration = 0;
 
   /* Create a file for each unused file structure */
 
-  iteration++;
   for (i = 0; i < CONFIG_EXAMPLES_CONFIGDATA_MAXENTRIES; i++)
     {
       entry = &g_entries[i];
@@ -450,7 +450,7 @@ static int configdata_verifyconfig(void)
                 {
                   g_nverified++;
 #if CONFIG_EXAMPLES_CONFIGDATA_VERBOSE != 0
-                  printf("  Verifed entry %04X, %d\n",
+                  printf("  Verified entry %04X, %d\n",
                          entry->id, entry->instance);
 #endif
                 }
@@ -664,7 +664,7 @@ int main(int argc, FAR char *argv[])
 
   /* Open the /dev/config device */
 
-  g_fd = open("/dev/config", O_RDOK);
+  g_fd = open("/dev/config", O_RDONLY);
   if (g_fd == -1)
     {
       printf("ERROR: Failed to open /dev/config %d\n", -errno);

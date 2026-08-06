@@ -1,6 +1,8 @@
 /********************************************************************************************
  * apps/graphics/nxwm/src/ctouchscreen.cxx
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,7 +34,7 @@
 #include <sched.h>
 #include <pthread.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <unistd.h>
 
 #include <nuttx/nx/nxglib.h>
@@ -179,7 +181,7 @@ void CTouchscreen::setCalibrationData(const struct SCalibrationData &caldata)
   m_calibData = caldata;
 
   // Note that we have calibration data.  Data will now be scaled and forwarded
-  // to NX (unless we are still in cpature mode)
+  // to NX (unless we are still in capture mode)
 
    m_calibrated = true;
 
@@ -203,7 +205,7 @@ bool CTouchscreen::waitRawTouchData(struct touch_sample_s *touch)
 {
   _info("Capturing touch input\n");
 
-  // Setup to cpature raw data into the user provided buffer
+  // Setup to capture raw data into the user provided buffer
 
   sched_lock();
   m_touch   = touch;

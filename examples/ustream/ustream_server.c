@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/ustream/ustream_server.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -78,7 +80,7 @@ int main(int argc, char *argv[])
 
   /* Bind the socket to a local address */
 
-  addrlen = strlen(CONFIG_EXAMPLES_USTREAM_ADDR) + 1;
+  addrlen = sizeof(CONFIG_EXAMPLES_USTREAM_ADDR);
   if (addrlen > UNIX_PATH_MAX)
     {
       addrlen = UNIX_PATH_MAX;
@@ -132,7 +134,8 @@ int main(int argc, char *argv[])
     }
 #endif
 
-  acceptsd = accept(listensd, (struct sockaddr *)&myaddr, &addrlen);
+  acceptsd = accept4(listensd, (struct sockaddr *)&myaddr, &addrlen,
+                     SOCK_CLOEXEC);
   if (acceptsd < 0)
     {
       printf("server: accept failure: %d\n", errno);

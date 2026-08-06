@@ -1,13 +1,10 @@
 /****************************************************************************
  * apps/include/netutils/dhcpc.h
  *
- *   Copyright (C) 2007, 2009-2011, 2015 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * This logic was leveraged from uIP which also has a BSD-style license:
- *
- *   Copyright (c) 2005, Swedish Institute of Computer Science
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2007, 2009-2011, 2015 Gregory Nutt
+ * SPDX-FileCopyrightText: 2005 Swedish Institute of Computer Science
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,12 +39,25 @@
  * Included Files
  ****************************************************************************/
 
+#include <nuttx/config.h>
 #include <stdint.h>
 #include <netinet/in.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Provide a default value for CONFIG_NETDB_DNSSERVER_NAMESERVERS if
+ * CONFIG_NETDB_DNSCLIENT is not enabled.
+ */
+
+#if !defined(CONFIG_NETDB_DNSSERVER_NAMESERVERS)
+#  define CONFIG_NETDB_DNSSERVER_NAMESERVERS 1
+#endif
+
+#if !defined(CONFIG_NETUTILS_DHCPC_NTP_SERVERS)
+#  define CONFIG_NETUTILS_DHCPC_NTP_SERVERS 1
+#endif
 
 /****************************************************************************
  * Public Types
@@ -58,9 +68,14 @@ struct dhcpc_state
   struct in_addr serverid;
   struct in_addr ipaddr;
   struct in_addr netmask;
-  struct in_addr dnsaddr;
+  struct in_addr dnsaddr[CONFIG_NETDB_DNSSERVER_NAMESERVERS];
+  uint8_t        num_dnsaddr;     /* Number of DNS addresses received */
+  struct in_addr ntpaddr[CONFIG_NETUTILS_DHCPC_NTP_SERVERS];
+  uint8_t        num_ntpaddr;     /* Number of NTP addresses received */
   struct in_addr default_router;
   uint32_t       lease_time;      /* Lease expires in this number of seconds */
+  uint32_t       renewal_time;    /* Seconds to transition to RENEW state(T1) */
+  uint32_t       rebinding_time;  /* Seconds to transition to REBIND state(T2) */
 };
 
 typedef void (*dhcpc_callback_t)(FAR struct dhcpc_state *presult);
@@ -81,6 +96,7 @@ FAR void *dhcpc_open(FAR const char *interface,
                      FAR const void *mac_addr, int mac_len);
 int  dhcpc_request(FAR void *handle, FAR struct dhcpc_state *presult);
 int  dhcpc_request_async(FAR void *handle, dhcpc_callback_t callback);
+int  dhcpc_release(FAR void *handle, FAR struct dhcpc_state *presult);
 void dhcpc_cancel(FAR void *handle);
 void dhcpc_close(FAR void *handle);
 

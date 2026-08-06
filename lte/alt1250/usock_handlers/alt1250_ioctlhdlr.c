@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_ioctlhdlr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -66,6 +68,7 @@ int usockreq_ioctl(FAR struct alt1250_s *dev,
       switch (request->cmd)
         {
           case FIONBIO:
+          case SIOCGIFFLAGS:
 
             /* ALT1250 doesn't use this command. Only return OK. */
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/elf/tests/struct/struct_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 
 const struct struct_dummy_s dummy_struct =
 {
-   DUMMY_SCALAR_VALUE3
+  DUMMY_SCALAR_VALUE3
 };
 
 int dummy_scalar = DUMMY_SCALAR_VALUE2;

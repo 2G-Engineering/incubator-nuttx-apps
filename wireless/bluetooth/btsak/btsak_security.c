@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/bluetooth/btsak/btsak_security.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -83,7 +85,7 @@ static void btsak_security_showusage(FAR const char *progname,
   fprintf(stderr,
           "\toutput capabilities).\n\n");
   fprintf(stderr, "Usage:\n\n");
-  fprintf(stderr, "\t%s <ifname> %s [-h] <addr> public|private <level>\n",
+  fprintf(stderr, "\t%s <ifname> %s [-h] <addr> public|random <level>\n",
           progname, cmd);
   fprintf(stderr,
           "\nWhere:\n\n");

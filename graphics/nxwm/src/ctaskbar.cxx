@@ -1,6 +1,8 @@
 /********************************************************************************************
  * apps/graphics/nxwm/src/ctaskbar.cxx
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,7 @@
 
 #include <nuttx/config.h>
 
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/nx/nxglib.h>
 
@@ -615,7 +617,7 @@ bool CTaskbar::maximizeApplication(IApplication *app)
 
 /**
  * Minimize an application by moving its window to the bottom of the and
- * redrawing the next visible appliation.
+ * redrawing the next visible application.
  *
  * @param app.  The new application to add to the task bar
  * @return true on success

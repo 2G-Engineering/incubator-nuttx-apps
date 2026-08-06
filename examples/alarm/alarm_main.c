@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/alarm/alarm_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -391,7 +393,7 @@ int main(int argc, FAR char *argv[])
 
       setrel.id      = alarmid;
       setrel.pid     = g_alarm_daemon_pid;
-      setrel.reltime = (time_t)seconds;
+      setrel.reltime = seconds;
 
       setrel.event.sigev_notify = SIGEV_SIGNAL;
       setrel.event.sigev_signo  = CONFIG_EXAMPLES_ALARM_SIGNO;

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/graphics/libjpeg/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -21,6 +23,8 @@
 include $(APPDIR)/Make.defs
 
 SRC = libjpeg
+
+# Decompressor
 
 CSRCS += $(SRC)/jaricom.c
 CSRCS += $(SRC)/jcomapi.c
@@ -49,6 +53,29 @@ CSRCS += $(SRC)/jquant2.c
 CSRCS += $(SRC)/jutils.c
 CSRCS += $(SRC)/jmemmgr.c
 CSRCS += $(SRC)/jmemname.c
+
+# Compressor
+
+CSRCS += $(SRC)/jcapimin.c
+CSRCS += $(SRC)/jcapistd.c
+CSRCS += $(SRC)/jcarith.c
+CSRCS += $(SRC)/jccoefct.c
+CSRCS += $(SRC)/jccolor.c
+CSRCS += $(SRC)/jcdctmgr.c
+CSRCS += $(SRC)/jchuff.c
+CSRCS += $(SRC)/jcinit.c
+CSRCS += $(SRC)/jcmainct.c
+CSRCS += $(SRC)/jcmarker.c
+CSRCS += $(SRC)/jcmaster.c
+CSRCS += $(SRC)/jcparam.c
+CSRCS += $(SRC)/jcprepct.c
+CSRCS += $(SRC)/jcsample.c
+CSRCS += $(SRC)/jctrans.c
+
+CSRCS += $(SRC)/jdatadst.c
+CSRCS += $(SRC)/jfdctint.c
+CSRCS += $(SRC)/jfdctfst.c
+CSRCS += $(SRC)/jfdctflt.c
 
 CFLAGS += -DTEMP_DIRECTORY=\"$(CONFIG_EXTERNALS_LIBJPEG_TEMP_DIR)\"
 

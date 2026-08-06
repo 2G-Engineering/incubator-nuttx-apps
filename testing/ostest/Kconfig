@@ -53,7 +53,7 @@ endif
 
 config TESTING_OSTEST_RR_RANGE
 	int "Round-robin test - end of search range"
-	default 10000
+	default 30000
 	range 1 32767
 	---help---
 		During round-robin scheduling test two threads are created. Each of the threads
@@ -62,7 +62,7 @@ config TESTING_OSTEST_RR_RANGE
 
 		This value specifies the end of search range and together with number of runs
 		allows to configure the length of this test - it should last at least a few
-		tens of seconds. Allowed values [1; 32767], default 10000
+		tens of seconds. Allowed values [1; 32767], default 30000
 
 config TESTING_OSTEST_RR_RUNS
 	int "Round-robin test - number of runs"
@@ -114,5 +114,24 @@ config TESTING_OSTEST_POWEROFF
 	bool "Terminate on test completion"
 	default n
 	depends on BOARDCTL_POWEROFF && TESTING_OSTEST_WAITRESULT
+
+config TESTING_OSTEST_SPINLOCK_THREADS
+	int "Number of spinlock test threads"
+	default 2
+	range 1 32
+
+config TESTING_OSTEST_MULTIUSER
+	bool "Multi-user identity and permission tests"
+	default n
+	depends on SCHED_USER_IDENTITY
+	---help---
+		Enable regression tests for UID/GID identity switching and file
+		permission enforcement.  Individual sub-tests run only when the
+		corresponding kernel options are enabled (for example pseudoFS
+		permission checks require FS_PERMISSION and PSEUDOFS_FILE).
+
+config TEST_LOOP_SCALE
+	int "Loop scale of spinlock test (N x 10,000)"
+	default 100
 
 endif # TESTING_OSTEST

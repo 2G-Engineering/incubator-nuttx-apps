@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_fileapps.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,8 @@
 #include <errno.h>
 #include <string.h>
 #include <libgen.h>
+#include <fcntl.h>
+
 #include <nuttx/lib/builtin.h>
 
 #include "nsh.h"
@@ -68,7 +72,7 @@
  ****************************************************************************/
 
 int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
-                FAR char **argv, FAR const char *redirfile, int oflags)
+                FAR char **argv, FAR const struct nsh_param_s *param)
 {
   posix_spawn_file_actions_t file_actions;
   posix_spawnattr_t attr;
@@ -104,22 +108,107 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
       goto errout_with_actions;
     }
 
-  /* Handle re-direction of output */
-
-  if (redirfile)
+  if (param)
     {
-      ret = posix_spawn_file_actions_addopen(&file_actions, 1, redirfile,
-                                             oflags, 0644);
-      if (ret != 0)
-        {
-          /* posix_spawn_file_actions_addopen returns a positive errno
-           * value on failure.
-           */
+      /* Handle redirection of input */
 
-          nsh_error(vtbl, g_fmtcmdfailed, cmd,
-                     "posix_spawn_file_actions_addopen",
-                     NSH_ERRNO);
-          goto errout_with_attrs;
+      if (param->file_in)
+        {
+          /* Set up to close open redirfile and set to stdin (0) */
+
+          ret = posix_spawn_file_actions_addopen(&file_actions, 0,
+                                                 param->file_in,
+                                                 param->oflags_in,
+                                                 0);
+          if (ret != 0)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_addopen",
+                        NSH_ERRNO);
+              goto errout_with_actions;
+            }
+        }
+#ifdef CONFIG_NSH_PIPELINE
+      else if (param->fd_in != -1)
+        {
+          ret = posix_spawn_file_actions_adddup2(&file_actions,
+                                                 param->fd_in, 0);
+          if (ret != 0)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_adddup2",
+                        NSH_ERRNO);
+              goto errout_with_actions;
+            }
+        }
+#endif
+
+      /* Handle re-direction of output */
+
+      if (param->file_out)
+        {
+          ret = posix_spawn_file_actions_addopen(&file_actions, 1,
+                                                 param->file_out,
+                                                 param->oflags_out,
+                                                 0644);
+          if (ret != 0)
+            {
+              /* posix_spawn_file_actions_addopen returns a positive errno
+               * value on failure.
+               */
+
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_addopen",
+                        NSH_ERRNO);
+              goto errout_with_attrs;
+            }
+        }
+#ifdef CONFIG_NSH_PIPELINE
+      else if (param->fd_out != -1)
+        {
+          ret = posix_spawn_file_actions_adddup2(&file_actions,
+                                                 param->fd_out, 1);
+          if (ret != 0)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_adddup2",
+                        NSH_ERRNO);
+              goto errout_with_actions;
+            }
+        }
+#endif
+
+      /* Handle redirection of error output */
+
+      if (param->file_err)
+        {
+          /* 2> file: Redirect stderr to a file */
+
+          ret = posix_spawn_file_actions_addopen(&file_actions, 2,
+                                                  param->file_err,
+                                                  param->oflags_err,
+                                                  0644);
+          if (ret != 0)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_addopen",
+                        NSH_ERRNO);
+              goto errout_with_attrs;
+            }
+        }
+      else if (param->fd_err != -1)
+        {
+          /* 2>&1: Redirect stderr to stdout */
+
+          ret = posix_spawn_file_actions_adddup2(&file_actions,
+                                                 param->fd_err, 2);
+          if (ret != 0)
+            {
+              nsh_error(vtbl, g_fmtcmdfailed, cmd,
+                        "posix_spawn_file_actions_adddup2",
+                        NSH_ERRNO);
+              goto errout_with_attrs;
+            }
         }
     }
 
@@ -131,7 +220,7 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
   if (index >= 0)
     {
       FAR const struct builtin_s *builtin;
-      struct sched_param param;
+      struct sched_param sched;
 
       /* Get information about the builtin */
 
@@ -144,8 +233,8 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
 
       /* Set the correct task size and priority */
 
-      param.sched_priority = builtin->priority;
-      ret = posix_spawnattr_setschedparam(&attr, &param);
+      sched.sched_priority = builtin->priority;
+      ret = posix_spawnattr_setschedparam(&attr, &sched);
       if (ret != 0)
         {
           goto errout_with_actions;
@@ -158,12 +247,6 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
         }
     }
 #endif
-
-  /* Lock the scheduler in an attempt to prevent the application from
-   * running until waitpid() has been called.
-   */
-
-  sched_lock();
 
   /* Execute the program. posix_spawnp returns a positive errno value on
    * failure.
@@ -188,6 +271,7 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
        *     foreground
        */
 
+       vtbl->np.np_lastpid = pid;
 #ifdef CONFIG_SCHED_WAITPID
       /* CONFIG_SCHED_WAITPID is selected, so we may run the command in
        * foreground unless we were specifically requested to run the command
@@ -283,9 +367,9 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
 
 #if !defined(CONFIG_SCHED_WAITPID) || !defined(CONFIG_NSH_DISABLEBG)
         {
-          struct sched_param param;
-          sched_getparam(ret, &param);
-          nsh_output(vtbl, "%s [%d:%d]\n", cmd, ret, param.sched_priority);
+          struct sched_param sched;
+          sched_getparam(ret, &sched);
+          nsh_output(vtbl, "%s [%d:%d]\n", cmd, ret, sched.sched_priority);
 
           /* Backgrounded commands always 'succeed' as long as we can start
            * them.
@@ -295,8 +379,6 @@ int nsh_fileapp(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
         }
 #endif /* !CONFIG_SCHED_WAITPID || !CONFIG_NSH_DISABLEBG */
     }
-
-  sched_unlock();
 
   /* Free attributes and file actions.  Ignoring return values in the case
    * of an error.

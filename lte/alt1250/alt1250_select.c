@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_select.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -50,7 +52,7 @@
 #define WRITESET_BIT            (1 << 1)
 
 /****************************************************************************
- * Private Data Type
+ * Private Types
  ****************************************************************************/
 
 struct select_params_s
@@ -69,7 +71,7 @@ struct select_params_s
 
 static struct alt_container_s select_container_obj[SELECT_CONTAINER_MAX];
 static FAR struct alt_container_s *g_current_container;
-static void *g_selectargs[SELECT_CONTAINER_MAX][6];
+static FAR void *g_selectargs[SELECT_CONTAINER_MAX][6];
 static struct select_params_s g_select_params[SELECT_CONTAINER_MAX];
 
 /****************************************************************************
@@ -89,7 +91,8 @@ static int send_select_command(FAR struct alt1250_s *dev,
   FAR void *in[7];
   uint16_t used_setbit = 0;
   int32_t usock_result;
-  struct alt_container_s container = {
+  struct alt_container_s container =
+  {
     0
   };
 
@@ -118,7 +121,7 @@ static int send_select_command(FAR struct alt1250_s *dev,
   set_container_ids(&container, 0, LTE_CMDID_SELECT);
   set_container_argument(&container, in, nitems(in));
 
-  return altdevice_send_command(dev->altfd, &container, &usock_result);
+  return altdevice_send_command(dev, dev->altfd, &container, &usock_result);
 }
 
 /****************************************************************************
@@ -197,7 +200,7 @@ static FAR struct alt_container_s *recv_selectcontainer(
   FAR struct alt1250_s *dev)
 {
   g_current_container = altdevice_exchange_selcontainer(dev->altfd,
-                          g_current_container);
+                                                        g_current_container);
   return g_current_container;
 }
 
@@ -266,7 +269,7 @@ static void handle_selectevt(FAR struct alt1250_s *dev,
   FAR struct usock_s *usock;
 
   dbg_alt1250("select reply. ret=%ld modem_errno=%ld\n",
-                                                altcom_resp, modem_errno);
+              altcom_resp, modem_errno);
 
   if (selectreq_id == dev->sid)
     {
@@ -288,7 +291,7 @@ static void handle_selectevt(FAR struct alt1250_s *dev,
   else
     {
       dbg_alt1250("Select event come wish in no selected. sel_id = %ld\n",
-                                                             selectreq_id);
+                  selectreq_id);
     }
 }
 
@@ -318,12 +321,12 @@ uint64_t perform_select_event(FAR struct alt1250_s *dev, uint64_t bitmap)
        */
 
       handle_selectevt(dev,
-        *((int32_t *)selectcontainer->outparam[0]),
-        *((int32_t *)selectcontainer->outparam[1]),
-        *((int32_t *)selectcontainer->outparam[2]),
-        (altcom_fd_set *)(selectcontainer->outparam[3]),
-        (altcom_fd_set *)(selectcontainer->outparam[4]),
-        (altcom_fd_set *)(selectcontainer->outparam[5]));
+                       *((FAR int32_t *)selectcontainer->outparam[0]),
+                       *((FAR int32_t *)selectcontainer->outparam[1]),
+                       *((FAR int32_t *)selectcontainer->outparam[2]),
+                       (FAR altcom_fd_set *)(selectcontainer->outparam[3]),
+                       (FAR altcom_fd_set *)(selectcontainer->outparam[4]),
+                       (FAR altcom_fd_set *)(selectcontainer->outparam[5]));
     }
 
   return bit;
@@ -365,4 +368,3 @@ void restart_select(FAR struct alt1250_s *dev)
   select_cancel(dev);
   select_start(dev);
 }
-

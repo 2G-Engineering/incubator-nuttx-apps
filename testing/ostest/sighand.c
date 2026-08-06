@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/sighand.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -128,7 +130,7 @@ static void wakeup_action(int signo, siginfo_t *info, void *ucontext)
     }
 }
 
-static int waiter_main(int argc, char *argv[])
+static FAR void *waiter_main(FAR void *arg)
 {
   sigset_t set;
   struct sigaction act;
@@ -215,11 +217,13 @@ void sighand_test(void)
 #ifdef CONFIG_SCHED_HAVE_PARENT
   struct sigaction act;
   struct sigaction oact;
-  sigset_t set;
 #endif
   struct sched_param param;
+  pthread_attr_t attr;
   union sigval sigvalue;
   pid_t waiterpid;
+  sigset_t oset;
+  sigset_t set;
   int status;
 
   printf("sighand_test: Initializing semaphore to 0\n");
@@ -256,6 +260,16 @@ void sighand_test(void)
 
   /* Start waiter thread  */
 
+  sigemptyset(&set);
+  sigaddset(&set, WAKEUP_SIGNAL);
+  status = sigprocmask(SIG_BLOCK, &set, &oset);
+  if (status != OK)
+    {
+      printf("sighand_test: ERROR sigprocmask failed, status=%d\n",
+              status);
+      ASSERT(false);
+    }
+
   printf("sighand_test: Starting waiter task\n");
   status = sched_getparam (0, &param);
   if (status != OK)
@@ -265,9 +279,11 @@ void sighand_test(void)
       param.sched_priority = PTHREAD_DEFAULT_PRIORITY;
     }
 
-  waiterpid = task_create("waiter", param.sched_priority,
-                           STACKSIZE, waiter_main, NULL);
-  if (waiterpid == ERROR)
+  pthread_attr_init(&attr);
+  pthread_attr_setschedparam(&attr, &param);
+  pthread_attr_setstacksize(&attr, STACKSIZE);
+  status = pthread_create(&waiterpid, &attr, waiter_main, NULL);
+  if (status != 0)
     {
       printf("sighand_test: ERROR failed to start waiter_main\n");
       ASSERT(false);
@@ -293,7 +309,7 @@ void sighand_test(void)
     {
       printf("sighand_test: ERROR sigqueue failed\n");
       ASSERT(false);
-      task_delete(waiterpid);
+      pthread_cancel(waiterpid);
     }
 
   /* Wait a bit */
@@ -327,6 +343,7 @@ void sighand_test(void)
 #endif
 
   printf("sighand_test: done\n");
+  sigprocmask(SIG_SETMASK, &oset, NULL);
   FFLUSH();
   sem_destroy(&sem2);
   sem_destroy(&sem1);

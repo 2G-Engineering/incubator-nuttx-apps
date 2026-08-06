@@ -1,6 +1,8 @@
 /********************************************************************************************
  * apps/graphics/nxwm/src/chexcalculator.cxx
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <cstdio>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "graphics/nxwidgets/cwidgetcontrol.hxx"
 
@@ -732,7 +734,7 @@ void CHexCalculator::handleActionEvent(const NXWidgets::CWidgetEventArgs &e)
 
               if (m_result)
                 {
-                  m_accum = (uint64_t)g_keyDesc[index].value;
+                  m_accum = g_keyDesc[index].value;
                 }
 
               // Otherwise, add the new value to the accumulator.  The way
@@ -741,12 +743,12 @@ void CHexCalculator::handleActionEvent(const NXWidgets::CWidgetEventArgs &e)
               else if (m_hexMode)
                 {
                   m_accum <<= 4;
-                  m_accum |= (uint64_t)g_keyDesc[index].value;
+                  m_accum |= g_keyDesc[index].value;
                 }
               else
                 {
                   m_accum *= 10;
-                  m_accum += (uint64_t)g_keyDesc[index].value;
+                  m_accum += g_keyDesc[index].value;
                 }
               updateText();
             }

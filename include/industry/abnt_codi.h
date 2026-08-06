@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/industry/abnt_codi.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -102,7 +104,8 @@ uint8_t abnt_codi_checksum(FAR const uint8_t *data);
 
 /* Parse a specific ABNT CODI sequence. */
 
-bool abnt_codi_parse(FAR const uint8_t *data, FAR struct abnt_codi_proto_s *proto);
+bool abnt_codi_parse(FAR const uint8_t *data,
+                     FAR struct abnt_codi_proto_s *proto);
 
 #ifdef __cplusplus
 }

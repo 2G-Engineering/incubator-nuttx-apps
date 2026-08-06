@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_delarp.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -74,8 +76,7 @@ int netlib_del_arpmapping(FAR const struct sockaddr_in *inaddr,
           memset(&req.arp_ha, 0, sizeof(struct sockaddr_in));
           if (ifname != NULL)
             {
-               strlcpy((FAR char *)&req.arp_dev, ifname,
-                       sizeof(req.arp_dev));
+               strlcpy(req.arp_dev, ifname, sizeof(req.arp_dev));
             }
           else
             {

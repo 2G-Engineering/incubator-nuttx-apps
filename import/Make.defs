@@ -1,6 +1,8 @@
 ############################################################################
 # apps/import/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -70,12 +72,14 @@ ifeq ($(CONFIG_BUILD_KERNEL),y)
   ifeq ($(CONFIG_HAVE_CXX),y)
     LDLIBS += -lxx
   endif
-ifneq ($(CONFIG_LIBM),y)
+ifeq ($(CONFIG_LIBM_TOOLCHAIN),y)
   LIBM = ${shell "$(CC)" $(ARCHCPUFLAGS) --print-file-name=libm.a}
 ifneq ($(LIBM),".")
   LDLIBPATH += -L "${shell dirname $(LIBM)}"
   LDLIBS += -lm
 endif
+else ifneq ($(CONFIG_LIBM_NONE),)
+  LDLIBS += -lm
 endif
 endif
 
@@ -90,5 +94,13 @@ endif
 
 # ELF module definitions
 
-LDELFFLAGS += -r -e _start -Bstatic
+ifeq ($(CONFIG_BINFMT_ELF_RELOCATABLE),y)
+  LDELFFLAGS += -r
+endif
+LDELFFLAGS += -e _start -Bstatic
+
+# Remove other ld scripts, just use import ld scripts
+#
+LDFILE := $(filter -T %.ld, $(LDELFFLAGS))
+LDELFFLAGS := $(filter-out $(LDFILE), $(LDELFFLAGS))
 LDELFFLAGS += $(addprefix -T,$(call CONVERT_PATH,$(TOPDIR)/scripts/gnu-elf.ld))

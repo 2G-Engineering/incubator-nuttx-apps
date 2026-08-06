@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/romfs/romfs_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -392,6 +394,12 @@ static void readdirectories(const char *path, struct node_s *entry)
       snprintf(g_scratchbuffer, sizeof(g_scratchbuffer),
                "%s/%s", path, direntry->d_name);
       fullpath = strdup(g_scratchbuffer);
+      if (fullpath == NULL)
+        {
+          printf("  ERROR: Out of memory\n");
+          g_nerrors++;
+          continue;
+        }
 
       if (DIRENT_ISDIRECTORY(direntry->d_type))
         {

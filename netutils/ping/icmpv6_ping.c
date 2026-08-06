@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/ping/icmpv6_ping.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -40,6 +42,7 @@
 #endif
 
 #include <arpa/inet.h>
+#include <netinet/icmp6.h>
 
 #include <nuttx/clock.h>
 #include <nuttx/net/icmpv6.h>
@@ -167,6 +170,7 @@ void icmp6_ping(FAR const struct ping6_info_s *info)
   struct ping6_result_s result;
   struct sockaddr_in6 destaddr;
   struct sockaddr_in6 fromaddr;
+  struct icmp6_filter filter;
   struct icmpv6_echo_request_s outhdr;
   FAR struct icmpv6_echo_reply_s *inhdr;
   struct pollfd recvfd;
@@ -208,10 +212,38 @@ void icmp6_ping(FAR const struct ping6_info_s *info)
       return;
     }
 
-  sockfd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMP6);
+  sockfd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
   if (sockfd < 0)
     {
       icmp6_callback(&result, ICMPv6_E_SOCKET, errno);
+      free(iobuffer);
+      return;
+    }
+
+#ifdef CONFIG_NET_BINDTODEVICE
+  if (info->devname)
+    {
+      ret = setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE,
+                       info->devname, strlen(info->devname));
+      if (ret < 0)
+        {
+          icmp6_callback(&result, ICMPV6_E_BINDDEV, errno);
+          free(iobuffer);
+          return;
+        }
+    }
+#endif
+
+  memset(&filter, 0xff, sizeof(filter));
+
+  /* ICMPv6_ECHO_REPLY >> 5 = 4 */
+
+  filter.icmp6_filt[4] &= ~(1 << (ICMPv6_ECHO_REPLY & 31));
+  if (setsockopt(sockfd, SOL_ICMPV6, ICMP6_FILTER, &filter,
+                 sizeof(filter)) < 0)
+    {
+      icmp6_callback(&result, ICMPv6_E_SOCKET, errno);
+      close(sockfd);
       free(iobuffer);
       return;
     }

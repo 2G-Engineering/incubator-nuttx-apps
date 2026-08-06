@@ -1,16 +1,13 @@
 /****************************************************************************
  * apps/netutils/webclient/webclient.c
- * Implementation of the HTTP client.
  *
- *   Copyright (C) 2007, 2009, 2011-2012, 2014, 2020 Gregory Nutt.
- *   All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Based on uIP which also has a BSD style license:
- *
- *   Author: Adam Dunkels <adam@dunkels.com>
- *   Copyright (c) 2002, Adam Dunkels.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2014, 2020 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2011-2012 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2007, 2009 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2002 Adam Dunkels. All rights reserved.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@dunkels.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +48,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -133,11 +130,11 @@
 #define CONN_WANT_WRITE WEBCLIENT_POLL_INFO_WANT_WRITE
 
 #ifdef CONFIG_DEBUG_ASSERTIONS
-#define	_CHECK_STATE(ctx, s)	DEBUGASSERT((ctx)->state == (s))
-#define	_SET_STATE(ctx, s)		ctx->state = (s)
+#define _CHECK_STATE(ctx, s) DEBUGASSERT((ctx)->state == (s))
+#define _SET_STATE(ctx, s)   ctx->state = (s)
 #else
-#define	_CHECK_STATE(ctx, s)	do {} while (0)
-#define	_SET_STATE(ctx, s)		do {} while (0)
+#define _CHECK_STATE(ctx, s) do {} while (0)
+#define _SET_STATE(ctx, s)   do {} while (0)
 #endif
 
 /****************************************************************************
@@ -166,9 +163,9 @@ enum webclient_state_e
 
 /* flags for wget_s::internal_flags */
 
-#define	WGET_FLAG_GOT_CONTENT_LENGTH 1U
-#define	WGET_FLAG_CHUNKED            2U
-#define	WGET_FLAG_GOT_LOCATION       4U
+#define WGET_FLAG_GOT_CONTENT_LENGTH 1U
+#define WGET_FLAG_CHUNKED            2U
+#define WGET_FLAG_GOT_LOCATION       4U
 
 struct wget_target_s
 {
@@ -428,7 +425,9 @@ static inline int wget_parsestatus(struct webclient_context *ctx,
               DEBUGASSERT(strlen(g_http10) == 8);
               DEBUGASSERT(strlen(g_http11) == 8);
 
-              if (ws->line[8] != ' ')  /* SP before the status-code */
+              /* SP before the status-code */
+
+              if (ws->line[8] != ' ')
                 {
                   return -EINVAL;
                 }
@@ -443,7 +442,9 @@ static inline int wget_parsestatus(struct webclient_context *ctx,
                   return -EINVAL;
                 }
 
-              if (*ep != ' ')  /* SP before reason-phrase */
+              /* SP before reason-phrase */
+
+              if (*ep != ' ')
                 {
                   return -EINVAL;
                 }
@@ -598,7 +599,10 @@ static inline int wget_parseheaders(struct webclient_context *ctx,
            */
 
           found = false;
-          if (ndx > 0) /* Should always be true */
+
+          /* Should always be true */
+
+          if (ndx > 0)
             {
               ninfo("Got HTTP header line%s: %.*s\n",
                     got_nl ? "" : " (truncated)",
@@ -817,7 +821,9 @@ static inline int wget_parsechunkheader(struct webclient_context *ctx,
            * our buffer is already full, so we start parsing it.
            */
 
-          if (ndx > 0) /* Should always be true */
+          /* Should always be true */
+
+          if (ndx > 0)
             {
               FAR char *semicolon;
 
@@ -851,7 +857,7 @@ static inline int wget_parsechunkheader(struct webclient_context *ctx,
               if (semicolon != NULL)
                 {
                   found_extension = true;
-                  ninfo("Ignoring extentions in chunk header\n");
+                  ninfo("Ignoring extensions in chunk header\n");
                   *semicolon = 0;
                 }
             }
@@ -1596,9 +1602,8 @@ int webclient_perform(FAR struct webclient_context *ctx)
                       /* Could not resolve host (or malformed IP address) */
 
                       nwarn("WARNING: Failed to resolve hostname\n");
-                      free_ws(ws);
-                      _SET_STATE(ctx, WEBCLIENT_CONTEXT_STATE_DONE);
-                      return -EHOSTUNREACH;
+                      ret = -EHOSTUNREACH;
+                      goto errout_with_errno;
                     }
 
                   server_address = (const struct sockaddr *)&server_in;

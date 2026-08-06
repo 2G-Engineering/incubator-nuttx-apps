@@ -1,6 +1,8 @@
 ############################################################################
 # apps/crypto/mbedtls/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -35,10 +37,30 @@ UNPACK ?= unzip -q -o
 MBEDTLS_UNPACKLIBDIR = $(MBEDTLS_UNPACKNAME)$(DELIM)library
 MBEDTLS_UNPACKPROGDIR = $(MBEDTLS_UNPACKNAME)$(DELIM)programs
 
-# This lets Mbed TLS better use some of the POSIX features we have
-CFLAGS += ${DEFINE_PREFIX}__unix__
+MBEDTLS_FRAMEWORK_URL ?= "https://github.com/Mbed-TLS/mbedtls-framework/archive"
 
-library/bignum.c_CFLAGS += -fno-lto
+MBEDTLS_FRAMEWORK_VERSION = df3307f2b4fe512def60886024f7be8fd1523ccd
+MBEDTLS_FRAMEWORK_ZIP = $(MBEDTLS_FRAMEWORK_VERSION).zip
+
+MBEDTLS_FRAMEWORK_UNPACKNAME = mbedtls-framework
+
+# This lets Mbed TLS better use some of the POSIX features we have
+CFLAGS += ${DEFINE_PREFIX}unix
+
+mbedtls/library/bignum.c_CFLAGS += -fno-lto
+mbedtls/library/ctr_drbg.c_CFLAGS += -Wno-array-bounds
+
+# Build break on Assemble compiler if -fno-omit-frame-pointer and -O3 enabled at same time
+# {standard input}: Assembler messages:
+# {standard input}:2560: Error: branch out of range
+# make[2]: *** [apps/Application.mk:170: mbedtls/library/sha256.o] Error 1
+
+ifeq ($(CONFIG_FRAME_POINTER),y)
+  ifeq ($(CONFIG_DEBUG_OPTLEVEL),"-O3")
+    mbedtls/library/sha256.c_CFLAGS += -O2
+    mbedtls/library/cmac.c_CFLAGS += -O2
+  endif
+endif
 
 ifeq ($(CONFIG_ARCH_SIM),y)
   CFLAGS += -O0
@@ -50,11 +72,23 @@ $(MBEDTLS_ZIP):
 	@echo "Downloading: $(MBEDTLS_URL)/$(MBEDTLS_ZIP)"
 	$(Q) curl -O -L $(MBEDTLS_URL)/$(MBEDTLS_ZIP)
 
+$(MBEDTLS_FRAMEWORK_ZIP):
+	@echo "Downloading: $(MBEDTLS_FRAMEWORK_URL)/$(MBEDTLS_FRAMEWORK_ZIP)"
+	$(Q) curl -O -L $(MBEDTLS_FRAMEWORK_URL)/$(MBEDTLS_FRAMEWORK_ZIP)
+
 $(MBEDTLS_UNPACKNAME): $(MBEDTLS_ZIP)
 	@echo "Unpacking: $(MBEDTLS_ZIP) -> $(MBEDTLS_UNPACKNAME)"
 	$(Q) $(UNPACK) $(MBEDTLS_ZIP)
 	$(Q) mv	mbedtls-$(MBEDTLS_VERSION) $(MBEDTLS_UNPACKNAME)
+	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0001-mbedtls-entropy_poll-use-getrandom-to-get-the-system.patch
+	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0002-mbedtls-add-mbedtls-x509-crt-pool.patch
+	$(Q) patch -p1 -d $(MBEDTLS_UNPACKNAME) < 0003-Fix-MBEDTLS_SSL_DTLS_CONNECTION_ID_COMPAT-warning.patch
 	$(Q) touch $(MBEDTLS_UNPACKNAME)
+
+$(MBEDTLS_FRAMEWORK_UNPACKNAME): $(MBEDTLS_FRAMEWORK_ZIP)
+	@echo "Unpacking: $(MBEDTLS_ZIP) -> $(MBEDTLS_FRAMEWORK_UNPACKNAME)"
+	$(Q) $(UNPACK) $(MBEDTLS_FRAMEWORK_ZIP)
+	$(Q) mv	mbedtls-framework-$(MBEDTLS_FRAMEWORK_VERSION) $(MBEDTLS_FRAMEWORK_UNPACKNAME)
 
 # Download and unpack tarball if no git repo found
 ifeq ($(wildcard $(MBEDTLS_UNPACKNAME)/.git),)
@@ -87,6 +121,81 @@ PRIORITY  += $(CONFIG_MBEDTLS_APP_SELFTEST_PRIORITY)
 STACKSIZE += $(CONFIG_MBEDTLS_APP_SELFTEST_STACKSIZE)
 
 MAINSRC += $(MBEDTLS_UNPACKPROGDIR)/test/selftest.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_APP_SSL_CLIENT2),y)
+
+PROGNAME  += $(CONFIG_MBEDTLS_APP_SSL_CLIENT2_PROGNAME)
+PRIORITY  += $(CONFIG_MBEDTLS_APP_SSL_CLIENT2_PRIORITY)
+STACKSIZE += $(CONFIG_MBEDTLS_APP_SSL_CLIENT2_STACKSIZE)
+
+MAINSRC += $(MBEDTLS_UNPACKPROGDIR)/ssl/ssl_client2.c
+CSRCS += $(MBEDTLS_UNPACKPROGDIR)/ssl/ssl_test_lib.c
+CSRCS += $(MBEDTLS_UNPACKPROGDIR)/test/query_config.c
+CSRCS += $(MBEDTLS_UNPACKNAME)/tests/src/certs.c
+CSRCS += $(MBEDTLS_FRAMEWORK_UNPACKNAME)/tests/src/helpers.c
+CSRCS += $(MBEDTLS_FRAMEWORK_UNPACKNAME)/tests/src/psa_crypto_helpers.c
+CFLAGS += ${INCDIR_PREFIX}$(MBEDTLS_UNPACKLIBDIR)
+CFLAGS += ${INCDIR_PREFIX}$(MBEDTLS_UNPACKNAME)/tests/include
+CFLAGS += ${INCDIR_PREFIX}$(MBEDTLS_FRAMEWORK_UNPACKNAME)/tests/include
+CFLAGS += ${INCDIR_PREFIX}$(MBEDTLS_FRAMEWORK_UNPACKNAME)/tests/programs
+endif
+
+# Download and unpack tarball if no git repo found
+ifeq ($(wildcard $(MBEDTLS_FRAMEWORK_UNPACKNAME)/.git),)
+context:: $(MBEDTLS_FRAMEWORK_UNPACKNAME)
+
+distclean::
+	$(call DELDIR, $(MBEDTLS_FRAMEWORK_UNPACKNAME))
+	$(call DELFILE, $(MBEDTLS_FRAMEWORK_ZIP))
+endif
+
+endif
+
+# Configuration alternative implementation
+
+ifneq ($(CONFIG_MBEDTLS_ENTROPY_HARDWARE_ALT)$(CONFIG_MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG),)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/entropy_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_ALT),y)
+
+CSRCS += $(APPDIR)/crypto/mbedtls/source/dev_alt.c
+
+ifeq ($(CONFIG_MBEDTLS_AES_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/aes_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_CMAC_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/cmac_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_MD5_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/md5_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_POLY1305_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/poly1305_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_RIPEMD160_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/ripemd160_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_SHA1_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/sha1_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_SHA256_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/sha256_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_SHA512_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/sha512_alt.c
+endif
+
+ifeq ($(CONFIG_MBEDTLS_BIGNUM_ALT),y)
+CSRCS += $(APPDIR)/crypto/mbedtls/source/bignum_alt.c
 endif
 
 endif

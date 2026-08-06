@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/trace/trace.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,16 +43,6 @@ extern "C"
  * Public Types
  ****************************************************************************/
 
-typedef enum
-{
-  TRACE_TYPE_LTTNG_KERNEL = 0,  /* Common Trace Format : Linux Kernel Trace */
-  TRACE_TYPE_GENERIC_CTF  = 1,  /* Common Trace Format : Generic CTF Trace */
-  TRACE_TYPE_LTTNG_UST    = 2,  /* Common Trace Format : LTTng UST Trace */
-  TRACE_TYPE_CUSTOM_TEXT  = 3,  /* Custom Text :         TmfGeneric */
-  TRACE_TYPE_CUSTOM_XML   = 4,  /* Custom XML :          Custom XML Log */
-  TRACE_TYPE_ANDROID      = 5,  /* Custom Format :       Android ATrace */
-} trace_dump_t;
-
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -65,7 +57,7 @@ typedef enum
  *
  ****************************************************************************/
 
-int trace_dump(trace_dump_t type, FAR FILE *out);
+int trace_dump(FAR FILE *out, bool binary);
 
 /****************************************************************************
  * Name: trace_dump_clear

@@ -1,14 +1,12 @@
 /****************************************************************************
  * apps/netutils/thttpd/thttpd.c
- * Tiny HTTP Server
  *
- *   Copyright (C) 2009, 2011 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Derived from the file of the same name in the original THTTPD package:
- *
- *   Copyright (C) 1995,1998,1999,2000,2001 by
- *   Jef Poskanzer <jef@mail.acme.com>. All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ * SPDX-FileCopyrightText: 2009, 2011 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2000, 2001 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1998, 1999 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1995 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,12 +50,11 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <arpa/inet.h>
 
 #include <nuttx/compiler.h>
-#include <nuttx/symtab.h>
 #include "netutils/thttpd.h"
 
 #include "config.h"
@@ -97,8 +94,8 @@ struct connect_s
   int conn_state;
   httpd_conn *hc;
   time_t active_at;
-  Timer *wakeup_timer;
-  Timer *linger_timer;
+  timer *wakeup_timer;
+  timer *linger_timer;
   off_t end_offset;            /* The final offset+1 of the file to send */
   off_t offset;                /* The current offset into the file to send */
   bool eof;                    /* Set true when length==0 read from file */
@@ -129,10 +126,10 @@ static void handle_linger(struct connect_s *conn, struct timeval *tv);
 static void finish_connection(struct connect_s *conn, struct timeval *tv);
 static void clear_connection(struct connect_s *conn, struct timeval *tv);
 static void really_clear_connection(struct connect_s *conn);
-static void idle(ClientData client_data, struct timeval *nowp);
-static void linger_clear_connection(ClientData client_data,
+static void idle(clientdata client_data, struct timeval *nowp);
+static void linger_clear_connection(clientdata client_data,
                                     struct timeval *nowp);
-static void occasional(ClientData client_data, struct timeval *nowp);
+static void occasional(clientdata client_data, struct timeval *nowp);
 
 /****************************************************************************
  * Private Functions
@@ -474,7 +471,7 @@ static void handle_send(struct connect_s *conn, struct timeval *tv)
 
           /* And update how much of the file we wrote */
 
-          conn->offset         += nwritten;
+          conn->offset         += nread;
           conn->hc->bytes_sent += nwritten;
           ninfo("Wrote %d bytes\n", nwritten);
         }
@@ -525,7 +522,7 @@ static void finish_connection(struct connect_s *conn, struct timeval *tv)
 
 static void clear_connection(struct connect_s *conn, struct timeval *tv)
 {
-  ClientData client_data;
+  clientdata client_data;
 
   if (conn->wakeup_timer != NULL)
     {
@@ -595,7 +592,7 @@ static void really_clear_connection(struct connect_s *conn)
   free_connections  = conn;
 }
 
-static void idle(ClientData client_data, struct timeval *nowp)
+static void idle(clientdata client_data, struct timeval *nowp)
 {
   int cnum;
   struct connect_s *conn;
@@ -630,7 +627,7 @@ static void idle(ClientData client_data, struct timeval *nowp)
     }
 }
 
-static void linger_clear_connection(ClientData client_data,
+static void linger_clear_connection(clientdata client_data,
                                     struct timeval *nowp)
 {
   struct connect_s *conn;
@@ -641,7 +638,7 @@ static void linger_clear_connection(ClientData client_data,
   really_clear_connection(conn);
 }
 
-static void occasional(ClientData client_data, struct timeval *nowp)
+static void occasional(clientdata client_data, struct timeval *nowp)
 {
   tmr_cleanup();
 }
@@ -728,7 +725,7 @@ int thttpd_main(int argc, char **argv)
 
   /* Set up the occasional timer */
 
-  if (tmr_create(NULL, occasional, JunkClientData,
+  if (tmr_create(NULL, occasional, junkclientdata,
       CONFIG_THTTPD_OCCASIONAL_MSEC * 1000L, 1) == NULL)
     {
       nerr("ERROR: tmr_create(occasional) failed\n");
@@ -737,7 +734,7 @@ int thttpd_main(int argc, char **argv)
 
   /* Set up the idle timer */
 
-  if (tmr_create(NULL, idle, JunkClientData, 5 * 1000L, 1) == NULL)
+  if (tmr_create(NULL, idle, junkclientdata, 5 * 1000L, 1) == NULL)
     {
       nerr("ERROR: tmr_create(idle) failed\n");
       exit(1);

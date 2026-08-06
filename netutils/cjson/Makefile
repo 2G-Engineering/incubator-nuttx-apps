@@ -1,6 +1,8 @@
 #############################################################################
 # apps/netutils/cjson/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -26,13 +28,13 @@ include $(APPDIR)/Make.defs
 
 WD := ${shell echo $(CURDIR) | sed -e 's/ /\\ /g'}
 
-CONFIG_NETUTILS_CJSON_URL ?= "https://github.com/DaveGamble/cJSON/archive"
+CONFIG_NETUTILS_CJSON_URL ?= "https://github.com/DaveGamble/cJSON/archive/refs/tags"
 CONFIG_NETUTILS_CJSON_VERSION ?= "1.7.10"
 CJSON_VERSION = $(patsubst "%",%,$(strip $(CONFIG_NETUTILS_CJSON_VERSION)))
 
 CJSON_TARBALL = v$(CJSON_VERSION).tar.gz
-
 CJSON_UNPACKNAME = cJSON
+
 UNPACK ?= tar -zxf
 
 CJSON_UNPACKDIR =  $(WD)/$(CJSON_UNPACKNAME)
@@ -74,9 +76,10 @@ MAINSRC += $(UNITY_CJSONTESTCS)
 
 CSRCS += $(CJSON_SRCDIR)/tests/unity_setup.c
 CFLAGS += -Wno-unused-function
+CFLAGS += -DCJSON_NESTING_LIMIT=CONFIG_CJSON_NESTING_LIMIT
 
-PRIORITY  = SCHED_PRIORITY_DEFAULT
-STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
+PRIORITY  = $(CONFIG_CJSON_TEST_PRIORITY)
+STACKSIZE = $(CONFIG_CJSON_TEST_STACKSIZE)
 endif
 
 $(CJSON_SRCDIR)$(DELIM)cJSON.h: $(CJSON_UNPACKNAME)

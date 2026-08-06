@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/touchscreen/tc_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,7 +33,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #ifdef CONFIG_EXAMPLES_TOUCHSCREEN_MOUSE
 #  include <nuttx/input/mouse.h>
@@ -126,7 +128,7 @@ int main(int argc, FAR char *argv[])
 
       iinfo("Reading...\n");
       nbytes = read(fd, &sample, sizeof(struct mouse_report_s));
-      iinfo("Bytes read: %d\n", nbytes);
+      iinfo("Bytes read: %zd\n", nbytes);
 
       /* Handle unexpected return values */
 
@@ -145,7 +147,7 @@ int main(int argc, FAR char *argv[])
         }
       else if (nbytes != sizeof(struct mouse_report_s))
         {
-          printf("tc_main: Unexpected read size=%d, expected=%d, Ignoring\n",
+          printf("tc_main: Unexpected read size=%zd,expected=%zd,Ignoring\n",
                  nbytes, sizeof(struct mouse_report_s));
         }
 

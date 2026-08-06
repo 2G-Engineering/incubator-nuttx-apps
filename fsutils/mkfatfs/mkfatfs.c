@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/fsutils/mkfatfs/mkfatfs.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,7 +31,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <unistd.h>
 
@@ -90,7 +92,7 @@ static uint32_t fat_systime2fattime(void)
     {
       /* Break done the seconds in date and time units */
 
-      if (gmtime_r((FAR const time_t *)&ts.tv_sec, &tm) != NULL)
+      if (gmtime_r(&ts.tv_sec, &tm) != NULL)
         {
           /* FAT can only represent dates since 1980.  struct tm can
            * represent dates since 1900.

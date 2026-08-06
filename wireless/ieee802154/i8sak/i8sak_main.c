@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/ieee802154/i8sak/i8sak_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -44,6 +46,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <arpa/inet.h>
 
 #include <nuttx/queue.h>
@@ -94,6 +97,7 @@ static const struct i8sak_command_s g_i8sak_commands[] =
   {"get",         (CODE void *)i8sak_get_cmd},
   {"poll",        (CODE void *)i8sak_poll_cmd},
   {"regdump",     (CODE void *)i8sak_regdump_cmd},
+  {"tracedump",   (CODE void *)i8sak_tracedump_cmd},
   {"reset",       (CODE void *)i8sak_reset_cmd},
   {"scan",        (CODE void *)i8sak_scan_cmd},
   {"set",         (CODE void *)i8sak_set_cmd},
@@ -101,8 +105,6 @@ static const struct i8sak_command_s g_i8sak_commands[] =
   {"startpan",    (CODE void *)i8sak_startpan_cmd},
   {"tx",          (CODE void *)i8sak_tx_cmd},
 };
-
-#define NCOMMANDS (sizeof(g_i8sak_commands) / sizeof(struct i8sak_command_s))
 
 static sq_queue_t g_i8sak_free;
 static sq_queue_t g_i8sak_instances;
@@ -119,6 +121,41 @@ static int i8sak_setup(FAR struct i8sak_s *i8sak, FAR const char *ifname);
 static int i8sak_daemon(int argc, FAR char *argv[]);
 static int i8sak_showusage(FAR const char *progname, int exitcode);
 static void i8sak_switch_instance(FAR char *ifname);
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+#if defined(CONFIG_BUILD_PROTECTED) || defined(CONFIG_BUILD_KERNEL) || \
+    !defined(CONFIG_IEEE802154_MAC)
+FAR const char *g_ieee802154_status_string[] =
+{
+  "Success",
+  "Out of capacity",
+  "Denied",
+  "Failure",
+  "Beacon loss",
+  "Channel access failure",
+  "Disable TRX failure",
+  "Failed security check",
+  "Frame too long",
+  "Invalid GTS",
+  "Invalid handle",
+  "Invalid parameter",
+  "No ack",
+  "No beacon",
+  "No data",
+  "No short address",
+  "PAN ID conflict",
+  "Realignment",
+  "Transaction expired",
+  "Transaction overflow",
+  "Tx active",
+  "Unavailable key",
+  "Unsupported attribute",
+  "Limit reached",
+};
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -811,6 +848,7 @@ static int i8sak_showusage(FAR const char *progname, int exitcode)
           "    get [-h] parameter\n"
           "    poll [-h]\n"
           "    regdump [-h]\n"
+          "    tracedump [-h]\n"
           "    reset [-h]\n"
           "    scan [-h|p|a|e] minch-maxch\n"
           "    set [-h] param val\n"
@@ -893,7 +931,7 @@ int main(int argc, FAR char *argv[])
   /* Find the command in the g_i8sak_command[] list */
 
   i8sakcmd = NULL;
-  for (i = 0; i < NCOMMANDS; i++)
+  for (i = 0; i < nitems(g_i8sak_commands); i++)
     {
       FAR const struct i8sak_command_s *cmd = &g_i8sak_commands[i];
       if (strcmp(argv[argind], cmd->name) == 0)

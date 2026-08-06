@@ -1,6 +1,8 @@
 ############################################################################
 # apps/graphics/libyuv/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -23,14 +25,16 @@ include $(APPDIR)/Make.defs
 SRCDIR = libyuv
 
 CXXEXT := .cc
-CXXFLAGS += -Wno-shadow
+CXXFLAGS += -Wno-shadow -Wno-undef
 CXXSRCS = $(wildcard $(SRCDIR)/source/*.cc)
 
 libyuv.tar.gz:
-	$(Q) curl -L https://chromium.googlesource.com/libyuv/libyuv/+archive/refs/heads/$(CONFIG_LIBYUV_BRANCH).tar.gz -o libyuv.tar.gz
+	$(Q) curl -L https://github.com/NuttX/nuttx/releases/download/libyuv/libyuv-refs_heads_$(CONFIG_LIBYUV_BRANCH).tar.gz -o libyuv.tar.gz
 	$(Q) mkdir -p $(SRCDIR)
 	$(Q) tar zxf libyuv.tar.gz --directory $(SRCDIR)
+ifeq ($(CONFIG_LIBYUV_BRANCH),"stable")
 	$(Q) patch -p0 < 0001-include-libyuv-fix-strict-prototype-warning.patch
+endif
 
 # Download and unpack tarball if no git repo found
 ifeq ($(wildcard libyuv/.git),)

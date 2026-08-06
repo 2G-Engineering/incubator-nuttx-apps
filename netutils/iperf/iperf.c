@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/iperf/iperf.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -46,7 +48,7 @@
 #define IPERF_TRAFFIC_TASK_PRIORITY  100
 #define IPERF_TRAFFIC_TASK_STACK     4096
 #define IPERF_REPORT_TASK_NAME       "iperf_report"
-#define IPERF_REPORT_TASK_PRIORITY   100
+#define IPERF_REPORT_TASK_PRIORITY   101
 #define IPERF_REPORT_TASK_STACK      4096
 
 #define IPERF_UDP_TX_LEN             (1472)
@@ -218,6 +220,7 @@ static void iperf_print_addr(FAR const char *str, FAR struct sockaddr *addr)
 {
   switch (addr->sa_family)
     {
+#ifdef CONFIG_NET_IPv4
       case AF_INET:
         {
           FAR struct sockaddr_in *inaddr = (FAR struct sockaddr_in *)addr;
@@ -225,6 +228,7 @@ static void iperf_print_addr(FAR const char *str, FAR struct sockaddr *addr)
                  inet_ntoa(inaddr->sin_addr), htons(inaddr->sin_port));
           return;
         }
+#endif
 
       case AF_LOCAL:
         {
@@ -323,8 +327,8 @@ static void iperf_report_task(FAR void *arg)
              ts_diff(&last, &start),
              ts_diff(&now, &start),
              now_len -last_len,
-             ((double)((now_len - last_len) * 8) / 1000000) /
-             (double)ts_diff(&now, &last)
+             (((now_len - last_len) * 8) / 1000000.0) /
+             ts_diff(&now, &last)
              );
       if (time != 0 && ts_diff(&now, &start) >= time)
         {
@@ -338,8 +342,8 @@ static void iperf_report_task(FAR void *arg)
              ts_diff(&start, &start),
              ts_diff(&now, &start),
              now_len,
-             ((double)(now_len * 8) / 1000000) /
-             (double)ts_diff(&now, &start)
+             ((now_len * 8) / 1000000.0) /
+             ts_diff(&now, &start)
              );
     }
 
@@ -520,7 +524,7 @@ static int iperf_tcp_server(FAR struct iperf_ctrl_t *ctrl,
     {
       /* TODO need to change to non-block mode */
 
-      sockfd = accept(listen_socket, remote_addr, &addrlen);
+      sockfd = accept4(listen_socket, remote_addr, &addrlen, SOCK_CLOEXEC);
       if (sockfd < 0)
         {
           iperf_show_socket_error_reason("tcp server listen", listen_socket);

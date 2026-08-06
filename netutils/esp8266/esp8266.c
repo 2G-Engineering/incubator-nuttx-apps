@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/esp8266/esp8266.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -37,11 +39,12 @@
 #include <termios.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <unistd.h>
 
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <nuttx/net/ip.h>
 
 #include "netutils/esp8266.h"
 
@@ -54,15 +57,15 @@
 #define NETAPP_IPCONFIG_MAC_OFFSET     (20)
 
 #ifndef CONFIG_NETUTILS_ESP8266_MAXTXLEN
-#   define CONFIG_NETUTILS_ESP8266_MAXTXLEN  256
+#  define CONFIG_NETUTILS_ESP8266_MAXTXLEN  256
 #endif
 
 #ifndef CONFIG_NETUTILS_ESP8266_MAXRXLEN
-#   define CONFIG_NETUTILS_ESP8266_MAXRXLEN  256
+#  define CONFIG_NETUTILS_ESP8266_MAXRXLEN  256
 #endif
 
 #if (CONFIG_NETUTILS_ESP8266_MAXRXLEN < CONFIG_NETUTILS_ESP8266_WORKER_BUF_LEN)
-#   error "CONFIG_NETUTILS_ESP8266_WORKER_BUF_LEN would be bigger than CONFIG_NETUTILS_ESP8266_MAXRXLEN"
+#  error "CONFIG_NETUTILS_ESP8266_WORKER_BUF_LEN would be bigger than CONFIG_NETUTILS_ESP8266_MAXRXLEN"
 #endif
 
 #define BUF_CMD_LEN     CONFIG_NETUTILS_ESP8266_MAXTXLEN
@@ -312,7 +315,7 @@ static lesp_socket_t *get_sock(int sockfd)
   if (((unsigned int)sockfd) >= SOCKET_NBR)
     {
       errno = EINVAL;
-      ninfo("Esp8266 invalid sockfd\n", sockfd);
+      ninfo("Esp8266 invalid sockfd %d\n", sockfd);
       return NULL;
     }
 
@@ -1120,6 +1123,7 @@ static int lesp_parse_cwjap_ans_line(char *ptr, lesp_ap_t *ap)
  *    "FreeWifi" => ssid
  *    -90 => rssi
  *    "00:07:cb:07:b6:00" => mac
+ *    1 => channel
  *
  *   Note: Content of ptr is modified and string in ap point into ptr string.
  *
@@ -1215,6 +1219,14 @@ static int lesp_parse_cwlap_ans_line(char *ptr, lesp_ap_t *ap)
                           ptr++;
                         }
                     }
+                }
+              break;
+
+          case 5:
+                {
+                  int i = atoi(ptr);
+
+                  ap->channel = i;
                 }
               break;
         }
@@ -1520,6 +1532,70 @@ int lesp_initialize(void)
 }
 
 /****************************************************************************
+ * Name: lesp_finalize
+ *
+ * Description:
+ *   finalize Esp8266 class.
+ *      - destroy worker thread
+ *      - close port
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   0 on success, -1 in case of error.
+ *
+ ****************************************************************************/
+
+int lesp_finalize(void)
+{
+  int i;
+
+  ninfo("Finalizing Esp8266...\n");
+
+  pthread_mutex_lock(&g_lesp_state.mutex);
+
+  if (!g_lesp_state.is_initialized)
+    {
+      pthread_mutex_unlock(&g_lesp_state.mutex);
+      ninfo("Esp8266 already finalized\n");
+      return 0;
+    }
+
+  pthread_mutex_lock(&g_lesp_state.worker.mutex);
+
+  for (i = 0; i < SOCKET_NBR; i++)
+    {
+      if ((g_lesp_state.sockets[i].flags & FLAGS_SOCK_USED) != 0)
+        {
+          nerr("ERROR: Exist opened socket\n");
+          pthread_mutex_unlock(&g_lesp_state.worker.mutex);
+          pthread_mutex_unlock(&g_lesp_state.mutex);
+          return -1;
+        }
+    }
+
+  /* Destroy worker thread */
+
+  g_lesp_state.worker.running = false;
+  pthread_kill(g_lesp_state.worker.thread, SIGTERM);
+  pthread_join(g_lesp_state.worker.thread, NULL);
+
+  if (g_lesp_state.fd > 0)
+    {
+       close(g_lesp_state.fd);
+       g_lesp_state.fd = -1;
+    }
+
+  g_lesp_state.is_initialized = false;
+
+  pthread_mutex_unlock(&g_lesp_state.worker.mutex);
+  pthread_mutex_unlock(&g_lesp_state.mutex);
+
+  return 0;
+}
+
+/****************************************************************************
  * Name: lesp_soft_reset
  *
  * Description:
@@ -1768,7 +1844,7 @@ int lesp_get_net(lesp_mode_t mode, in_addr_t *ip,
     {
       ninfo("Read:%s\n", g_lesp_state.bufans);
 
-      ret = lesp_parse_cipxxx_ans_line(g_lesp_state.bufans, mask);
+      ret = lesp_parse_cipxxx_ans_line(g_lesp_state.bufans, gw);
       if (ret < 0)
         {
           nerr("ERROR: Line badly formed.\n");
@@ -1836,19 +1912,15 @@ int lesp_set_net(lesp_mode_t mode, in_addr_t ip,
 
   if (ret >= 0)
     {
-      ret = lesp_ask_ans_ok(LESP_TIMEOUT_MS, "AT+CIP%s_CUR=\"%d.%d.%d.%d\","
-                            "\"%d.%d.%d.%d\",\"%d.%d.%d.%d\"\r\n",
+      ret = lesp_ask_ans_ok(LESP_TIMEOUT_MS, "AT+CIP%s_CUR=\"%u.%u.%u.%u\","
+                            "\"%u.%u.%u.%u\",\"%u.%u.%u.%u\"\r\n",
                             (mode == LESP_MODE_STATION) ? "STA" : "AP",
-                            *((uint8_t *)&(ip)+0), *((uint8_t *)&(ip)+1),
-                            *((uint8_t *)&(ip)+2), *((uint8_t *)&(ip)+3),
-                            *((uint8_t *)&(gateway)+0),
-                            *((uint8_t *)&(gateway)+1),
-                            *((uint8_t *)&(gateway)+2),
-                            *((uint8_t *)&(gateway)+3),
-                            *((uint8_t *)&(mask)+0),
-                            *((uint8_t *)&(mask)+1),
-                            *((uint8_t *)&(mask)+2),
-                            *((uint8_t *)&(mask)+3));
+                            ip4_addr1(ip), ip4_addr2(ip),
+                            ip4_addr3(ip), ip4_addr4(ip),
+                            ip4_addr1(gateway), ip4_addr2(gateway),
+                            ip4_addr3(gateway), ip4_addr4(gateway),
+                            ip4_addr1(mask), ip4_addr2(mask),
+                            ip4_addr3(mask), ip4_addr4(mask));
     }
 
   pthread_mutex_unlock(&g_lesp_state.mutex);
@@ -2180,7 +2252,7 @@ int lesp_socket(int domain, int type, int protocol)
  *   close socket creates with lesp_socket.
  *
  * Input Parameters:
- *   sockfd   : socket indentifer.
+ *   sockfd    Socket descriptor returned by socket()
  *
  * Returned Value:
  *   A 0 on success; -1 on error.
@@ -2284,7 +2356,7 @@ int lesp_connect(int sockfd, FAR const struct sockaddr *addr,
                  socklen_t addrlen)
 {
   int ret = 0;
-  const char *proto_str;
+  const char *proto_str = "";
   lesp_socket_t *sock;
   struct sockaddr_in *in;
   unsigned short port;
@@ -2337,9 +2409,9 @@ int lesp_connect(int sockfd, FAR const struct sockaddr *addr,
   if (ret >= 0)
     {
       ret = lesp_ask_ans_ok(LESP_TIMEOUT_MS, "AT+CIPSTART=%d,\"%s\","
-                            "\"%d.%d.%d.%d\",%d\r\n", sockfd, proto_str,
-                            *((uint8_t *)&ip + 0), *((uint8_t *)&ip +1),
-                            *((uint8_t *)&ip + 2), *((uint8_t *)&ip + 3),
+                            "\"%u.%u.%u.%u\",%d\r\n", sockfd, proto_str,
+                            ip4_addr1(ip), ip4_addr2(ip),
+                            ip4_addr3(ip), ip4_addr4(ip),
                             port);
       if (ret < 0)
         {

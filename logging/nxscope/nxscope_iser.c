@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/logging/nxscope/nxscope_iser.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,7 @@
 
 #include <nuttx/config.h>
 
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +36,7 @@
 #include <logging/nxscope/nxscope.h>
 
 /****************************************************************************
- * Private Type Definition
+ * Private Types
  ****************************************************************************/
 
 struct nxscope_intf_ser_s
@@ -207,15 +209,16 @@ int nxscope_ser_init(FAR struct nxscope_intf_s *intf,
   tcgetattr(priv->fd, &tio);
 
 #ifdef CONFIG_SERIAL_TERMIOS
-  /* Configure a baud rate */
-
-  DEBUGASSERT(priv->cfg->baud > 0);
-
-  ret = cfsetspeed(&tio, priv->cfg->baud);
-  if (ret < 0)
+  if (priv->cfg->baud > 0)
     {
-      _err("ERROR: failed to set baud rate %d\n", errno);
-      goto errout;
+      /* Configure a baud rate */
+
+      ret = cfsetspeed(&tio, priv->cfg->baud);
+      if (ret < 0)
+        {
+          _err("ERROR: failed to set baud rate %d\n", errno);
+          goto errout;
+        }
     }
 #endif
 

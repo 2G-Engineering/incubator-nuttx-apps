@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/industry/foc/float/foc_ang_openloop.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -259,9 +261,11 @@ static int foc_angle_ol_run_f32(FAR foc_angle_f32_t *h,
   DEBUGASSERT(h->data);
   ol = h->data;
 
-  /* Update open-loop */
+  /* Update open-loop.
+   * NOTE: we don't use dir argument here, instead we use signed velocity.
+   */
 
-  motor_openloop(&ol->data, in->vel, in->dir);
+  motor_openloop(&ol->data, in->vel, 1.0f);
 
   /* Get open-loop angle */
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/sensor/pm1p0.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,20 +31,11 @@
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_UORB
-static void print_sensor_pm1p0_message(FAR const struct orb_metadata *meta,
-                                       FAR const void *buffer)
-{
-  FAR const struct sensor_pm1p0 *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
-               "pm1p0: %.4f", meta->o_name, message->timestamp,
-               now - message->timestamp, message->pm1p0);
-}
+static const char sensor_pm1p0_format[] = "timestamp:%" PRIu64 ",pm1p0:%hf";
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ORB_DEFINE(sensor_pm1p0, struct sensor_pm1p0, print_sensor_pm1p0_message);
+ORB_DEFINE(sensor_pm1p0, struct sensor_pm1p0, sensor_pm1p0_format);

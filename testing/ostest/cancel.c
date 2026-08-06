@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/cancel.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -49,7 +51,7 @@ static sem_t sem_thread_started;
  * Private Functions
  ****************************************************************************/
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
 static void sem_cleaner(FAR void *arg)
 {
   printf("sem_cleaner #%u\n", (unsigned int)((uintptr_t)arg));
@@ -60,12 +62,12 @@ static FAR void *sem_waiter(FAR void *parameter)
 {
   int status;
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
   int i;
 
   /* Register some clean-up handlers */
 
-  for (i = 0; i < CONFIG_PTHREAD_CLEANUP_STACKSIZE ; i++)
+  for (i = 0; i < CONFIG_TLS_NCLEANUP ; i++)
     {
       pthread_cleanup_push(sem_cleaner, (FAR void *)((uintptr_t)(i + 1)));
     }
@@ -161,7 +163,7 @@ static FAR void *sem_waiter(FAR void *parameter)
 }
 
 #if !defined(CONFIG_DISABLE_MQUEUE) && defined(CONFIG_CANCELLATION_POINTS)
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
 static void mqueue_cleaner(FAR void *arg)
 {
   FAR mqd_t *mqcancel = (FAR mqd_t *)arg;
@@ -182,7 +184,7 @@ static FAR void *mqueue_waiter(FAR void *parameter)
   char msgbuffer[CONFIG_MQ_MAXMSGSIZE];
   size_t nbytes;
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
   /* Register clean-up handler */
 
   pthread_cleanup_push(mqueue_cleaner, (FAR void *)&mqcancel);
@@ -249,12 +251,12 @@ static FAR void *asynch_waiter(FAR void *parameter)
 {
   int status;
 
-#ifdef CONFIG_PTHREAD_CLEANUP
+#if CONFIG_TLS_NCLEANUP > 0
   int i;
 
   /* Register some clean-up handlers */
 
-  for (i = 0; i < CONFIG_PTHREAD_CLEANUP_STACKSIZE ; i++)
+  for (i = 0; i < CONFIG_TLS_NCLEANUP ; i++)
     {
       pthread_cleanup_push(sem_cleaner,
                           (FAR void *)((uintptr_t)(i + 1)));

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/nxscope/nxscope_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -27,14 +29,17 @@
 #include <sys/boardctl.h>
 
 #include <assert.h>
+#include <errno.h>
+#include <getopt.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 
 #ifdef CONFIG_EXAMPLES_NXSCOPE_TIMER
 #  include <sys/ioctl.h>
 #  include <fcntl.h>
-#  include <stdlib.h>
 #  include <signal.h>
 #  include <nuttx/timers/timer.h>
 #endif
@@ -42,12 +47,24 @@
 #include "logging/nxscope/nxscope.h"
 
 /****************************************************************************
- * Private Type Definition
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#ifdef CONFIG_LIBM_NONE
+#  error "math library must be selected for this example"
+#endif
+
+#define SIN_DT              (0.01f)
+#define STREAM_THREAD_USLEP 100
+
+/****************************************************************************
+ * Private Types
  ****************************************************************************/
 
 struct nxscope_thr_env_s
 {
   FAR struct nxscope_s *nxs;
+  int interval;
 };
 
 /****************************************************************************
@@ -58,7 +75,7 @@ struct nxscope_thr_env_s
  * Name: nxscope_cb_userid
  ****************************************************************************/
 
-int nxscope_cb_userid(FAR void *priv, uint8_t id, FAR uint8_t *buff)
+static int nxscope_cb_userid(FAR void *priv, uint8_t id, FAR uint8_t *buff)
 {
   UNUSED(priv);
 
@@ -71,11 +88,75 @@ int nxscope_cb_userid(FAR void *priv, uint8_t id, FAR uint8_t *buff)
  * Name: nxscope_cb_start
  ****************************************************************************/
 
-int nxscope_cb_start(FAR void *priv, bool start)
+static int nxscope_cb_start(FAR void *priv, bool start)
 {
   UNUSED(priv);
 
   printf("--> nxscope_cb_start: start=%d\n", start);
+
+  return OK;
+}
+
+/****************************************************************************
+ * Name: nxscope_show_usage
+ ****************************************************************************/
+
+static void nxscope_show_usage(FAR const char *progname)
+{
+  printf("Usage: %s [-i <stream_interval_us>]\n", progname);
+  printf("          [-m <main_interval_us>]\n");
+}
+
+/****************************************************************************
+ * Name: nxscope_parse_args
+ ****************************************************************************/
+
+static int nxscope_parse_args(int argc, FAR char *argv[],
+                              FAR int *stream_interval,
+                              FAR int *main_interval)
+{
+  unsigned long value = 0;
+  int opt             = 0;
+
+  DEBUGASSERT(argv);
+  DEBUGASSERT(stream_interval);
+  DEBUGASSERT(main_interval);
+
+  while ((opt = getopt(argc, argv, "i:m:")) != -1)
+    {
+      switch (opt)
+        {
+          case 'i':
+            {
+              value = strtoul(optarg, NULL, 10);
+              if (value == 0)
+                {
+                  printf("ERROR: invalid interval: %s\n", optarg);
+                  return -EINVAL;
+                }
+
+              *stream_interval = (int)value;
+              break;
+            }
+
+          case 'm':
+            {
+              value = strtoul(optarg, NULL, 10);
+              if (value == 0)
+                {
+                  printf("ERROR: invalid interval: %s\n", optarg);
+                  return -EINVAL;
+                }
+
+              *main_interval = (int)value;
+              break;
+            }
+
+          default:
+            printf("ERROR: unsupported argument\n");
+            return -EINVAL;
+        }
+    }
 
   return OK;
 }
@@ -85,7 +166,7 @@ int nxscope_cb_start(FAR void *priv, bool start)
  * Name: nxscope_timer_init
  ****************************************************************************/
 
-static int nxscope_timer_init(void)
+static int nxscope_timer_init(int interval_us)
 {
   int                   fd = 0;
   int                   ret = 0;
@@ -103,8 +184,7 @@ static int nxscope_timer_init(void)
 
   /* Set the timer interval */
 
-  ret = ioctl(fd, TCIOC_SETTIMEOUT,
-              CONFIG_EXAMPLES_NXSCOPE_TIMER_INTERVAL);
+  ret = ioctl(fd, TCIOC_SETTIMEOUT, interval_us);
   if (ret < 0)
     {
       printf("ERROR: Failed to set the timer interval: %d\n", errno);
@@ -184,7 +264,7 @@ static FAR void *nxscope_samples_thr(FAR void *arg)
 #ifdef CONFIG_EXAMPLES_NXSCOPE_TIMER
   /* Initialize timer for periodic signal. */
 
-  ret = nxscope_timer_init();
+  ret = nxscope_timer_init(envp->interval);
   if (ret < 0)
     {
       printf("ERROR: nxscope_timer_init() failed: %d\n", errno);
@@ -197,14 +277,14 @@ static FAR void *nxscope_samples_thr(FAR void *arg)
   sigaddset(&set, CONFIG_EXAMPLES_NXSCOPE_TIMER_SIGNO);
 #endif
 
-  /* Initialize float vector */
-
-  v[0] = -1.0f;
-  v[1] = 0.0f;
-  v[2] = 1.0f;
-
   while (1)
     {
+      /* Float vector - tree-phase sine waveform */
+
+      v[0] = sinf(i * SIN_DT);
+      v[1] = sinf(i * SIN_DT + (2.0f / 3.0f) * M_PI);
+      v[2] = sinf(i * SIN_DT + (4.0f / 3.0f) * M_PI);
+
       /* Channel 0 */
 
       nxscope_put_uint8(envp->nxs, 0, i);
@@ -261,7 +341,6 @@ static FAR void *nxscope_samples_thr(FAR void *arg)
 
       nxscope_put_b16(envp->nxs, 13, ftob16(-1.0f));
 
-#ifdef CONFIG_HAVE_LONG_LONG
       /* Channel 14 */
 
       nxscope_put_ub32(envp->nxs, 14, dtob32(1.0));
@@ -269,7 +348,6 @@ static FAR void *nxscope_samples_thr(FAR void *arg)
       /* Channel 15 */
 
       nxscope_put_b32(envp->nxs, 15, dtob32(-1.0));
-#endif
 
       /* Channel 16 */
 
@@ -294,7 +372,7 @@ static FAR void *nxscope_samples_thr(FAR void *arg)
           goto errout;
         }
 #else
-      usleep(100);
+      usleep(envp->interval);
 #endif
     }
 
@@ -309,6 +387,7 @@ errout:
   return NULL;
 }
 
+#ifdef CONFIG_EXAMPLES_NXSCOPE_CHARLOG
 /****************************************************************************
  * Name: nxscope_charlog_thr
  ****************************************************************************/
@@ -336,6 +415,7 @@ static FAR void *nxscope_charlog_thr(FAR void *arg)
 
   return NULL;
 }
+#endif
 
 #ifdef CONFIG_LOGGING_NXSCOPE_CRICHANNELS
 /****************************************************************************
@@ -406,6 +486,7 @@ int main(int argc, FAR char *argv[])
 {
   struct nxscope_s            nxs;
   int                         ret = OK;
+  int                         interval;
   pthread_t                   thread;
   struct nxscope_thr_env_s    env;
   struct nxscope_cfg_s        nxs_cfg;
@@ -416,20 +497,38 @@ int main(int argc, FAR char *argv[])
 #ifdef CONFIG_LOGGING_NXSCOPE_INTF_SERIAL
   struct nxscope_ser_cfg_s    nxs_ser_cfg;
 #endif
+#ifdef CONFIG_LOGGING_NXSCOPE_INTF_UDP
+  struct nxscope_udp_cfg_s    nxs_udp_cfg;
+#endif
 #ifdef CONFIG_LOGGING_NXSCOPE_INTF_DUMMY
   struct nxscope_dummy_cfg_s  nxs_dummy_cfg;
 #endif
 
-#ifndef CONFIG_NSH_ARCHINIT
-  /* Perform architecture-specific initialization (if configured) */
+  /* Default settings */
 
-  boardctl(BOARDIOC_INIT, 0);
+  interval     = CONFIG_EXAMPLES_NXSCOPE_MAIN_INTERVAL;
+#ifdef CONFIG_EXAMPLES_NXSCOPE_TIMER
+  env.interval = CONFIG_EXAMPLES_NXSCOPE_TIMER_INTERVAL;
+#else
+  env.interval = STREAM_THREAD_USLEP;
+#endif
 
-#  ifdef CONFIG_BOARDCTL_FINALINIT
+  /* Parse args */
+
+  ret = nxscope_parse_args(argc, argv, &env.interval, &interval);
+  if (ret < 0)
+    {
+      nxscope_show_usage(argv[0]);
+      return EXIT_FAILURE;
+    }
+
+  printf("stream interval = %d\n", env.interval);
+  printf("main interval = %d\n", interval);
+
+#ifdef CONFIG_BOARDCTL_FINALINIT
   /* Perform architecture-specific final-initialization (if configured) */
 
   boardctl(BOARDIOC_FINALINIT, 0);
-#  endif
 #endif
 
 #ifdef CONFIG_EXAMPLES_NXSCOPE_CDCACM
@@ -465,6 +564,22 @@ int main(int argc, FAR char *argv[])
   if (ret < 0)
     {
       printf("ERROR: nxscope_ser_init failed %d\n", ret);
+      goto errout_nointf;
+    }
+#endif
+
+#ifdef CONFIG_LOGGING_NXSCOPE_INTF_UDP
+  /* Configuration */
+
+  nxs_udp_cfg.port     = CONFIG_EXAMPLES_NXSCOPE_UDP_PORT;
+  nxs_udp_cfg.nonblock = true;
+
+  /* Initialize UDP interface */
+
+  ret = nxscope_udp_init(&intf, &nxs_udp_cfg);
+  if (ret < 0)
+    {
+      printf("ERROR: nxscope_udp_init failed %d\n", ret);
       goto errout_nointf;
     }
 #endif
@@ -588,7 +703,6 @@ int main(int argc, FAR char *argv[])
   u.s.cri   = 0;
   nxscope_chan_init(&nxs, 13, "chan13", u.u8, 1, 0);
 
-#ifdef CONFIG_HAVE_LONG_LONG
   u.s.dtype = NXSCOPE_TYPE_UB32;
   u.s._res  = 0;
   u.s.cri   = 0;
@@ -598,7 +712,6 @@ int main(int argc, FAR char *argv[])
   u.s._res  = 0;
   u.s.cri   = 0;
   nxscope_chan_init(&nxs, 15, "chan15", u.u8, 1, 0);
-#endif
 
   /* Vector data channel */
 
@@ -621,12 +734,14 @@ int main(int argc, FAR char *argv[])
   u.s.cri   = 0;
   nxscope_chan_init(&nxs, 18, "chan18", u.u8, 0, 4);
 
+#ifdef CONFIG_EXAMPLES_NXSCOPE_CHARLOG
   /* Char channel with metadata */
 
   u.s.dtype = NXSCOPE_TYPE_CHAR;
   u.s._res  = 0;
   u.s.cri   = 0;
   nxscope_chan_init(&nxs, 19, "chan19", u.u8, 64, 4);
+#endif
 
 #ifdef CONFIG_LOGGING_NXSCOPE_CRICHANNELS
   /* Critical channel */
@@ -649,6 +764,7 @@ int main(int argc, FAR char *argv[])
       goto errout;
     }
 
+#ifdef CONFIG_EXAMPLES_NXSCOPE_CHARLOG
   /* Create char log thread */
 
   env.nxs = &nxs;
@@ -658,6 +774,7 @@ int main(int argc, FAR char *argv[])
       printf("ERROR: pthread_create failed %d\n", ret);
       goto errout;
     }
+#endif
 
 #ifdef CONFIG_LOGGING_NXSCOPE_CRICHANNELS
   /* Create critical channel thread */
@@ -698,7 +815,7 @@ int main(int argc, FAR char *argv[])
           printf("ERROR: nxscope_recv failed %d\n", ret);
         }
 
-      usleep(100000);
+      usleep(interval);
     }
 
 errout:
@@ -713,6 +830,9 @@ errout_nonxscope:
 
 #if defined(CONFIG_LOGGING_NXSCOPE_INTF_SERIAL)
   nxscope_ser_deinit(&intf);
+#endif
+#if defined(CONFIG_LOGGING_NXSCOPE_INTF_UDP)
+  nxscope_udp_deinit(&intf);
 #endif
 #if defined(CONFIG_LOGGING_NXSCOPE_INTF_DUMMY)
   nxscope_dummy_deinit(&intf);

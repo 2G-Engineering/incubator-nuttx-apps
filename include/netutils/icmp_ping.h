@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/netutils/icmp_ping.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,6 +50,8 @@
 #define ICMP_E_POLL        -11 /* extra: error code    */
 #define ICMP_E_RECVFROM    -13 /* extra: error code    */
 #define ICMP_E_RECVSMALL   -15 /* extra: recv bytes    */
+#define ICMP_E_BINDDEV     -17 /* extra: error bind    */
+#define ICMP_E_FILTER      -19 /* extra: error filter  */
 
 /* Negative even number represent warning(recoverable) */
 
@@ -68,6 +72,9 @@ struct ping_result_s;
 struct ping_info_s
 {
   FAR const char *hostname; /* Host name to ping */
+#ifdef CONFIG_NET_BINDTODEVICE
+  FAR const char *devname;  /* Device name to bind */
+#endif
   uint16_t count;           /* Number of pings requested */
   uint16_t datalen;         /* Number of bytes to be sent */
   uint16_t delay;           /* Deciseconds to delay between pings */

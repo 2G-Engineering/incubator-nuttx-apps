@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_session.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -207,25 +209,26 @@ int nsh_session(FAR struct console_stdio_s *pstate,
        * occurs. Either  will cause the session to terminate.
        */
 
-      ret = cle_fd(pstate->cn_line, g_nshprompt, CONFIG_NSH_LINELEN,
+      ret = cle_fd(pstate->cn_line, nsh_prompt(), LINE_MAX,
                    INFD(pstate), OUTFD(pstate));
-      if (ret < 0)
+      if (ret == EOF)
         {
           dprintf(ERRFD(pstate), g_fmtcmdfailed, "nsh_session",
                   "cle", NSH_ERRNO_OF(-ret));
-          continue;
+          ret = EXIT_SUCCESS;
+          break;
         }
 #else
       /* Display the prompt string */
 
-      write(OUTFD(pstate), g_nshprompt, strlen(g_nshprompt));
+      write(OUTFD(pstate), nsh_prompt(), strlen(nsh_prompt()));
 
       /* readline() normally returns the number of characters read, but
        * will return EOF on end of file or if an error occurs.  EOF
        * will cause the session to terminate.
        */
 
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
+      ret = readline_fd(pstate->cn_line, LINE_MAX,
                         INFD(pstate), OUTFD(pstate));
       if (ret == EOF)
         {
@@ -243,6 +246,7 @@ int nsh_session(FAR struct console_stdio_s *pstate,
       /* Parse process the command */
 
       nsh_parse(vtbl, pstate->cn_line);
+      nsh_update_prompt();
     }
 
   return ret;

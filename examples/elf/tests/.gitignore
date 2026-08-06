@@ -4,4 +4,6 @@
 /cromfs
 /cromfs.c
 /dirlist.c
+/extfs
 /symtab.c
+/Kconfig

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/libobd2/obd_waitresponse.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -92,10 +94,10 @@ int obd_wait_response(FAR struct obd_dev_s *dev, uint8_t opmode, uint8_t pid,
           return -EAGAIN;
         }
 
-      #ifdef CONFIG_DEBUG_INFO
+#ifdef CONFIG_DEBUG_INFO
         printf("  ID: %4u DLC: %u\n",
                dev->can_rxmsg.cm_hdr.ch_id, dev->can_rxmsg.cm_hdr.ch_dlc);
-      #endif
+#endif
 
       msgdlc = dev->can_rxmsg.cm_hdr.ch_dlc;
 

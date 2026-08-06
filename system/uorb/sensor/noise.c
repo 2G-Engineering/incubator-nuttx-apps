@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/sensor/noise.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,20 +31,12 @@
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_UORB
-static void print_sensor_noise_message(FAR const struct orb_metadata *meta,
-                                       FAR const void *buffer)
-{
-  FAR const struct sensor_noise *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
-               "noise: %.4f", meta->o_name, message->timestamp,
-               now - message->timestamp, message->db);
-}
+static const char sensor_noise_format[] =
+  "timestamp:%" PRIu64 ",noise:%hf";
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ORB_DEFINE(sensor_noise, struct sensor_noise, print_sensor_noise_message);
+ORB_DEFINE(sensor_noise, struct sensor_noise, sensor_noise_format);

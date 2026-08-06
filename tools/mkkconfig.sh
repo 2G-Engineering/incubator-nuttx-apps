@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
+############################################################################
 # apps/tools/mkkconfig.sh
+#
+# SPDX-License-Identifier: Apache-2.0
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -16,7 +19,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 #
-
+############################################################################
 # Get the input parameter list
 
 USAGE="USAGE: mkkconfig.sh [-d] [-h] [-m <menu>] [-o <kconfig-file>]"
@@ -56,7 +59,7 @@ fi
 
 echo mkkconfig in $PWD
 
-KCONFIG_LIST=`ls -1 $PWD/*/Kconfig`
+KCONFIG_LIST=`ls -1 $PWD/*/Kconfig 2>/dev/null`
 
 echo "#" > ${KCONFIG}
 echo "# For a description of the syntax of this configuration file," >> ${KCONFIG}

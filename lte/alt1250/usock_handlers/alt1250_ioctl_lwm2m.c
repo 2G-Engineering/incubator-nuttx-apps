@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_ioctl_lwm2m.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -608,7 +610,7 @@ static int perform_m2m_applysetting(FAR struct alt1250_s *dev,
     }
 
   *usock_result = OK;
-  dev->lwm2m_apply_xid = (int64_t)xid;
+  dev->lwm2m_apply_xid = xid;
 
   MODEM_STATE_INTENTRST(dev);
   altdevice_reset(dev->altfd);

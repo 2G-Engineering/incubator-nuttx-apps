@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/i2schar/i2schar_transmitter.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,8 +31,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include <nuttx/audio/audio.h>
 
@@ -77,17 +80,13 @@
 pthread_addr_t i2schar_transmitter(pthread_addr_t arg)
 {
   FAR struct ap_buffer_s *apb;
-  struct audio_buf_desc_s desc;
-  uint8_t crap;
-  uint8_t *ptr;
+  FAR struct ap_buffer_s *transmitter_apb = (FAR struct ap_buffer_s *)arg;
   int bufsize;
   int nwritten;
-  int ret;
   int fd;
   int i;
-  int j;
 
-  /* Open the I2C character device */
+  /* Open the I2S character device */
 
   fd = open(g_i2schar.devpath, O_WRONLY);
   if (fd < 0)
@@ -100,32 +99,12 @@ pthread_addr_t i2schar_transmitter(pthread_addr_t arg)
 
   /* Loop for the requested number of times */
 
-  for (i = 0, crap = 0; i < CONFIG_EXAMPLES_I2SCHAR_TXBUFFERS; i++)
+  for (i = 0; i < g_i2schar.txcount; i++)
     {
-      /* Allocate an audio buffer of the configured size */
+      /* Use the provided transmitter buffer */
 
-      desc.numbytes   = CONFIG_EXAMPLES_I2SCHAR_BUFSIZE;
-      desc.u.pbuffer = &apb;
-
-      ret = apb_alloc(&desc);
-      if (ret < 0)
-        {
-           printf("i2schar_transmitter:"
-                  "ERROR: failed to allocate buffer %d: %d\n", i + 1, ret);
-           close(fd);
-           pthread_exit(NULL);
-        }
-
+      apb = transmitter_apb;
       bufsize = sizeof(struct ap_buffer_s) + CONFIG_EXAMPLES_I2SCHAR_BUFSIZE;
-
-      /* Fill the audio buffer with crap */
-
-      for (j = 0, ptr = apb->samp; j < CONFIG_EXAMPLES_I2SCHAR_BUFSIZE; j++)
-        {
-          *ptr++ = crap++;
-        }
-
-      apb->nbytes = CONFIG_EXAMPLES_I2SCHAR_BUFSIZE;
 
       /* Then send the buffer */
 
