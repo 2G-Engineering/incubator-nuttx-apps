@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/mount/mount_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -215,6 +217,13 @@ static void show_directories(const char *path, int indent)
           snprintf(g_namebuffer, sizeof(g_namebuffer),
                    "%s/%s", path, direntry->d_name);
           subdir = strdup(g_namebuffer);
+          if (subdir == NULL)
+            {
+              printf("show_directories: ERROR out of memory\n");
+              g_nerrors++;
+              continue;
+            }
+
           show_directories(subdir, indent + 1);
           free(subdir);
         }

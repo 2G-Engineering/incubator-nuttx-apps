@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/ping/ping.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,6 +34,17 @@
 #include <errno.h>
 #include <limits.h>
 #include <fixedmath.h>
+
+#if defined(CONFIG_SYSTEM_PING6) && defined(CONFIG_LIBC_EXECFUNCS)
+#define PING_ENABLE_PING6_FALLBACK
+#endif
+
+#ifdef PING_ENABLE_PING6_FALLBACK
+#include <spawn.h>
+#include <sys/wait.h>
+#endif
+
+#include <nuttx/net/ip.h>
 
 #include "netutils/icmp_ping.h"
 
@@ -96,6 +109,7 @@ static void show_usage(FAR const char *progname, int exitcode)
   printf("  -s <size> specifies the number of data bytes to be sent.  "
          "Default %u.\n",
          ICMP_PING_DATALEN);
+  printf("  -I <interface> is the bind device for traffic\n");
   printf("  -h shows this text and exits.\n");
   exit(exitcode);
 }
@@ -116,8 +130,10 @@ static void ping_result(FAR const struct ping_result_s *result)
   switch (result->code)
     {
       case ICMP_E_HOSTIP:
+#ifndef PING_ENABLE_PING6_FALLBACK
         fprintf(stderr, "ERROR: ping_gethostip(%s) failed\n",
                 result->info->hostname);
+#endif
         break;
 
       case ICMP_E_MEMORY:
@@ -130,10 +146,10 @@ static void ping_result(FAR const struct ping_result_s *result)
 
       case ICMP_I_BEGIN:
         printf("PING %u.%u.%u.%u %u bytes of data\n",
-               (unsigned int)(result->dest.s_addr) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 8) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 16) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 24) & 0xff,
+               ip4_addr1(result->dest.s_addr),
+               ip4_addr2(result->dest.s_addr),
+               ip4_addr3(result->dest.s_addr),
+               ip4_addr4(result->dest.s_addr),
                result->info->datalen);
         break;
 
@@ -153,10 +169,10 @@ static void ping_result(FAR const struct ping_result_s *result)
 
       case ICMP_W_TIMEOUT:
         printf("No response from %u.%u.%u.%u: icmp_seq=%u time=%ld ms\n",
-               (unsigned int)(result->dest.s_addr) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 8) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 16) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 24) & 0xff,
+               ip4_addr1(result->dest.s_addr),
+               ip4_addr2(result->dest.s_addr),
+               ip4_addr3(result->dest.s_addr),
+               ip4_addr4(result->dest.s_addr),
                result->seqno, result->extra);
         break;
 
@@ -167,6 +183,12 @@ static void ping_result(FAR const struct ping_result_s *result)
       case ICMP_E_RECVSMALL:
         fprintf(stderr, "ERROR: short ICMP packet: %ld\n", result->extra);
         break;
+
+#ifdef CONFIG_NET_BINDTODEVICE
+      case ICMP_E_BINDDEV:
+        fprintf(stderr, "ERROR: setsockopt error: %ld\n", result->extra);
+        break;
+#endif
 
       case ICMP_W_IDDIFF:
         fprintf(stderr,
@@ -201,10 +223,10 @@ static void ping_result(FAR const struct ping_result_s *result)
 
         printf("%u bytes from %u.%u.%u.%u: icmp_seq=%u time=%ld.%ld ms\n",
                result->info->datalen,
-               (unsigned int)(result->dest.s_addr) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 8) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 16) & 0xff,
-               (unsigned int)(result->dest.s_addr >> 24) & 0xff,
+               ip4_addr1(result->dest.s_addr),
+               ip4_addr2(result->dest.s_addr),
+               ip4_addr3(result->dest.s_addr),
+               ip4_addr4(result->dest.s_addr),
                result->seqno, result->extra / USEC_PER_MSEC,
                result->extra % USEC_PER_MSEC / MSEC_PER_DSEC);
         break;
@@ -268,6 +290,49 @@ static void ping_result(FAR const struct ping_result_s *result)
     }
 }
 
+#ifdef PING_ENABLE_PING6_FALLBACK
+/****************************************************************************
+ * Name: ping6_fallback
+ ****************************************************************************/
+
+static int ping6_fallback(int argc, FAR char *argv[])
+{
+  pid_t pid;
+  int ret;
+  int status;
+
+  if (argc <= 0)
+    {
+      return EXIT_FAILURE;
+    }
+
+  argv[0] = CONFIG_SYSTEM_PING6_PROGNAME;
+
+  ret = posix_spawnp(&pid, CONFIG_SYSTEM_PING6_PROGNAME, NULL, NULL,
+                     argv, NULL);
+  if (ret != 0)
+    {
+      fprintf(stderr, "ERROR: posix_spawnp(%s) failed: %d\n",
+              CONFIG_SYSTEM_PING6_PROGNAME, ret);
+      return EXIT_FAILURE;
+    }
+
+  ret = waitpid(pid, &status, 0);
+  if (ret < 0)
+    {
+      fprintf(stderr, "ERROR: waitpid() failed: %d\n", errno);
+      return EXIT_FAILURE;
+    }
+
+  if (WIFEXITED(status))
+    {
+      return WEXITSTATUS(status);
+    }
+
+  return EXIT_FAILURE;
+}
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -285,6 +350,9 @@ int main(int argc, FAR char *argv[])
   info.delay     = ICMP_POLL_DELAY;
   info.timeout   = ICMP_POLL_DELAY;
   info.callback  = ping_result;
+#ifdef CONFIG_NET_BINDTODEVICE
+  info.devname   = NULL;
+#endif
   info.priv      = &priv;
   priv.code      = ICMP_I_OK;
   priv.tmin      = LONG_MAX;
@@ -296,7 +364,7 @@ int main(int argc, FAR char *argv[])
 
   exitcode = EXIT_FAILURE;
 
-  while ((option = getopt(argc, argv, ":c:i:W:s:h")) != ERROR)
+  while ((option = getopt(argc, argv, ":c:i:W:s:I:h")) != ERROR)
     {
       switch (option)
         {
@@ -356,6 +424,14 @@ int main(int argc, FAR char *argv[])
             }
             break;
 
+          case 'I':
+#ifdef CONFIG_NET_BINDTODEVICE
+            info.devname = optarg;
+#else
+            fprintf(stderr, "ERROR: Bind to device not supported\n");
+#endif
+            break;
+
           case 'h':
             exitcode = EXIT_SUCCESS;
             goto errout_with_usage;
@@ -381,7 +457,15 @@ int main(int argc, FAR char *argv[])
 
   info.hostname = argv[optind];
   icmp_ping(&info);
-  return priv.code < 0 ? EXIT_FAILURE: EXIT_SUCCESS;
+
+#ifdef PING_ENABLE_PING6_FALLBACK
+  if (priv.code == ICMP_E_HOSTIP)
+    {
+      return ping6_fallback(argc, argv);
+    }
+#endif
+
+  return priv.code < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 
 errout_with_usage:
   optind = 0;

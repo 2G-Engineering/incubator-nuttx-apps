@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/bluetooth/btsak/btsak.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,6 +34,7 @@
 
 #include <nuttx/config.h>
 
+#include <stdbool.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netpacket/bluetooth.h>
@@ -178,7 +181,7 @@ int btsak_str2addr(FAR const char *str, FAR uint8_t *addr);
  *
  * Description:
  *   Convert a string to an address type.  String options are "public" or
- *   "private".
+ *   "random".
  *
  ****************************************************************************/
 

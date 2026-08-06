@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/nxtext/nxtext_putc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/nx/nx.h>
 #include <nuttx/nx/nxfonts.h>
@@ -93,6 +95,7 @@ static void nxtext_freeglyph(FAR struct nxtext_glyph_s *glyph)
     {
       free(glyph->bitmap);
     }
+
   memset(glyph, 0, sizeof(struct nxtext_glyph_s));
 }
 
@@ -109,11 +112,11 @@ nxtext_allocglyph(FAR struct nxtext_state_s *st)
   int i;
 
   /* Search through the glyph cache looking for an unused glyph.  Also, keep
-   * track of the least used glyph as well.  We need that if we have to replace
-   * a glyph in the cache.
+   * track of the least used glyph as well.  We need that if we have to
+   * replace a glyph in the cache.
    */
 
-   for (i = 0; i < st->maxglyphs; i++)
+  for (i = 0; i < st->maxglyphs; i++)
     {
       /* Is this glyph in use? */
 
@@ -147,9 +150,9 @@ nxtext_allocglyph(FAR struct nxtext_state_s *st)
 
   if (luusecnt > 1)
     {
-       uint8_t decr = luusecnt - 1;
+      uint8_t decr = luusecnt - 1;
 
-       for (i = 0; i < st->maxglyphs; i++)
+      for (i = 0; i < st->maxglyphs; i++)
         {
           /* Is this glyph in use? */
 
@@ -178,7 +181,7 @@ nxtext_findglyph(FAR struct nxtext_state_s *st, uint8_t ch)
 
   /* First, try to find the glyph in the cache of pre-rendered glyphs */
 
-   for (i = 0; i < st->maxglyphs; i++)
+  for (i = 0; i < st->maxglyphs; i++)
     {
       FAR struct nxtext_glyph_s *glyph = &st->glyph[i];
       if (glyph->usecnt > 0 && glyph->code == ch)
@@ -187,7 +190,7 @@ nxtext_findglyph(FAR struct nxtext_state_s *st, uint8_t ch)
 
           if (glyph->usecnt < MAX_USECNT)
             {
-               glyph->usecnt++;
+              glyph->usecnt++;
             }
 
           /* And return the glyph that we found */
@@ -195,6 +198,7 @@ nxtext_findglyph(FAR struct nxtext_state_s *st, uint8_t ch)
           return glyph;
         }
     }
+
   return NULL;
 }
 
@@ -246,13 +250,13 @@ nxtext_renderglyph(FAR struct nxtext_state_s *st,
       /* Pack 1-bit pixels into a 2-bits */
 
       pixel &= 0x01;
-      pixel  = (pixel) << 1 |pixel;
+      pixel  = (pixel) << 1 | pixel;
 #  endif
 #  if CONFIG_EXAMPLES_NXTEXT_BPP < 4
       /* Pack 2-bit pixels into a nibble */
 
       pixel &= 0x03;
-      pixel  = (pixel) << 2 |pixel;
+      pixel  = (pixel) << 2 | pixel;
 #  endif
 
       /* Pack 4-bit nibbles into a byte */
@@ -290,7 +294,7 @@ nxtext_renderglyph(FAR struct nxtext_state_s *st,
 
       /* Then render the glyph into the allocated memory */
 
-      ret = RENDERER((FAR nxgl_mxpixel_t*)glyph->bitmap,
+      ret = RENDERER((FAR nxgl_mxpixel_t *)glyph->bitmap,
                       glyph->height, glyph->width, glyph->stride,
                       fbm, st->fcolor[0]);
       if (ret < 0)
@@ -310,7 +314,8 @@ nxtext_renderglyph(FAR struct nxtext_state_s *st,
  * Name: nxtext_fontsize
  ****************************************************************************/
 
-static int nxtext_fontsize(NXHANDLE hfont, uint8_t ch, FAR struct nxgl_size_s *size)
+static int nxtext_fontsize(NXHANDLE hfont, uint8_t ch,
+                           FAR struct nxgl_size_s *size)
 {
   FAR const struct nx_fontbitmap_s *fbm;
 
@@ -363,7 +368,7 @@ nxtext_getglyph(NXHANDLE hfont, FAR struct nxtext_state_s *st, uint8_t ch)
  *
  * Description:
  *   This is part of the nxtext_putc logic.  It creates and positions a
- *   the character and renders (or re-uses) a glyph for font.
+ *   the character and renders (or reuses) a glyph for font.
  *
  ****************************************************************************/
 
@@ -377,37 +382,39 @@ nxtext_addchar(NXHANDLE hfont, FAR struct nxtext_state_s *st, uint8_t ch)
 
   if (st->nchars < st->maxchars)
     {
-       /* Yes, setup the bitmap information */
+      /* Yes, setup the bitmap information */
 
-       bm        = &st->bm[st->nchars];
-       bm->code  = ch;
-       bm->flags = 0;
-       bm->pos.x = st->fpos.x;
-       bm->pos.y = st->fpos.y;
+      bm        = &st->bm[st->nchars];
+      bm->code  = ch;
+      bm->flags = 0;
+      bm->pos.x = st->fpos.x;
+      bm->pos.y = st->fpos.y;
 
-       /* Find (or create) the matching glyph */
+      /* Find (or create) the matching glyph */
 
-       glyph = nxtext_getglyph(hfont, st, ch);
-       if (!glyph)
-         {
-            /* No, there is no font for this code.  Just mark this as a space. */
+      glyph = nxtext_getglyph(hfont, st, ch);
+      if (!glyph)
+        {
+          /* No, there is no font for this code.  Just mark this as a
+           * space.
+           */
 
-            bm->flags |= BMFLAGS_NOGLYPH;
+          bm->flags |= BMFLAGS_NOGLYPH;
 
-            /* Set up the next character position */
+          /* Set up the next character position */
 
-            st->fpos.x += st->spwidth;
-         }
-       else
-         {
-            /* Set up the next character position */
+          st->fpos.x += st->spwidth;
+        }
+      else
+        {
+          /* Set up the next character position */
 
-            st->fpos.x += glyph->width;
-         }
+          st->fpos.x += glyph->width;
+        }
 
-       /* Success.. increment nchars to retain this character */
+      /* Success.. increment nchars to retain this character */
 
-       st->nchars++;
+      st->nchars++;
     }
 
   return bm;
@@ -463,7 +470,8 @@ void nxtext_newline(FAR struct nxtext_state_s *st)
  *
  ****************************************************************************/
 
-void nxtext_putc(NXWINDOW hwnd, FAR struct nxtext_state_s *st, NXHANDLE hfont, uint8_t ch)
+void nxtext_putc(NXWINDOW hwnd, FAR struct nxtext_state_s *st,
+                 NXHANDLE hfont, uint8_t ch)
 {
   FAR const struct nxtext_bitmap_s *bm;
 
@@ -560,13 +568,13 @@ void nxtext_fillchar(NXWINDOW hwnd, FAR const struct nxgl_rect_s *rect,
 
       /* Find (or create) the glyph that goes with this font */
 
-       glyph = nxtext_getglyph(hfont, st, bm->code);
-       if (!glyph)
-         {
-           /* Shouldn't happen */
+      glyph = nxtext_getglyph(hfont, st, bm->code);
+      if (!glyph)
+        {
+          /* Shouldn't happen */
 
-           return;
-         }
+          return;
+        }
 
       /* Blit the font bitmap into the window */
 

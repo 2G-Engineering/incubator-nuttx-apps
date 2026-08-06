@@ -1,7 +1,8 @@
 /****************************************************************************
  * apps/interpreters/bas/bas_main.c
  *
- *   Copyright (c) 1999-2014 Michael Haardt
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: 1999-2014 Michael Haardt
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -83,7 +84,7 @@ int main(int argc, FAR char *argv[])
           break;
 
         case 'V':
-          printf("bas %s\n", CONFIG_INTERPRETER_BAS_VERSION);
+          printf("bas %s\n", CONFIG_INTERPRETERS_BAS_VERSION);
           exit(0);
           break;
 
@@ -128,7 +129,7 @@ int main(int argc, FAR char *argv[])
       fputs(_("-u  Output all tokens in uppercase\n"),
             stdout);
       fputs(_("-h  Display this help and exit\n"), stdout);
-      fputs(_("-V  Ooutput version information and exit\n"),
+      fputs(_("-V  Output version information and exit\n"),
             stdout);
       exit(0);
     }

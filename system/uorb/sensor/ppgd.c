@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/sensor/ppgd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,23 +31,13 @@
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_UORB
-static void print_sensor_ppgd_message(FAR const struct orb_metadata *meta,
-                                      FAR const void *buffer)
-{
-  FAR const struct sensor_ppgd *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
-               "ppg1: %" PRIu32 " ppg2: %" PRIu32 " current: %" PRIu32 " "
-               "gain1: %" PRIu16 " gain2: %" PRIu16 "",
-               meta->o_name, message->timestamp, now - message->timestamp,
-               message->ppg[0], message->ppg[1], message->current,
-               message->gain[0], message->gain[1]);
-}
+static const char sensor_ppgd_format[] =
+  "timestamp:%" PRIu64 ",ppg0:%" PRIu32 ",ppg1:%" PRIu32 ","
+  "current:%" PRIu32 ",gain0:%hu,gain1:%hu";
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ORB_DEFINE(sensor_ppgd, struct sensor_ppgd, print_sensor_ppgd_message);
+ORB_DEFINE(sensor_ppgd, struct sensor_ppgd, sensor_ppgd_format);

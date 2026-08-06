@@ -1,6 +1,8 @@
 ############################################################################
 # apps/Directory.mk
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@ include $(APPDIR)/Make.defs
 
 SUBDIRS       := $(dir $(wildcard */Makefile))
 CONFIGSUBDIRS := $(filter-out $(dir $(wildcard */Kconfig)),$(SUBDIRS))
+CLEANSUBDIRS  := $(dir $(wildcard *$(DELIM).built))
 CLEANSUBDIRS  += $(dir $(wildcard */.depend))
 CLEANSUBDIRS  += $(dir $(wildcard */.kconfig))
 CLEANSUBDIRS  := $(sort $(CLEANSUBDIRS))
@@ -51,6 +54,7 @@ endif
 	$(Q) touch .kconfig
 
 clean: $(foreach SDIR, $(CLEANSUBDIRS), $(SDIR)_clean)
+	@:
 
 distclean: $(foreach SDIR, $(CLEANSUBDIRS), $(SDIR)_distclean)
 ifneq ($(MENUDESC),)

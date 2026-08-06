@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/industry/foc/float/foc_vel_opll.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -211,6 +213,8 @@ static int foc_velocity_pll_zero_f32(FAR foc_velocity_f32_t *h)
   motor_sobserver_pll_init(&pll->data,
                            pll->cfg.kp,
                            pll->cfg.ki);
+
+  pll->o.speed = 0.0f;
 
   return ret;
 }

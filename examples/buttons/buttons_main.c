@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/buttons/buttons_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -217,9 +219,11 @@ static int button_daemon(int argc, char *argv[])
       goto errout_with_fd;
     }
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   /* Ignore the default signal action */
 
   signal(CONFIG_EXAMPLES_BUTTONS_SIGNO, SIG_IGN);
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
 #endif
 
   /* Now loop forever, waiting BUTTONs events */

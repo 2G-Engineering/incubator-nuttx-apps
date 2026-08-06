@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/dhcpd/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -24,13 +26,23 @@ include $(APPDIR)/Make.defs
 
 CSRCS = dhcpd_daemon.c
 
-MAINSRC = dhcpd_start.c dhcpd_stop.c target.c
+MAINSRC = target.c
 
 # DHCPD built-in application info
 
-PROGNAME = dhcpd_start dhcpd_stop dhcpd
+PROGNAME = dhcpd
 PRIORITY = SCHED_PRIORITY_DEFAULT
 STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
 MODULE = $(CONFIG_EXAMPLES_DHCPD)
+
+ifneq ($(CONFIG_BUILD_KERNEL),y)
+MAINSRC += dhcpd_start.c
+PROGNAME += dhcpd_start
+endif
+
+ifeq ($(CONFIG_SCHED_WAITPID),y)
+MAINSRC += dhcpd_stop.c
+PROGNAME += dhcpd_stop
+endif
 
 include $(APPDIR)/Application.mk

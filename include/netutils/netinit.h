@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/netutils/netinit.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -53,10 +55,6 @@
 
 #ifndef CONFIG_NETINIT_DNSIPADDR
 #  define CONFIG_NETINIT_DNSIPADDR CONFIG_NETINIT_DRIPADDR
-#endif
-
-#ifndef CONFIG_NETINIT_MACADDR
-#  define CONFIG_NETINIT_MACADDR   0x00e0deadbeef
 #endif
 
 #if !defined(CONFIG_NETINIT_THREAD) || !defined(CONFIG_ARCH_PHY_INTERRUPT) || \

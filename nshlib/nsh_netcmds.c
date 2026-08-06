@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_netcmds.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -43,7 +45,7 @@
 #include <libgen.h>      /* Needed for basename */
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <getopt.h>
 
 #if defined(CONFIG_LIBC_NETDB) && !defined(CONFIG_NSH_DISABLE_NSLOOKUP)
@@ -88,10 +90,6 @@
 #  ifndef CONFIG_NSH_DISABLE_WGET
 #    include "netutils/webclient.h"
 #  endif
-#endif
-
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
-#  include "netutils/dhcpc.h"
 #endif
 
 #include "nsh.h"
@@ -142,6 +140,15 @@ struct tftpc_args_s
   FAR const char *srcpath;   /* Path at src */
   in_addr_t       ipaddr;    /* Host IP address */
 };
+#endif
+
+#ifdef CONFIG_NET_ARP
+typedef enum
+{
+  ARP_DEFAULT,               /* Did not set arp configure in the command */
+  ARP_ENABLE,                /* Clean the NOARP flag for the interface to enable the arp learning function */
+  ARP_DISABLE                /* Set the NOARP flag for the interface to disable the arp learning function */
+} arp_cfg_e;
 #endif
 
 typedef int (*nsh_netdev_callback_t)(FAR struct nsh_vtbl_s *vtbl,
@@ -550,11 +557,15 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv4
   struct in_addr addr;
   in_addr_t gip = INADDR_ANY;
+  in_addr_t mip;
 #endif
 #ifdef CONFIG_NET_IPv6
   struct in6_addr addr6;
   struct in6_addr gip6 = IN6ADDR_ANY_INIT;
   FAR char *preflen = NULL;
+#  ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+  bool remove = false;
+#  endif
 #endif
   int i;
   FAR char *ifname = NULL;
@@ -565,7 +576,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef HAVE_HWADDR
   FAR char *hw = NULL;
 #endif
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
   FAR char *dns = NULL;
 #endif
 #if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
@@ -573,11 +584,11 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #endif
   bool missingarg = true;
   bool badarg = false;
+#ifdef CONFIG_NET_ARP
+  arp_cfg_e arpflag = ARP_DEFAULT;
+#endif
 #ifdef HAVE_HWADDR
   mac_addr_t macaddr;
-#endif
-#if defined(CONFIG_NETINIT_DHCPC)
-  FAR void *handle;
 #endif
   int ret;
   int mtu = 0;
@@ -701,7 +712,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
                 }
 #endif
 
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
               else if (!strcmp(tmp, "dns"))
                 {
                   if (argc - 1 >= i + 1)
@@ -717,8 +728,14 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #endif
               else if (!strcmp(tmp, "add"))
                 {
-                  /* Compatible with linux IPv6 command, do nothing. */
-
+#if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDEV_MULTIPLE_IPv6)
+                  remove = false;
+                  continue;
+                }
+              else if (!strcmp(tmp, "del"))
+                {
+                  remove = true;
+#endif
                   continue;
                 }
               else if (!strcmp(tmp, "mtu"))
@@ -737,6 +754,20 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
                       badarg = true;
                     }
                 }
+#ifdef CONFIG_NET_ARP
+              else if (!strcmp(tmp, "arp"))
+                {
+                  /* Enable arp function on interface */
+
+                  arpflag = ARP_ENABLE;
+                }
+              else if (!strcmp(tmp, "-arp"))
+                {
+                  /* Disable arp function on interface */
+
+                  arpflag = ARP_DISABLE;
+                }
+#endif
               else if (hostip == NULL && i <= 4)
                 {
                   /* Let first non-option be host ip, to support inet/inet6
@@ -802,10 +833,17 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
             }
 
           ninfo("Host IP: %s\n", hostip);
-          inet_pton(AF_INET6, hostip, &addr6);
+          ret = inet_pton(AF_INET6, hostip, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
 
+#ifndef CONFIG_NETDEV_MULTIPLE_IPv6
       netlib_set_ipv6addr(ifname, &addr6);
+#endif
     }
 #endif /* CONFIG_NET_IPv6 */
 
@@ -816,7 +854,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     {
       if (hostip != NULL)
         {
-#if defined(CONFIG_NETINIT_DHCPC)
+#if defined(CONFIG_NETUTILS_DHCPC)
           if (strcmp(hostip, "dhcp") == 0)
             {
               /* Set DHCP addr */
@@ -844,54 +882,6 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
     }
 #endif /* CONFIG_NET_IPv4 */
 
-  /* Set gateway */
-
-#ifdef CONFIG_NET_IPv6
-#ifdef CONFIG_NET_IPv4
-  if (inet6)
-#endif
-    {
-      /* Only set the gateway address if it was explicitly provided. */
-
-      if (gwip != NULL)
-        {
-          ninfo("Gateway: %s\n", gwip);
-          inet_pton(AF_INET6, gwip, &addr6);
-
-          netlib_set_dripv6addr(ifname, &addr6);
-          gip6 = addr6;
-        }
-    }
-#endif /* CONFIG_NET_IPv6 */
-
-#ifdef CONFIG_NET_IPv4
-#ifdef CONFIG_NET_IPv6
-  else
-#endif
-    {
-      if (gwip != NULL)
-        {
-          ninfo("Gateway: %s\n", gwip);
-          gip = addr.s_addr = inet_addr(gwip);
-        }
-      else
-        {
-          if (gip != 0)
-            {
-              ninfo("Gateway: default\n");
-              gip  = NTOHL(gip);
-              gip &= ~0x000000ff;
-              gip |= 0x00000001;
-              gip  = HTONL(gip);
-            }
-
-          addr.s_addr = gip;
-        }
-
-      netlib_set_dripv4addr(ifname, &addr);
-    }
-#endif /* CONFIG_NET_IPv4 */
-
   /* Set network mask */
 
 #ifdef CONFIG_NET_IPv6
@@ -899,23 +889,53 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (inet6)
 #endif
     {
+      struct in6_addr mask6;
+#ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+      uint8_t plen;
+#endif
       if (mask != NULL)
         {
           ninfo("Netmask: %s\n", mask);
-          inet_pton(AF_INET6, mask, &addr6);
+          ret = inet_pton(AF_INET6, mask, &mask6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
       else if (preflen != NULL)
         {
           ninfo("Prefixlen: %s\n", preflen);
-          netlib_prefix2ipv6netmask(atoi(preflen), &addr6);
+          netlib_prefix2ipv6netmask(atoi(preflen), &mask6);
         }
       else
         {
           ninfo("Netmask: Default\n");
-          inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &addr6);
+          inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask6);
         }
 
-      netlib_set_ipv6netmask(ifname, &addr6);
+#ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+      plen = netlib_ipv6netmask2prefix(mask6.in6_u.u6_addr16);
+      if (remove)
+        {
+          ret = netlib_del_ipv6addr(ifname, &addr6, plen);
+        }
+      else
+        {
+          ret = netlib_add_ipv6addr(ifname, &addr6, plen);
+        }
+
+      if (ret < 0)
+        {
+          perror("Failed to manage IPv6 address");
+
+          /* REVISIT: Should we return ERROR or just let it go? */
+
+          return ERROR;
+        }
+#else
+      netlib_set_ipv6netmask(ifname, &mask6);
+#endif /* CONFIG_NETDEV_MULTIPLE_IPv6 */
     }
 #endif /* CONFIG_NET_IPv6 */
 
@@ -935,13 +955,67 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           addr.s_addr = inet_addr("255.255.255.0");
         }
 
+      mip = addr.s_addr;
       netlib_set_ipv4netmask(ifname, &addr);
+    }
+#endif /* CONFIG_NET_IPv4 */
+
+  /* Set gateway */
+
+#ifdef CONFIG_NET_IPv6
+#ifdef CONFIG_NET_IPv4
+  if (inet6)
+#endif
+    {
+      /* Only set the gateway address if it was explicitly provided. */
+
+      if (gwip != NULL)
+        {
+          ninfo("Gateway: %s\n", gwip);
+          ret = inet_pton(AF_INET6, gwip, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
+
+          netlib_set_dripv6addr(ifname, &addr6);
+          gip6 = addr6;
+        }
+    }
+#endif /* CONFIG_NET_IPv6 */
+
+#ifdef CONFIG_NET_IPv4
+#ifdef CONFIG_NET_IPv6
+  else
+#endif
+    {
+      if (gwip != NULL)
+        {
+          ninfo("Gateway: %s\n", gwip);
+          gip = addr.s_addr = inet_addr(gwip);
+        }
+      else
+        {
+          if (gip != INADDR_ANY)
+            {
+              ninfo("Gateway: default\n");
+              gip  = ntohl(gip);
+              gip &= ntohl(mip);
+              gip |= 0x00000001;
+              gip  = htonl(gip);
+            }
+
+          addr.s_addr = gip;
+        }
+
+      netlib_set_dripv4addr(ifname, &addr);
     }
 #endif /* CONFIG_NET_IPv4 */
 
   UNUSED(ifname); /* Not used in all configurations */
 
-#if defined(CONFIG_NETINIT_DHCPC) || defined(CONFIG_NETINIT_DNS)
+#ifdef CONFIG_NETDB_DNSCLIENT
 #ifdef CONFIG_NET_IPv6
 #ifdef CONFIG_NET_IPv4
   if (inet6)
@@ -950,7 +1024,12 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       if (dns != NULL)
         {
           ninfo("DNS: %s\n", dns);
-          inet_pton(AF_INET6, dns, &addr6);
+          ret = inet_pton(AF_INET6, dns, &addr6);
+          if (ret <= 0)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, argv[0]);
+              return ERROR;
+            }
         }
       else
         {
@@ -981,48 +1060,24 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       netlib_set_ipv4dnsaddr(&addr);
     }
 #endif /* CONFIG_NET_IPv4 */
-#endif /* CONFIG_NETINIT_DHCPC || CONFIG_NETINIT_DNS */
+#endif /* CONFIG_NETDB_DNSCLIENT */
 
-#if defined(CONFIG_NETINIT_DHCPC)
-  /* Get the MAC address of the NIC */
+#if defined(CONFIG_NETUTILS_DHCPC)
 
   if (!gip)
     {
-      netlib_getmacaddr("eth0", macaddr);
+      netlib_obtain_ipv4addr(ifname);
+    }
+#endif
 
-      /* Set up the DHCPC modules */
-
-      handle = dhcpc_open("eth0", &macaddr, IFHWADDRLEN);
-
-      /* Get an IP address.  Note that there is no logic for renewing the IP
-       * address in this example.  The address should be renewed in
-       * ds.lease_time/2 seconds.
-       */
-
-      if (handle != NULL)
-        {
-          struct dhcpc_state ds;
-
-          dhcpc_request(handle, &ds);
-          netlib_set_ipv4addr("eth0", &ds.ipaddr);
-
-          if (ds.netmask.s_addr != 0)
-            {
-              netlib_set_ipv4netmask("eth0", &ds.netmask);
-            }
-
-          if (ds.default_router.s_addr != 0)
-            {
-              netlib_set_dripv4addr("eth0", &ds.default_router);
-            }
-
-          if (ds.dnsaddr.s_addr != 0)
-            {
-              netlib_set_ipv4dnsaddr(&ds.dnsaddr);
-            }
-
-          dhcpc_close(handle);
-        }
+#ifdef CONFIG_NET_ARP
+  if (arpflag == ARP_ENABLE)
+    {
+      netlib_ifarp(ifname);
+    }
+  else if (arpflag == ARP_DISABLE)
+    {
+      netlib_ifnoarp(ifname);
     }
 #endif
 
@@ -1037,6 +1092,60 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv6
   UNUSED(gip6);
 #endif
+
+  return OK;
+}
+#endif
+
+/****************************************************************************
+ * Name: cmd_vconfig
+ ****************************************************************************/
+
+#if defined(CONFIG_NET_VLAN) && !defined(CONFIG_NSH_DISABLE_VCONFIG)
+int cmd_vconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
+{
+  DEBUGASSERT(argc >= 2);
+
+  if (!strcmp(argv[1], "add"))
+    {
+      int prio = 0;
+
+      if (argc != 4 && argc != 5)
+        {
+          nsh_error(vtbl, g_fmtargrequired, argv[0]);
+          return ERROR;
+        }
+
+      if (argc == 5)
+        {
+          prio = atoi(argv[4]);
+        }
+
+      if (netlib_add_vlan(argv[2], atoi(argv[3]), prio) < 0)
+        {
+          perror("Failed to add VLAN");
+          return ERROR;
+        }
+    }
+  else if (!strcmp(argv[1], "rem") || !strcmp(argv[1], "del"))
+    {
+      if (argc != 3)
+        {
+          nsh_error(vtbl, g_fmtargrequired, argv[0]);
+          return ERROR;
+        }
+
+      if (netlib_del_vlan(argv[2]) < 0)
+        {
+          perror("Failed to remove VLAN");
+          return ERROR;
+        }
+    }
+  else
+    {
+      nsh_error(vtbl, g_fmtarginvalid, argv[1]);
+      return ERROR;
+    }
 
   return OK;
 }
@@ -1201,7 +1310,7 @@ int cmd_arp(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           FAR uint8_t *ptr;
 
           if (ifname != NULL &&
-              strcmp(ifname, (FAR char *)arptab[i].arp_dev) != 0)
+              strcmp(ifname, arptab[i].arp_dev) != 0)
             {
               continue;
             }
@@ -1310,7 +1419,7 @@ int cmd_arp(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   /* Error exits */
 
 errout_cmdfaild:
-  if (ret == -ENOENT)
+  if (ret == -ENOENT || ret == -ENETUNREACH)
     {
       nsh_error(vtbl, g_fmtnosuch, argv[0], "ARP entry", argv[optind]);
     }
@@ -1446,6 +1555,12 @@ int cmd_wget(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (localfile == NULL)
     {
       allocfile = strdup(url);
+      if (allocfile == NULL)
+        {
+          fmt = g_fmtcmdoutofmemory;
+          goto errout;
+        }
+
       localfile = basename(allocfile);
     }
 

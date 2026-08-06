@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/adb/logcat_service.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 
 #include <nuttx/syslog/ramlog.h>
 #include <unistd.h>
@@ -36,12 +39,12 @@
  * Private types
  ****************************************************************************/
 
-typedef struct alog_service_s
+typedef struct logcat_service_s
 {
   adb_service_t service;
   uv_poll_t poll;
   int wait_ack;
-} alog_service_t;
+} logcat_service_t;
 
 /****************************************************************************
  * Private Function Prototypes
@@ -54,58 +57,53 @@ static void logcat_on_data_available(uv_poll_t * handle,
  * Private Functions
  ****************************************************************************/
 
-static int alog_on_write(adb_service_t *service, apacket *p)
+static int logcat_on_write(adb_service_t *service, apacket *p)
 {
   UNUSED(p);
   UNUSED(service);
   return -1;
 }
 
-static void alog_on_kick(struct adb_service_s *service)
+static void logcat_on_kick(struct adb_service_s *service)
 {
-  alog_service_t *svc = container_of(service, alog_service_t, service);
+  logcat_service_t *svc = container_of(service, logcat_service_t, service);
   if (!svc->wait_ack)
     {
-      int ret;
-      ret = uv_poll_start(&svc->poll, UV_READABLE, logcat_on_data_available);
-      assert(ret == 0);
+      uv_poll_start(&svc->poll, UV_READABLE, logcat_on_data_available);
     }
 }
 
-static int alog_on_ack(adb_service_t *service, apacket *p)
+static int logcat_on_ack(adb_service_t *service, apacket *p)
 {
   UNUSED(p);
-  alog_service_t *svc = container_of(service, alog_service_t, service);
+  logcat_service_t *svc = container_of(service, logcat_service_t, service);
   svc->wait_ack = 0;
-  alog_on_kick(service);
+  logcat_on_kick(service);
   return 0;
 }
 
 static void close_cb(uv_handle_t *handle)
 {
-  alog_service_t *service = container_of(handle, alog_service_t, poll);
+  logcat_service_t *service = container_of(handle, logcat_service_t, poll);
   free(service);
 }
 
-static void alog_close(struct adb_service_s *service)
+static void logcat_on_close(struct adb_service_s *service)
 {
   int fd;
-  int ret;
-  alog_service_t *svc = container_of(service, alog_service_t, service);
+  logcat_service_t *svc = container_of(service, logcat_service_t, service);
 
-  ret = uv_fileno((uv_handle_t *)&svc->poll, &fd);
-  assert(ret == 0);
-
+  uv_fileno((uv_handle_t *)&svc->poll, &fd);
   close(fd);
   uv_close((uv_handle_t *)&svc->poll, close_cb);
 }
 
-static const adb_service_ops_t logcat_ops =
+static const adb_service_ops_t g_logcat_ops =
 {
-  .on_write_frame = alog_on_write,
-  .on_ack_frame   = alog_on_ack,
-  .on_kick        = alog_on_kick,
-  .on_close       = alog_close
+  .on_write_frame = logcat_on_write,
+  .on_ack_frame   = logcat_on_ack,
+  .on_kick        = logcat_on_kick,
+  .on_close       = logcat_on_close
 };
 
 static void logcat_on_data_available(uv_poll_t * handle,
@@ -114,7 +112,7 @@ static void logcat_on_data_available(uv_poll_t * handle,
   int ret;
   int fd;
   apacket_uv_t *ap;
-  alog_service_t *service = container_of(handle, alog_service_t, poll);
+  logcat_service_t *service = container_of(handle, logcat_service_t, poll);
   adb_client_uv_t *client = (adb_client_uv_t *)handle->data;
 
   ap = adb_uv_packet_allocate(client, 0);
@@ -126,7 +124,7 @@ static void logcat_on_data_available(uv_poll_t * handle,
 
   if (status)
     {
-      adb_log("status error %d\n", status);
+      adb_err("status error %d\n", status);
 
       /* Fatal error, stop service */
 
@@ -139,7 +137,7 @@ static void logcat_on_data_available(uv_poll_t * handle,
   ret = read(fd, ap->p.data, CONFIG_ADBD_PAYLOAD_SIZE);
   if (ret < 0)
     {
-      adb_log("frame read failed %d %d\n", ret, errno);
+      adb_err("frame read failed %d %d\n", ret, errno);
       if (errno == EAGAIN)
         {
           /* TODO this should never happen */
@@ -180,35 +178,45 @@ exit_stop_service:
 
 adb_service_t * logcat_service(adb_client_t *client, const char *params)
 {
+  int fd;
   int ret;
-  alog_service_t *service =
-      (alog_service_t *)malloc(sizeof(alog_service_t));
+
+  logcat_service_t *service =
+      (logcat_service_t *)malloc(sizeof(logcat_service_t));
 
   if (service == NULL)
     {
       return NULL;
     }
 
-  service->service.ops = &logcat_ops;
+  service->service.ops = &g_logcat_ops;
   service->wait_ack = 0;
 
   /* TODO parse params string to extract logcat parameters */
 
-  ret = open(CONFIG_SYSLOG_DEVPATH, O_RDONLY | O_CLOEXEC);
+  fd = open(CONFIG_SYSLOG_DEVPATH, O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+    {
+      adb_err("failed to open %s (%d)\n", CONFIG_SYSLOG_DEVPATH, errno);
+      free(service);
+      return NULL;
+    }
 
+  ret = ioctl(fd, PIPEIOC_POLLINTHRD, 1);
   if (ret < 0)
     {
-      adb_log("failed to open %s (%d)\n", CONFIG_SYSLOG_DEVPATH, errno);
+      adb_err("failed to control %s (%d)\n", CONFIG_SYSLOG_DEVPATH, errno);
+      close(fd);
       free(service);
       return NULL;
     }
 
   uv_handle_t *handle = adb_uv_get_client_handle(client);
-  ret = uv_poll_init(handle->loop, &service->poll, ret);
+  ret = uv_poll_init(handle->loop, &service->poll, fd);
   assert(ret == 0);
 
   service->poll.data = client;
-  alog_on_kick(&service->service);
+  logcat_on_kick(&service->service);
 
   return &service->service;
 }

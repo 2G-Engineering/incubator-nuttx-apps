@@ -1,6 +1,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // apps/include/graphics/twm4nx/ciconwidget.hxx
 //
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed to the Apache Software Foundation (ASF) under one or more
 // contributor license agreements.  See the NOTICE file distributed with
 // this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,7 @@
 #include <cstdint>
 #include <cstdbool>
 #include <mqueue.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/nx/nxglib.h>
 #include <nuttx/nx/nx.h>

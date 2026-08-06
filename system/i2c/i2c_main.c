@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/i2c/i2c_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "i2ctool.h"
 
@@ -41,7 +43,8 @@
  * Private Function Prototypes
  ****************************************************************************/
 
-static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc, char **argv);
+static int i2ccmd_help(FAR struct i2ctool_s *i2ctool,
+                       int argc, FAR char **argv);
 static int i2ccmd_unrecognized(FAR struct i2ctool_s *i2ctool, int argc,
                                FAR char **argv);
 
@@ -96,7 +99,8 @@ const char g_i2cxfrerror[]    = "i2ctool: %s: Transfer failed: %d\n";
  * Name: i2ccmd_help
  ****************************************************************************/
 
-static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
+static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc,
+                       FAR char **argv)
 {
   const struct cmdmap_s *ptr;
 
@@ -147,6 +151,10 @@ static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
   i2ctool_printf(i2ctool,
                  "  [-r regaddr] is the I2C device register index (hex)."
                  "  Default: not used/sent\n");
+  i2ctool_printf(
+      i2ctool,
+      "  [-z] instructs the 'dev' command to scan the I2C bus by sending "
+      "zero-byte write headers (if the architecture supports it)\n");
 
   i2ctool_printf(i2ctool, "\nNOTES:\n");
 #ifndef CONFIG_DISABLE_ENVIRON
@@ -157,7 +165,7 @@ static int i2ccmd_help(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
                  "o Arguments are \"sticky\". For example, once "
                  "the I2C address is\n");
   i2ctool_printf(i2ctool,
-                 "  specified, that address will be re-used until "
+                 "  specified, that address will be reused until "
                  "it is changed.\n");
   i2ctool_printf(i2ctool, "\nWARNING:\n");
   i2ctool_printf(i2ctool,
@@ -221,7 +229,7 @@ static int i2c_execute(FAR struct i2ctool_s *i2ctool, int argc,
  ****************************************************************************/
 
 static FAR char *i2c_argument(FAR struct i2ctool_s *i2ctool,
-                              int argc, char *argv[], int *pindex)
+                              int argc, FAR char *argv[], FAR int *pindex)
 {
   FAR char *arg;
   int  index = *pindex;
@@ -266,7 +274,8 @@ static FAR char *i2c_argument(FAR struct i2ctool_s *i2ctool,
  * Name: i2c_parse
  ****************************************************************************/
 
-static int i2c_parse(FAR struct i2ctool_s *i2ctool, int argc, char *argv[])
+static int i2c_parse(FAR struct i2ctool_s *i2ctool,
+                     int argc, FAR char *argv[])
 {
   FAR char *newargs[MAX_ARGUMENTS + 2];
   FAR char *cmd;
@@ -395,6 +404,7 @@ int main(int argc, FAR char *argv[])
     }
 
   g_i2ctool.hasregindx = false;
+  g_i2ctool.zerowrite = false;
 
   /* Parse and process the command line */
 

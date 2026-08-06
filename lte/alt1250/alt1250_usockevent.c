@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_usockevent.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -61,7 +63,7 @@ static const usrsock_reqhandler_t handlers[USRSOCK_REQUEST__MAX] =
  ****************************************************************************/
 
 int usock_reply(int ufd, int action_code, int32_t result,
-    uint32_t xid, FAR struct usock_ackinfo_s *ackinfo)
+                uint32_t xid, FAR struct usock_ackinfo_s *ackinfo)
 {
   int ret = OK;
 
@@ -119,7 +121,7 @@ int perform_usockrequest(FAR struct alt1250_s *dev)
               /* In unsupported ioctl command case */
 
               usock_reply(dev->usockfd, REP_SEND_ACK_WOFREE, ret,
-                                          USOCKREQXID(dev->usockreq), NULL);
+                          USOCKREQXID(dev->usockreq), NULL);
               return OK;
             }
         }

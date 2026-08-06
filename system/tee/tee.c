@@ -1,14 +1,11 @@
 /****************************************************************************
  * apps/system/tee/tee.c
- * $NetBSD: tee.c,v 1.6 1997/10/20 00:37:11 lukem Exp $
  *
- *   Copyright (c) 2016.  Gregory Nutt.  All rights reserved.
- *   Author:  Gregory Nutt <gnutt@nuttx.org>
- *
- * Leveraged from NetBSD:
- *
- *   Copyright (c) 1988, 1993
- *     The Regents of the University of California.  All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2016 Gregory Nutt.  All rights reserved.
+ * SPDX-FileCopyrightText: 1993 The Regents of the University of California.
+ * SPDX-FileCopyrightText: 1993 The Regents of the University of California.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -19,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *  This product includes software developed by the University of
- *  California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,7 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -110,8 +103,9 @@ static void show_usage(FAR const char *progrname, int exitcode)
   fprintf(stderr, "-a:\n");
   fprintf(stderr, "\tAppend to the file (vs. truncating)\n");
   fprintf(stderr, "file:\n");
-  fprintf(stderr, "\tArbitrary number of options output files.  Output\n");
-  fprintf(stderr, "\twill go to stdout in addition to each of these files.\n");
+  fprintf(stderr, "\tArbitrary number of options output files. Output\n");
+  fprintf(stderr, "\twill go to stdout in addition to each of these\n");
+  fprintf(stderr, "\tfiles.\n");
   fprintf(stderr, "-h:\n");
   fprintf(stderr, "\tShows this message and exits\n");
   exit(exitcode);

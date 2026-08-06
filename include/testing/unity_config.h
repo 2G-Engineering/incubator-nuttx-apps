@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/testing/unity_config.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -43,6 +45,12 @@
 
 #ifdef CONFIG_TESTING_UNITY_OUTPUT_COLOR
 #  define UNITY_OUTPUT_COLOR 1
+#endif
+
+/* Enable Unity TEST_PRINTF */
+
+#ifdef CONFIG_TESTING_UNITY_PRINT_FORMATTED
+#  define UNITY_INCLUDE_PRINT_FORMATTED 1
 #endif
 
 #endif /* UNITY_CONFIG_H */

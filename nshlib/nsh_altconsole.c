@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_altconsole.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,7 +30,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
+#include <string.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
@@ -96,6 +99,10 @@ static int nsh_clone_console(FAR struct console_stdio_s *pstate)
   /* Setup the stdout */
 
   OUTFD(pstate) = 1;
+
+  /* Setup stdin */
+
+  INFD(pstate) = 0;
 
   return OK;
 }

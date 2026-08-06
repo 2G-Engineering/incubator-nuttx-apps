@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_connecthdlr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -68,11 +70,11 @@ static int postproc_getsockopt(FAR struct alt1250_s *dev,
    */
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   if (*usock_result >= 0)
     {
-      *usock_result = *(int32_t *)(resp[3]);
+      *usock_result = *(FAR int32_t *)(resp[3]);
       *usock_xid = USOCKET_XID(usock);
 
       dbg_alt1250("connect result = %d\n", *usock_result);
@@ -124,7 +126,7 @@ static int postproc_connect(FAR struct alt1250_s *dev,
    */
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   dbg_alt1250("%s connect result:%d\n", __func__, *usock_result);
 
@@ -175,7 +177,7 @@ static int send_connect_command(FAR struct alt1250_s *dev,
   set_container_response(container, USOCKET_REP_RESPONSE(usock), idx);
   set_container_postproc(container, postproc_connect, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -191,7 +193,7 @@ int nextstep_check_connectres(FAR struct alt1250_s *dev,
 {
   int ret = REP_NO_CONTAINER;
   int32_t usock_result;
-  struct alt_container_s *container;
+  FAR struct alt_container_s *container;
 
   dbg_alt1250("%s start\n", __func__);
 

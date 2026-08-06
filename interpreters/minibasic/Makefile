@@ -1,6 +1,8 @@
 ############################################################################
 # apps/interpreters/minibasic/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -29,8 +31,8 @@ MAINSRC = script.c
 # Mini Basic built-in application info
 
 PROGNAME  = basic
-PRIORITY  = $(CONFIG_INTERPRETER_MINIBASIC_PRIORITY)
-STACKSIZE = $(CONFIG_INTERPRETER_MINIBASIC_STACKSIZE)
+PRIORITY  = $(CONFIG_INTERPRETERS_MINIBASIC_PRIORITY)
+STACKSIZE = $(CONFIG_INTERPRETERS_MINIBASIC_STACKSIZE)
 MODULE    = $(CONFIG_INTERPRETERS_MINIBASIC)
 
 include $(APPDIR)/Application.mk

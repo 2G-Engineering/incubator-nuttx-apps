@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/foc/foc_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -75,7 +77,12 @@ struct args_s g_args =
     .fmode = CONFIG_EXAMPLES_FOC_FMODE,
     .mmode = CONFIG_EXAMPLES_FOC_MMODE,
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_OPENLOOP
-    .qparam = CONFIG_EXAMPLES_FOC_OPENLOOP_Q,
+    .qparam   = CONFIG_EXAMPLES_FOC_OPENLOOP_Q,
+    .ol_force = false,
+#  ifdef CONFIG_EXAMPLES_FOC_ANGOBS
+    .ol_hys = CONFIG_EXAMPLES_FOC_ANGOBS_HYS,
+    .ol_thr = CONFIG_EXAMPLES_FOC_ANGOBS_THR,
+#  endif
 #endif
 #ifdef CONFIG_EXAMPLES_FOC_CONTROL_PI
     .foc_pi_kp = CONFIG_EXAMPLES_FOC_IDQ_KP,
@@ -102,6 +109,10 @@ struct args_s g_args =
     .posmax = CONFIG_EXAMPLES_FOC_SETPOINT_MAX,
 #  endif
 #endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
+    .acc = CONFIG_EXAMPLES_FOC_RAMP_ACC,
+    .dec = CONFIG_EXAMPLES_FOC_RAMP_DEC,
+#endif
 #ifdef CONFIG_EXAMPLES_FOC_HAVE_IDENT
     .ident_res_ki = CONFIG_EXAMPLES_FOC_IDENT_RES_KI,
     .ident_res_curr = CONFIG_EXAMPLES_FOC_IDENT_RES_CURRENT,
@@ -109,10 +120,29 @@ struct args_s g_args =
     .ident_ind_volt = CONFIG_EXAMPLES_FOC_IDENT_IND_VOLTAGE,
     .ident_ind_sec = CONFIG_EXAMPLES_FOC_IDENT_IND_SEC,
 #endif
+#ifdef CONFIG_EXAMPLES_FOC_HAVE_VEL
+    .vel_filter = CONFIG_EXAMPLES_FOC_VELNOW_FILTER,
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_VELOBS_PLL
+    .vel_pll_kp = CONFIG_EXAMPLES_FOC_VELOBS_PLL_KP,
+    .vel_pll_ki = CONFIG_EXAMPLES_FOC_VELOBS_PLL_KI,
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_VELOBS_DIV
+    .vel_div_samples = CONFIG_EXAMPLES_FOC_VELOBS_DIV_SAMPLES,
+    .vel_div_filter = CONFIG_EXAMPLES_FOC_VELOBS_DIV_FILTER,
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_VELCTRL_PI
+    .vel_pi_kp = CONFIG_EXAMPLES_FOC_VELCTRL_PI_KP,
+    .vel_pi_ki = CONFIG_EXAMPLES_FOC_VELCTRL_PI_KI,
+#endif
+#ifdef CONFIG_EXAMPLES_FOC_ANGOBS_NFO
+    .ang_nfo_slow = CONFIG_EXAMPLES_FOC_ANGOBS_NFO_GAINSLOW,
+    .ang_nfo_gain = CONFIG_EXAMPLES_FOC_ANGOBS_NFO_GAIN,
+#endif
   }
 };
 
-/* Start allowed at defaule */
+/* Start allowed at default */
 
 static bool            g_start_allowed      = true;
 static pthread_mutex_t g_start_allowed_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -264,16 +294,10 @@ int main(int argc, char *argv[])
       goto errout_no_nxscope;
     }
 
-#ifndef CONFIG_NSH_ARCHINIT
-  /* Perform architecture-specific initialization (if configured) */
-
-  boardctl(BOARDIOC_INIT, 0);
-
-#  ifdef CONFIG_BOARDCTL_FINALINIT
+#ifdef CONFIG_BOARDCTL_FINALINIT
   /* Perform architecture-specific final-initialization (if configured) */
 
   boardctl(BOARDIOC_FINALINIT, 0);
-#  endif
 #endif
 
   PRINTF("\nStart foc_main application!\n\n");
@@ -368,8 +392,7 @@ int main(int argc, char *argv[])
     {
       PRINTFV("foc_main loop %d\n", time);
 
-#if defined(CONFIG_EXAMPLES_FOC_NXSCOPE) &&       \
-    !defined(CONFIG_EXAMPLES_FOC_NXSCOPE_THREAD)
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE_MAIN
       foc_nxscope_work(&nxs);
 #endif
 

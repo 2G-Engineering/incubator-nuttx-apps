@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/gcov/gcov.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,8 +24,16 @@
  * Included Files
  ****************************************************************************/
 
+#include <fcntl.h>
+#include <gcov.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syslog.h>
 #include <unistd.h>
+
+#include <nuttx/crc16.h>
+#include <nuttx/streams.h>
 
 /****************************************************************************
  * Private Functions
@@ -35,19 +45,15 @@
 
 static void show_usage(FAR const char *progname)
 {
-  printf("\nUsage: %s [-d] [-r] [-h]\n", progname);
+  printf("\nUsage: %s [-d path] [-t strip] [-r] [-h]\n", progname);
   printf("\nWhere:\n");
-  printf("  -d dump the coverage.\n");
+  printf("  -d dump the coverage, path is the path to the coverage file, "
+         "the default output is to stdout\n");
+  printf("  -t strip the path prefix number\n");
   printf("  -r reset the coverage\n");
   printf("  -h show this text and exits.\n");
+  exit(EXIT_FAILURE);
 }
-
-/****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
-
-void __gcov_dump(void);
-void __gcov_reset(void);
 
 /****************************************************************************
  * Public Functions
@@ -55,33 +61,37 @@ void __gcov_reset(void);
 
 int main(int argc, FAR char *argv[])
 {
+  FAR const char *strip = CONFIG_COVERAGE_DEFAULT_PREFIX_STRIP;
+  FAR const char *path = NULL;
   int option;
 
-  if (argc < 2)
-    {
-      show_usage(argv[0]);
-    }
-
-  while ((option = getopt(argc, argv, "drh")) != ERROR)
+  while ((option = getopt(argc, argv, "d::t:orh")) != ERROR)
     {
       switch (option)
         {
-          case 'd':
-            __gcov_dump();
-            break;
+        case 'd':
+          path = optarg;
+          break;
 
-          case 'r':
-            __gcov_reset();
-            break;
+        case 't':
+          strip = optarg;
+          break;
 
-          case '?':
-          default:
-            fprintf(stderr, "ERROR: Unrecognized option\n");
+        case 'r':
+          __gcov_reset();
+          break;
 
-          case 'h':
-            show_usage(argv[0]);
+        case '?':
+        default:
+          fprintf(stderr, "ERROR: Unrecognized option\n");
+
+        case 'h':
+          show_usage(argv[0]);
         }
     }
 
+  setenv("GCOV_PREFIX_STRIP", strip, 1);
+  setenv("GCOV_PREFIX", path, 1);
+  __gcov_dump();
   return 0;
 }

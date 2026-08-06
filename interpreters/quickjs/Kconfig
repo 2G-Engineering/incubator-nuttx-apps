@@ -14,7 +14,7 @@ choice
 	default INTERPRETERS_QUICKJS_NONE
 
 config INTERPRETERS_QUICKJS_NONE
-	bool "distable quickjs interpreter"
+	bool "Disable quickjs interpreter"
 
 config INTERPRETERS_QUICKJS_MINI
 	bool "Minimal quickjs interpreter"
@@ -28,8 +28,8 @@ config INTERPRETERS_QUICKJS_BIGNUM
 	bool "Bignum support"
 	default n
 	---help---
-	It's depend on libatomic,
-	Not all platform support it.
+		It's depend on libatomic,
+		Not all platform support it.
 
 config INTERPRETERS_QUICKJS_PRIORITY
 	int "QuickJS interpreter priority"
@@ -40,11 +40,11 @@ config INTERPRETERS_QUICKJS_STACKSIZE
 	default 8192
 
 config INTERPRETERS_QUICKJS_EXT_HOOK
-	bool "External init/destory hook"
+	bool "External init/destroy hook"
 	default n
 	depends on INTERPRETERS_QUICKJS_MINI
 	---help---
 		Since minimal interpreter only support 'console.log',
-		you can export custom module by implement init/destory hook.
+		you can export custom module by implement init/destroy hook.
 
-endif
+endif # INTERPRETERS_QUICKJS

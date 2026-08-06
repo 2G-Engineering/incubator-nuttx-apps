@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/telnetd/telnetd_daemon.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 #include <sched.h>
 #include <spawn.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/net/telnet.h>
 
@@ -72,7 +74,7 @@ int telnetd_daemon(FAR const struct telnetd_config_s *config)
 #endif
   } addr;
 
-#ifdef CONFIG_SCHED_HAVE_PARENT
+#if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_ENABLE_ALL_SIGNALS)
   struct sigaction sa;
   sigset_t blockset;
 #endif
@@ -83,7 +85,7 @@ int telnetd_daemon(FAR const struct telnetd_config_s *config)
   int optval;
 #endif
 
-#ifdef CONFIG_SCHED_HAVE_PARENT
+#if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_ENABLE_ALL_SIGNALS)
   /* Call sigaction with the SA_NOCLDWAIT flag so that we do not transform
    * children into "zombies" when they terminate:  Child exit status will
    * not be retained.
@@ -111,7 +113,7 @@ int telnetd_daemon(FAR const struct telnetd_config_s *config)
       nerr("ERROR: sigprocmask failed: %d\n", errno);
       goto errout;
     }
-#endif /* CONFIG_SCHED_HAVE_PARENT */
+#endif /* CONFIG_SCHED_HAVE_PARENT && CONFIG_ENABLE_ALL_SIGNALS */
 
   /* Create a new TCP socket to use to listen for connections */
 
@@ -197,7 +199,7 @@ int telnetd_daemon(FAR const struct telnetd_config_s *config)
       ninfo("Accepting connections on port %d\n", ntohs(config->d_port));
 
       addrlen = sizeof(addr);
-      acceptsd = accept(listensd, &addr.generic, &addrlen);
+      acceptsd = accept4(listensd, &addr.generic, &addrlen, SOCK_CLOEXEC);
       if (acceptsd < 0)
         {
           /* Just continue if a signal was received */

@@ -1,15 +1,11 @@
 /****************************************************************************
  * apps/examples/xmlrpc/xmlrpc_main.c
  *
- *   Copyright (C) 2012 Max Holtzberg. All rights reserved.
- *   Copyright (C) 2015 Gregory Nutt. All rights reserved.
- *   Author: Max Holtzberg <mh@uvc.de>
- *
- * Based on the embeddable lightweight XML-RPC server code discussed
- * in the article at: http://www.drdobbs.com/web-development/\
- *    an-embeddable-lightweight-xml-rpc-server/184405364
- *
- *  Copyright (c) 2002 Cogito LLC.  All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2012 Max Holtzberg. All rights reserved.
+ * SPDX-FileCopyrightText: 2015 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2002 Cogito LLC.  All rights reserved.
+ * SPDX-FileContributor: Max Holtzberg <mh@uvc.de>
  *
  *  Redistribution and use in source and binary forms, with or
  *  without modification, is hereby granted without fee provided
@@ -41,6 +37,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ****************************************************************************/
 
+/* Based on the embeddable lightweight XML-RPC server code discussed
+ * in the article at: http://www.drdobbs.com/web-development/\
+ *    an-embeddable-lightweight-xml-rpc-server/184405364
+ */
+
 /* Lightweight Embedded XML-RPC Server main
  *
  * mtj@cogitollc.com
@@ -51,7 +52,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -334,6 +335,7 @@ static int xmlrpc_netinit(void)
     {
       struct dhcpc_state ds;
       char inetaddr[INET_ADDRSTRLEN];
+      int ret;
 
       dhcpc_request(handle, &ds);
       netlib_set_ipv4addr("eth0", &ds.ipaddr);
@@ -348,9 +350,17 @@ static int xmlrpc_netinit(void)
           netlib_set_dripv4addr("eth0", &ds.default_router);
         }
 
-      if (ds.dnsaddr.s_addr != 0)
+      for (int i = 0; i < ds.num_dnsaddr; i++)
         {
-          netlib_set_ipv4dnsaddr(&ds.dnsaddr);
+          if (ds.dnsaddr[i].s_addr != 0)
+            {
+              ret = netlib_set_ipv4dnsaddr(&ds.dnsaddr[i]);
+              if (ret < 0)
+                {
+                  nerr("ERROR: Set DNS server %d:%s address failed: %d\n",
+                       i, inet_ntoa(ds.dnsaddr[i]), ret);
+                }
+            }
         }
 
       dhcpc_close(handle);
@@ -410,7 +420,8 @@ int main(int argc, FAR char *argv[])
   for (; ; )
     {
       clilen = sizeof(cliaddr);
-      connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
+      connfd = accept4(listenfd, (struct sockaddr *)&cliaddr, &clilen,
+                       SOCK_CLOEXEC);
       if (connfd <= 0)
         {
           break;

@@ -1,11 +1,26 @@
 /****************************************************************************
  * apps/netutils/codecs/md5.c
  *
- * This file is part of the NuttX RTOS:
+ * SPDX-License-Identifier: Apache-2.0
  *
- *   Copyright (C) 2012 Gregory Nutt. All rights reserved.
- *   Author: Darcy Gong
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.  The
+ * ASF licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
  *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ *
+ ****************************************************************************/
+
+/****************************************************************************
  * Reference:
  *
  *   This code implements the MD5 message-digest algorithm.
@@ -25,33 +40,6 @@
  *
  *   See README and COPYING for more details.
  *
- * And is re-released under the NuttX modified BSD license:
- *
- *   Redistribution and use in source and binary forms, with or without
- *   modification, are permitted provided that the following conditions
- *   are met:
- *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the name of the Institute nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- *   THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS''
- *   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- *   THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- *   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS
- *   BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- *   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- *   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- *   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- *   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- *   THE POSSIBILITY OF SUCH DAMAGE.
- *
  ****************************************************************************/
 
 /****************************************************************************
@@ -64,6 +52,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "netutils/md5.h"
 
@@ -85,6 +75,10 @@
 
 #  define MD5STEP(f, w, x, y, z, data, s) \
         (w += f(x, y, z) + data,  w = w<<s | w>>(32-s),  w += x)
+
+/* Encoding Memory Block Size */
+
+#define MD5_BUFSIZE 1024
 
 /****************************************************************************
  * Private Functions
@@ -404,6 +398,61 @@ char *md5_hash(const uint8_t * addr, const size_t len)
 
   hash[32] = 0;
   return hash;
+}
+
+/****************************************************************************
+ * Name: md5_file
+ *
+ * Description:
+ *   MD5 hash for a file
+ *
+ * Input Parameters:
+ *   path: File Path
+ *   mac : Buffer for the hash
+ *
+ ****************************************************************************/
+
+int md5_file(const char *path, uint8_t *mac)
+{
+  int fd;
+  int ret;
+  unsigned char *buf;
+  MD5_CTX ctx;
+
+  fd = open(path, O_RDONLY);
+  if (fd < 0)
+    {
+      return -errno;
+    }
+
+  buf = malloc(MD5_BUFSIZE);
+  if (buf == NULL)
+    {
+      ret = -ENOMEM;
+      goto out;
+    }
+
+  md5_init(&ctx);
+
+  while (1)
+    {
+      /* Block calculation md5 */
+
+      ret = read(fd, buf, MD5_BUFSIZE);
+      if (ret <= 0)
+        {
+          ret = ret < 0 ? -errno : 0;
+          break;
+        }
+
+      md5_update(&ctx, buf, ret);
+    }
+
+  md5_final(mac, &ctx);
+  free(buf);
+out:
+  close(fd);
+  return ret;
 }
 
 #endif /* CONFIG_CODECS_HASH_MD5 */

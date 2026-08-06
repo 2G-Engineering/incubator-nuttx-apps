@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_sockethdlr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -94,7 +96,7 @@ static int send_fctl_command(FAR struct alt1250_s *dev,
   set_container_postproc(container, cmd == ALTCOM_SETFL ? postproc_setfl :
                           cmd == ALTCOM_GETFL ? postproc_getfl : NULL, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -119,7 +121,7 @@ static int postproc_setfl(FAR struct alt1250_s *dev,
   dbg_alt1250("%s start\n", __func__);
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   if (*usock_result >= 0)
     {
@@ -174,7 +176,7 @@ static int postproc_setfl(FAR struct alt1250_s *dev,
             break;
 
           default:
-            dbg_alt1250("unexpected sequense. reqid:0x%02x\n",
+            dbg_alt1250("unexpected sequence. reqid:0x%02x\n",
                         USOCKET_REQID(usock));
             *usock_result = -EFAULT;
             break;
@@ -216,7 +218,7 @@ static int postproc_getfl(FAR struct alt1250_s *dev,
   dbg_alt1250("%s start\n", __func__);
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   if (*usock_result >= 0)
     {
@@ -269,7 +271,7 @@ static int postproc_socket(FAR struct alt1250_s *dev,
   dbg_alt1250("%s start\n", __func__);
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   if (*usock_result >= 0)
     {
@@ -331,7 +333,7 @@ static int send_socket_command(FAR struct alt1250_s *dev,
   set_container_response(container, USOCKET_REP_RESPONSE(usock), idx);
   set_container_postproc(container, postproc_socket, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -393,11 +395,11 @@ int usockreq_socket(FAR struct alt1250_s *dev,
            request->type != SOCK_CTRL)
     {
       /* If domain is AF_INET while usock_enable is false,
-       * set usockid to -EPROTONOSUPPORT to fallback kernel
+       * set usockid to -ENOTSUP to fallback kernel
        * network stack.
        */
 
-      *usock_result = -EPROTONOSUPPORT;
+      *usock_result = -ENOTSUP;
       return REP_SEND_ACK_WOFREE;
     }
 

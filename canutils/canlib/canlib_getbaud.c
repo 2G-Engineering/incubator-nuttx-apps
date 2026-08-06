@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/canlib/canlib_getbaud.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,15 +24,10 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
-
 #include <sys/ioctl.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
+
 #include <nuttx/can/can.h>
 
 /****************************************************************************
@@ -63,10 +60,9 @@ int canlib_getbaud(int fd, FAR int *bauds)
   if (ret != OK)
     {
       canerr("CANIOC_GET_BITTIMING failed, errno=%d\n", errno);
-      return 0;
+      return ret;
     }
 
   *bauds = timings.bt_baud;
-
   return ret;
 }

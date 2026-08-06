@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/thttpd/content/Makefile.binfs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,7 @@ PROGNAME = hello tasks
 PRIORITY = $(CONFIG_THTTPD_CGI_PRIORITY)
 STACKSIZE = $(CONFIG_THTTPD_CGI_STACKSIZE)
 
-CSRCS = hello.c tasks.c
+MAINSRC = hello.c tasks.c
 
 DEPPATH += --dep-path hello --dep-path tasks
 VPATH += :hello:tasks

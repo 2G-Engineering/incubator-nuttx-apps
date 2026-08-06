@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/webserver/httpd_dirlist.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,7 +36,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <string.h>
 #include <dirent.h>
 #include <stdlib.h>
@@ -194,7 +196,11 @@ ssize_t httpd_dirlist(int outfd, FAR struct httpd_fs_file *file)
         }
 
       ret = asprintf(&path, "%s/%s", file->path, dent->d_name);
-      ASSERT(ret > 0 && path);
+      if (ret < 0 || path == NULL)
+        {
+          nerr("ERROR: asprintf failed\n");
+          break;
+        }
 
       /* call stat() to obtain modified time and size */
 

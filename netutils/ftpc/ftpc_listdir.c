@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/ftpc/ftpc_listdir.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,7 +33,7 @@
 #include <libgen.h>
 #include <assert.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "netutils/ftpc.h"
 
@@ -255,6 +257,7 @@ FAR struct ftpc_dirlist_s *ftpc_listdir(SESSION handle,
   FAR char *tmpfname;
   bool iscurrdir;
   unsigned int nnames;
+  unsigned int i;
   int allocsize;
   int ret;
 
@@ -363,6 +366,17 @@ FAR struct ftpc_dirlist_s *ftpc_listdir(SESSION handle,
 
       ftpc_nlstparse(filestream, ftpc_addname, dirlist);
       DEBUGASSERT(nnames == dirlist->nnames);
+
+      for (i = 0; i < dirlist->nnames; i++)
+        {
+          if (dirlist->name[i] == NULL)
+            {
+              nerr("ERROR: Failed to allocate directory name\n");
+              ftpc_dirfree(dirlist);
+              dirlist = NULL;
+              break;
+            }
+        }
     }
 
 errout:

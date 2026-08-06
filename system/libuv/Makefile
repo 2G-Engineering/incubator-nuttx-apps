@@ -1,6 +1,8 @@
 ############################################################################
 # apps/system/libuv/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -22,12 +24,11 @@ include $(APPDIR)/Make.defs
 
 LIBUV_PATCHS ?= $(sort $(wildcard 000*.patch))
 
-LIBUV_VERSION  = 1.42.0
+LIBUV_VERSION  = 1.46.0
 LIBUV_UNPACK   = libuv
 LIBUV_TARBALL  = v$(LIBUV_VERSION).zip
 LIBUV_URL_BASE = https://github.com/libuv/libuv/archive/refs/tags
 LIBUV_URL      = $(LIBUV_URL_BASE)/$(LIBUV_TARBALL)
-
 
 $(LIBUV_TARBALL):
 	@echo "Downloading: $(LIBUV_TARBALL)"
@@ -51,9 +52,12 @@ CFLAGS += -I$(LIBUV_UNPACK)/test
 CFLAGS += -Wno-shadow
 CFLAGS += -DDEF_THREADPOOL_SIZE=CONFIG_LIBUV_THREADPOOL_SIZE
 CFLAGS += -DDEF_THREADPOOL_STACKSIZE=CONFIG_LIBUV_THREAD_STACKSIZE
+CFLAGS += -DDEF_THREADPOOL_PRIORITY=CONFIG_LIBUV_THREADPOOL_PRIORITY
+CFLAGS += -DMAX_EPOLL_EVENTS=CONFIG_LIBUV_MAX_EPOLL_EVENTS
+CFLAGS += -DPREP_EVENT_SIZE=CONFIG_LIBUV_PREP_EVENT_SIZE
+CFLAGS += -DDEF_STREAM_READ_BUF_SIZE=CONFIG_LIBUV_STREAM_READ_BUF_SIZE
 
-GCCVER = $(shell $(CC) --version | grep gcc | sed -r 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-ifeq ($(GCCVER),12.2.1)
+ifeq ($(shell expr "$(GCCVER)" \>= 12), 1)
   CFLAGS += -Wno-dangling-pointer
 endif
 
@@ -69,15 +73,21 @@ CSRCS += core.c
 CSRCS += poll.c
 CSRCS += loop.c
 CSRCS += thread.c
+CSRCS += thread-common.c
 CSRCS += posix-hrtime.c
+ifneq ($(CONFIG_LIBUV_BACKEND_EPOLL),)
+CSRCS += linux.c
+else
 CSRCS += posix-poll.c
+CSRCS += no-fsevents.c
+endif
 CSRCS += uv-data-getter-setters.c
 CSRCS += version.c
 ifeq ($(CONFIG_LIBUV_UTILS_TEST),)
 CSRCS += idna.c
 CSRCS += strscpy.c
+CSRCS += strtok.c
 endif
-CSRCS += no-fsevents.c
 CSRCS += uv-common.c
 CSRCS += random-devurandom.c
 CSRCS += random.c
@@ -102,9 +112,12 @@ ifneq ($(CONFIG_LIBC_DLFCN),)
 CSRCS += dl.c
 endif
 
-ifneq ($(CONFIG_NET),)
+ifneq ($(CONFIG_LIBC_NETDB),)
 CSRCS += getaddrinfo.c
 CSRCS += getnameinfo.c
+endif
+
+ifneq ($(CONFIG_NET),)
 CSRCS += inet.c
 endif
 
@@ -130,167 +143,7 @@ CSRCS += runner.c
 CSRCS += runner-unix.c
 CSRCS += echo-server.c
 
-CSRCS += test-active.c
-CSRCS += test-async.c
-CSRCS += test-async-null-cb.c
-CSRCS += test-barrier.c
-CSRCS += test-callback-order.c
-CSRCS += test-callback-stack.c
-CSRCS += test-close-fd.c
-CSRCS += test-close-order.c
-CSRCS += test-condvar.c
-CSRCS += test-connection-fail.c
-CSRCS += test-connect-unspecified.c
-CSRCS += test-cwd-and-chdir.c
-CSRCS += test-default-loop-close.c
-CSRCS += test-delayed-accept.c
-CSRCS += test-dlerror.c
-CSRCS += test-eintr-handling.c
-CSRCS += test-embed.c
-CSRCS += test-emfile.c
-CSRCS += test-env-vars.c
-CSRCS += test-error.c
-CSRCS += test-fail-always.c
-CSRCS += test-fs.c
-CSRCS += test-fs-copyfile.c
-CSRCS += test-fs-event.c
-CSRCS += test-fs-fd-hash.c
-CSRCS += test-fs-open-flags.c
-CSRCS += test-fs-poll.c
-CSRCS += test-fs-readdir.c
-CSRCS += test-getaddrinfo.c
-CSRCS += test-get-currentexe.c
-CSRCS += test-gethostname.c
-CSRCS += test-get-loadavg.c
-CSRCS += test-get-memory.c
-CSRCS += test-getnameinfo.c
-CSRCS += test-get-passwd.c
-CSRCS += test-getsockname.c
-CSRCS += test-getters-setters.c
-CSRCS += test-gettimeofday.c
-CSRCS += test-handle-fileno.c
-CSRCS += test-homedir.c
-CSRCS += test-hrtime.c
-CSRCS += test-idle.c
-CSRCS += test-idna.c
-CSRCS += test-ip4-addr.c
-CSRCS += test-ip6-addr.c
-CSRCS += test-ipc.c
-CSRCS += test-ipc-heavy-traffic-deadlock-bug.c
-CSRCS += test-ipc-send-recv.c
-CSRCS += test-loop-alive.c
-CSRCS += test-loop-close.c
-CSRCS += test-loop-configure.c
-CSRCS += test-loop-handles.c
-CSRCS += test-loop-stop.c
-CSRCS += test-loop-time.c
-CSRCS += test-metrics.c
-CSRCS += test-multiple-listen.c
-CSRCS += test-mutexes.c
-CSRCS += test-not-readable-nor-writable-on-read-error.c
-CSRCS += test-not-readable-on-eof.c
-CSRCS += test-not-writable-after-shutdown.c
-CSRCS += test-osx-select.c
-CSRCS += test-pass-always.c
-CSRCS += test-ping-pong.c
-CSRCS += test-pipe-bind-error.c
-CSRCS += test-pipe-connect-error.c
-CSRCS += test-pipe-connect-multiple.c
-CSRCS += test-pipe-connect-prepare.c
-CSRCS += test-pipe-getsockname.c
-CSRCS += test-pipe-pending-instances.c
-CSRCS += test-pipe-sendmsg.c
-CSRCS += test-pipe-server-close.c
-CSRCS += test-pipe-set-fchmod.c
-CSRCS += test-pipe-set-non-blocking.c
-CSRCS += test-platform-output.c
-CSRCS += test-poll.c
-CSRCS += test-poll-close.c
-CSRCS += test-poll-close-doesnt-corrupt-stack.c
-CSRCS += test-poll-closesocket.c
-CSRCS += test-poll-multiple-handles.c
-CSRCS += test-poll-oob.c
-CSRCS += test-process-priority.c
-CSRCS += test-process-title.c
-CSRCS += test-process-title-threadsafe.c
-CSRCS += test-queue-foreach-delete.c
-CSRCS += test-random.c
-CSRCS += test-ref.c
-CSRCS += test-run-nowait.c
-CSRCS += test-run-once.c
-CSRCS += test-semaphore.c
-CSRCS += test-shutdown-close.c
-CSRCS += test-shutdown-eof.c
-CSRCS += test-shutdown-simultaneous.c
-CSRCS += test-shutdown-twice.c
-CSRCS += test-signal.c
-CSRCS += test-signal-multiple-loops.c
-CSRCS += test-signal-pending-on-close.c
-CSRCS += test-socket-buffer-size.c
-CSRCS += test-spawn.c
-CSRCS += test-stdio-over-pipes.c
-CSRCS += test-strscpy.c
-CSRCS += test-tcp-alloc-cb-fail.c
-CSRCS += test-tcp-bind6-error.c
-CSRCS += test-tcp-bind-error.c
-CSRCS += test-tcp-close-accept.c
-CSRCS += test-tcp-close.c
-CSRCS += test-tcp-close-reset.c
-CSRCS += test-tcp-close-while-connecting.c
-CSRCS += test-tcp-connect6-error.c
-CSRCS += test-tcp-connect-error-after-write.c
-CSRCS += test-tcp-connect-error.c
-CSRCS += test-tcp-connect-timeout.c
-CSRCS += test-tcp-create-socket-early.c
-CSRCS += test-tcp-flags.c
-CSRCS += test-tcp-oob.c
-CSRCS += test-tcp-open.c
-CSRCS += test-tcp-read-stop.c
-CSRCS += test-tcp-read-stop-start.c
-CSRCS += test-tcp-shutdown-after-write.c
-CSRCS += test-tcp-try-write.c
-CSRCS += test-tcp-try-write-error.c
-CSRCS += test-tcp-unexpected-read.c
-CSRCS += test-tcp-write-after-connect.c
-CSRCS += test-tcp-writealot.c
-CSRCS += test-tcp-write-fail.c
-CSRCS += test-tcp-write-queue-order.c
-CSRCS += test-tcp-write-to-half-open-connection.c
-CSRCS += test-test-macros.c
-CSRCS += test-thread.c
-CSRCS += test-thread-equal.c
-CSRCS += test-threadpool.c
-CSRCS += test-threadpool-cancel.c
-CSRCS += test-timer-again.c
-CSRCS += test-timer.c
-CSRCS += test-timer-from-check.c
-CSRCS += test-tmpdir.c
-CSRCS += test-tty.c
-CSRCS += test-tty-duplicate-key.c
-CSRCS += test-tty-escape-sequence-processing.c
-CSRCS += test-udp-alloc-cb-fail.c
-CSRCS += test-udp-bind.c
-CSRCS += test-udp-connect.c
-CSRCS += test-udp-create-socket-early.c
-CSRCS += test-udp-dgram-too-big.c
-CSRCS += test-udp-ipv6.c
-CSRCS += test-udp-mmsg.c
-CSRCS += test-udp-multicast-interface6.c
-CSRCS += test-udp-multicast-interface.c
-CSRCS += test-udp-multicast-join6.c
-CSRCS += test-udp-multicast-join.c
-CSRCS += test-udp-multicast-ttl.c
-CSRCS += test-udp-open.c
-CSRCS += test-udp-options.c
-CSRCS += test-udp-send-and-recv.c
-CSRCS += test-udp-send-hang-loop.c
-CSRCS += test-udp-send-immediate.c
-CSRCS += test-udp-sendmmsg-error.c
-CSRCS += test-udp-send-unreachable.c
-CSRCS += test-udp-try-send.c
-CSRCS += test-uname.c
-CSRCS += test-walk-handles.c
-CSRCS += test-watcher-cross-stop.c
+CSRCS += $(wildcard libuv/test/test-*.c)
 endif
 
 ifneq ($(CONFIG_LIBUV_UTILS_BENCHMARK),)

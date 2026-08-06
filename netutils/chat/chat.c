@@ -1,9 +1,10 @@
 /****************************************************************************
  * apps/netutils/chat/chat.c
  *
- *   Copyright (C) 2016 Vladimir Komendantskiy. All rights reserved.
- *   Author: Vladimir Komendantskiy <vladimir@moixaenergy.com>
- *   Partly based on code by Max Nekludov <macscomp@gmail.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2016 Vladimir Komendantskiy. All rights reserved.
+ * SPDX-FileContributor: Vladimir Komendantskiy <vladimir@moixaenergy.com>
+ * SPDX-FileContributor: Max Nekludov <macscomp@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +45,7 @@
 #include <sys/stat.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <poll.h>
 #include <stdio.h>
@@ -61,7 +62,7 @@
 #define CHAT_TOKEN_SIZE    128
 
 /****************************************************************************
- * Pivate types
+ * Private types
  ****************************************************************************/
 
 /* Type of singly-linked list of tokens */
@@ -107,6 +108,8 @@ static int chat_tokenise(FAR struct chat *priv,
 
   int tok_on_delimiter(void)
   {
+    FAR struct chat_token *newtok;
+
     if (!tok_pos && !quoted && !no_termin)
       {
           /* a) the first character in the script is a delimiter or
@@ -121,9 +124,29 @@ static int chat_tokenise(FAR struct chat *priv,
     /* Terminate the temporary */
 
     tok_str[tok_pos] = '\0';
+    newtok = malloc(sizeof(struct chat_token));
+    if (newtok == NULL)
+      {
+        /* out of memory */
+
+        return -ENOMEM;
+      }
+
+    /* Copy the temporary */
+
+    newtok->string = strdup(tok_str);
+    if (newtok->string == NULL)
+      {
+        free(newtok);
+        return -ENOMEM;
+      }
+
+    newtok->no_termin = no_termin;
+    newtok->next = NULL;
+
     if (tok)
       {
-        tok->next = malloc(sizeof(struct chat_token));
+        tok->next = newtok;
 
         /* The terminated token becomes previous */
 
@@ -133,25 +156,9 @@ static int chat_tokenise(FAR struct chat *priv,
       {
         /* There was no previous token */
 
-        *first_tok = malloc(sizeof(struct chat_token));
+        *first_tok = newtok;
         tok = *first_tok;
       }
-
-    if (!tok)
-      {
-        /* out of memory */
-
-        return -ENOMEM;
-      }
-
-    /* Copy the temporary */
-
-    tok->string = strdup(tok_str);
-    tok->no_termin = no_termin;
-
-    /* Initialize the next token */
-
-    tok->next = NULL;
 
     /* Reset the buffer position */
 

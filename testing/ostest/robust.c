@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/robust.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -208,7 +210,7 @@ void robust_test(void)
     {
       sleep(1);
     }
-  while (kill(g_robust_mutex.pid, 0) == 0 || errno != ESRCH);
+  while (kill(waiter, 0) == 0 || errno != ESRCH);
 
   /* Make the mutex consistent and try again.  It should succeed this time. */
 

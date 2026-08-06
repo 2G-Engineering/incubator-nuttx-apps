@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/libcurl4nx/curl4nx_easy_perform.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -522,7 +524,7 @@ int curl4nx_easy_perform(FAR struct curl4nx_s *handle)
 
                                               redirected = true;
                                               redircount += 1;
-                                              curl4nx_info("
+                                              curl4nx_info("\
                                                 REDIRECTION (%d) -> %s\n",
                                                 redircount,
                                                 headerbuf + off);

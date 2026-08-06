@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_login.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <termios.h>
+#include <errno.h>
 
 #include "fsutils/passwd.h"
 #ifdef CONFIG_NSH_CLE
@@ -171,7 +174,7 @@ int nsh_login(FAR struct console_stdio_s *pstate)
 
       /* readline() returns EOF on failure */
 
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
+      ret = readline_fd(pstate->cn_line, LINE_MAX,
                         INFD(pstate), OUTFD(pstate));
       if (ret != EOF)
         {
@@ -207,8 +210,7 @@ int nsh_login(FAR struct console_stdio_s *pstate)
         }
 
       password[0] = '\0';
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
-                        INFD(pstate), -1);
+      ret = readline_fd(pstate->cn_line, LINE_MAX, INFD(pstate), -1);
 
       /* Enable echo again after password */
 
@@ -249,6 +251,16 @@ int nsh_login(FAR struct console_stdio_s *pstate)
 #endif
             {
               write(OUTFD(pstate), g_loginsuccess, strlen(g_loginsuccess));
+
+#if defined(CONFIG_NSH_LOGIN_SETUID) && defined(CONFIG_SCHED_USER_IDENTITY)
+              if (nsh_setuser_identity(username) < 0)
+                {
+                  write(OUTFD(pstate), g_badidentity, strlen(g_badidentity));
+                  return -1;
+                }
+
+              nsh_update_prompt();
+#endif
               return OK;
             }
           else

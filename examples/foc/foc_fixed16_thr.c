@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/foc/foc_fixed16_thr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -23,6 +25,8 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include <nuttx/spinlock.h>
 
 #include <assert.h>
 #include <dspb16.h>
@@ -50,8 +54,18 @@
 #  error
 #endif
 
+/* Critical section */
+
+#ifdef CONFIG_EXAMPLES_FOC_CONTROL_CRITSEC
+#  define foc_enter_critical() irqstate_t intflags = enter_critical_section()
+#  define foc_leave_critical() leave_critical_section(intflags)
+#else
+#  define foc_enter_critical()
+#  define foc_leave_critical()
+#endif
+
 /****************************************************************************
- * Private Type Definition
+ * Private Types
  ****************************************************************************/
 
 /****************************************************************************
@@ -127,7 +141,9 @@ static int foc_handler_run(FAR struct foc_motor_b16_s *motor,
 
   /* Get FOC handler state */
 
-  foc_handler_state_b16(&motor->handler, &motor->foc_state);
+  foc_handler_state_b16(&motor->handler,
+                        &motor->foc_state,
+                        &motor->mod_state);
 
   return ret;
 }
@@ -226,12 +242,12 @@ static void foc_fixed16_nxscope(FAR struct foc_nxscope_s *nxs,
   nxscope_put_vb16(&nxs->nxs, i++, ptr, 1);
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VEL)
-#  warning not supported yet
-  i++;
+  ptr = (FAR b16_t *)&motor->vel_el;
+  nxscope_put_vb16(&nxs->nxs, i++, ptr, 1);
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VM)
-#  warning not supported yet
-  i++;
+  ptr = (FAR b16_t *)&motor->vel_mech;
+  nxscope_put_vb16(&nxs->nxs, i++, ptr, 1);
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VBUS)
   ptr = (FAR b16_t *)&motor->vbus;
@@ -251,11 +267,29 @@ static void foc_fixed16_nxscope(FAR struct foc_nxscope_s *nxs,
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_DQREF)
   ptr = (FAR b16_t *)&motor->dq_ref;
-  nxscope_put_vb16_t(&nxs->nxs, i++, ptr, 2);
+  nxscope_put_vb16(&nxs->nxs, i++, ptr, 2);
 #endif
 #if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_VDQCOMP)
   ptr = (FAR b16_t *)&motor->vdq_comp;
-  nxscope_put_vb16_t(&nxs->nxs, i++, ptr, 2);
+  nxscope_put_vb16(&nxs->nxs, i++, ptr, 2);
+#endif
+#if (CONFIG_EXAMPLES_FOC_NXSCOPE_CFG & FOC_NXSCOPE_SVM3)
+  b16_t svm3_tmp[4];
+
+  /* Convert sector to b16_t.
+   * Normally, a sector value is an integer in the range 1-6 but we convert
+   * it to b16_t and range to 0.1-0.6. This is to send the entire SVM3 state
+   * as b16_t array and scale the sector value closer to PWM duty values
+   * (range 0.0 to 0.5) which makes it easier to visualize the data later.
+   */
+
+  svm3_tmp[0] = b16mulb16(itob16(motor->mod_state.sector), ftob16(0.1f));
+  svm3_tmp[1] = motor->mod_state.d_u;
+  svm3_tmp[2] = motor->mod_state.d_v;
+  svm3_tmp[3] = motor->mod_state.d_w;
+
+  ptr = svm3_tmp;
+  nxscope_put_vb16(&nxs->nxs, i++, ptr, 4);
 #endif
 
   nxscope_unlock(&nxs->nxs);
@@ -275,10 +309,8 @@ int foc_fixed16_thr(FAR struct foc_ctrl_env_s *envp)
   struct foc_mq_s         handle;
   struct foc_motor_b16_s  motor;
   struct foc_device_s     dev;
-  int                     time = 0;
   int                     ret  = OK;
 
-  UNUSED(time);
   DEBUGASSERT(envp);
 
   PRINTFV("foc_fixed_thr, id=%d\n", envp->id);
@@ -305,9 +337,10 @@ int foc_fixed16_thr(FAR struct foc_ctrl_env_s *envp)
       goto errout;
     }
 
-  /* Get PWM max duty */
+  /* Store data from device */
 
   motor.pwm_duty_max = FOCDUTY_TO_FIXED16(dev.info.hw_cfg.pwm_max);
+  motor.iphase_adc = b16idiv(dev.info.hw_cfg.iphase_scale, 100000);
 
   /* Start with motor free */
 
@@ -321,7 +354,21 @@ int foc_fixed16_thr(FAR struct foc_ctrl_env_s *envp)
 
   while (motor.mq.quit == false)
     {
-      PRINTFV("foc_fixed16_thr %d %d\n", envp->id, time);
+      foc_enter_critical();
+
+      if (motor.mq.start == true)
+        {
+          /* Get FOC device state */
+
+          ret = foc_dev_state_get(&dev);
+          if (ret < 0)
+            {
+              PRINTF("ERROR: foc_dev_state_get failed %d!\n", ret);
+              goto errout;
+            }
+        }
+
+      PRINTFV("foc_fixed16_thr %d %d\n", envp->id, motor.time);
 
       /* Handle mqueue */
 
@@ -356,119 +403,126 @@ int foc_fixed16_thr(FAR struct foc_ctrl_env_s *envp)
             }
 
           motor.startstop = false;
+
+          /* Start from the beginning of the control loop */
+
+          foc_leave_critical();
+          continue;
         }
 
-      /* Run control logic if controller started */
+      /* Ignore control logic if controller not started yet */
 
-      if (motor.mq.start == true)
+      if (motor.mq.start == false)
         {
-          /* Get FOC device state */
-
-          ret = foc_dev_state_get(&dev);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_dev_state_get failed %d!\n", ret);
-              goto errout;
-            }
+          foc_leave_critical();
+          usleep(1000);
+          continue;
+        }
 
 #ifdef CONFIG_EXAMPLES_FOC_STATE_USE_MODEL_PMSM
-          /* Get model state */
+      /* Get model state */
 
-          ret = foc_model_state_get(&motor, &dev);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_model_state_get failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_model_state_get(&motor, &dev);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_model_state_get failed %d!\n", ret);
+          goto errout;
+        }
 #endif
 
-          /* Handle controller state */
+      /* Handle controller state */
 
-          ret = foc_dev_state_handle(&dev, &motor.fault);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_dev_state_handle failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_dev_state_handle(&dev, &motor.fault);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_dev_state_handle failed %d!\n", ret);
+          goto errout;
+        }
 
-          /* Get motor state */
+      /* Get motor state */
 
-          ret = foc_motor_get(&motor);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_motor_get failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_motor_get(&motor);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_motor_get failed %d!\n", ret);
+          goto errout;
+        }
 
-          /* Motor control */
+      /* Motor control */
 
-          ret = foc_motor_control(&motor);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_motor_control failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_motor_control(&motor);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_motor_control failed %d!\n", ret);
+          goto errout;
+        }
 
-          /* Run FOC */
+      /* Run FOC */
 
-          ret = foc_handler_run(&motor, &dev);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_handler_run failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_handler_run(&motor, &dev);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_handler_run failed %d!\n", ret);
+          goto errout;
+        }
 
 #ifdef FOC_STATE_PRINT_PRE
-          /* Print state if configured */
+      /* Print state if configured */
 
-          if (time % FOC_STATE_PRINT_PRE == 0)
-            {
-              foc_state_print(&motor);
-            }
+      if (motor.time % FOC_STATE_PRINT_PRE == 0)
+        {
+          foc_state_print(&motor);
+        }
 #endif
 
 #ifdef CONFIG_EXAMPLES_FOC_STATE_USE_MODEL_PMSM
-          /* Feed FOC model with data */
+      /* Feed FOC model with data */
 
-          foc_model_run_b16(&motor.model,
-                            ftob16(FOC_MODEL_LOAD),
-                            &motor.foc_state.vab);
+      foc_model_run_b16(&motor.model,
+                        ftob16(FOC_MODEL_LOAD),
+                        &motor.foc_state.vab);
 #endif
 
-          /* Set FOC device parameters */
+      /* Set FOC device parameters */
 
-          ret = foc_dev_params_set(&dev);
-          if (ret < 0)
-            {
-              PRINTF("ERROR: foc_dev_params_set failed %d!\n", ret);
-              goto errout;
-            }
+      ret = foc_dev_params_set(&dev);
+      if (ret < 0)
+        {
+          PRINTF("ERROR: foc_dev_params_set failed %d!\n", ret);
+          goto errout;
+        }
 
 #ifdef CONFIG_EXAMPLES_FOC_NXSCOPE
-          /* Capture nxscope samples */
+      /* Capture nxscope samples */
 
-          if (time % CONFIG_EXAMPLES_FOC_NXSCOPE_PRESCALER == 0)
-            {
-              foc_fixed16_nxscope(envp->nxs, &motor, &dev);
-            }
+      if (motor.time % CONFIG_EXAMPLES_FOC_NXSCOPE_PRESCALER == 0)
+        {
+          foc_fixed16_nxscope(envp->nxs, &motor, &dev);
+        }
 #endif
 
-          /* Terminate control thread */
+#ifdef CONFIG_EXAMPLES_FOC_NXSCOPE_CONTROL
+      /* Handle nxscope work */
 
-          if (motor.ctrl_state == FOC_CTRL_STATE_TERMINATE)
-            {
-              PRINTF("TERMINATE CTRL THREAD\n");
-              goto errout;
-            }
-        }
-      else
+      if (motor.time % CONFIG_EXAMPLES_FOC_NXSCOPE_WORK_PRESCALER == 0)
         {
-          usleep(1000);
+          foc_nxscope_work(envp->nxs);
+        }
+#endif
+
+      /* Terminate control thread */
+
+      if (motor.ctrl_state == FOC_CTRL_STATE_TERMINATE)
+        {
+          PRINTF("TERMINATE CTRL THREAD\n");
+          goto errout;
         }
 
       /* Increase counter */
 
-      time += 1;
+      motor.time += 1;
+
+      foc_leave_critical();
     }
 
 errout:
@@ -490,6 +544,12 @@ errout:
     {
       PRINTF("ERROR: foc_device_deinit %d failed %d\n", envp->id, ret);
     }
+
+#ifdef CONFIG_EXAMPLES_FOC_PERF_EXIT
+  /* Print final perf stats */
+
+  foc_perf_exit(&dev.perf);
+#endif
 
   PRINTF("foc_fixed16_thr %d exit\n", envp->id);
 

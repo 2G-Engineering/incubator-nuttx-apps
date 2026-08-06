@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/tcpecho/tcpecho_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,7 +28,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <poll.h>
 #include <stdint.h>
@@ -89,6 +91,7 @@ static int tcpecho_netsetup(void)
   struct dhcpc_state ds;
   void *handle;
   char inetaddr[INET_ADDRSTRLEN];
+  int ret;
 #endif
 
   /* Many embedded network interfaces must have a software assigned MAC */
@@ -164,9 +167,17 @@ static int tcpecho_netsetup(void)
       netlib_set_dripv4addr("eth0", &ds.default_router);
     }
 
-  if (ds.dnsaddr.s_addr != 0)
+  for (int i = 0; i < ds.num_dnsaddr; i++)
     {
-      netlib_set_ipv4dnsaddr(&ds.dnsaddr);
+      if (ds.dnsaddr[i].s_addr != 0)
+        {
+          ret = netlib_set_ipv4dnsaddr(&ds.dnsaddr[i]);
+          if (ret < 0)
+            {
+              nerr("ERROR: Set DNS server %d:%s address failed: %d\n",
+                   i, inet_ntoa(ds.dnsaddr[i]), ret);
+            }
+        }
     }
 
   dhcpc_close(handle);
@@ -244,7 +255,8 @@ static int tcpecho_server(void)
           /* new client connection */
 
           clilen = sizeof(cliaddr);
-          connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
+          connfd = accept4(listenfd, (struct sockaddr *)&cliaddr, &clilen,
+                           SOCK_CLOEXEC);
 
           ninfo("new client: %s\n",
                 inet_ntoa_r(cliaddr.sin_addr, inetaddr, sizeof(inetaddr)));

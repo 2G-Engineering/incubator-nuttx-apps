@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/nxplayer/nxplayer.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -38,6 +40,7 @@
 #include <strings.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <unistd.h>
 #ifdef CONFIG_NXPLAYER_HTTP_STREAMING_SUPPORT
 #  include <sys/time.h>
@@ -68,7 +71,7 @@
 #endif
 
 /****************************************************************************
- * Private Type Declarations
+ * Private Types
  ****************************************************************************/
 
 #ifdef CONFIG_NXPLAYER_FMT_FROM_EXT
@@ -92,6 +95,9 @@ int nxplayer_getmidisubformat(int fd);
 int nxplayer_getmp3subformat(int fd);
 #endif
 
+#ifdef CONFIG_AUDIO_FORMAT_SBC
+int nxplayer_getsbcsubformat(int fd);
+#endif
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -119,7 +125,10 @@ static const struct nxplayer_ext_fmt_s g_known_ext[] =
   { "midi",     AUDIO_FMT_MIDI, nxplayer_getmidisubformat },
 #endif
 #ifdef CONFIG_AUDIO_FORMAT_OGG_VORBIS
-  { "ogg",      AUDIO_FMT_OGG_VORBIS, NULL }
+  { "ogg",      AUDIO_FMT_OGG_VORBIS, NULL },
+#endif
+#ifdef CONFIG_AUDIO_FORMAT_SBC
+  { "sbc",      AUDIO_FMT_SBC, nxplayer_getsbcsubformat }
 #endif
 };
 
@@ -131,6 +140,11 @@ static const struct nxplayer_dec_ops_s g_dec_ops[] =
   {
     AUDIO_FMT_MP3,
     nxplayer_parse_mp3,
+    nxplayer_fill_common
+  },
+  {
+    AUDIO_FMT_SBC,
+    nxplayer_parse_sbc,
     nxplayer_fill_common
   },
   {
@@ -534,6 +548,13 @@ int nxplayer_getmp3subformat(int fd)
 }
 #endif
 
+#ifdef CONFIG_AUDIO_FORMAT_SBC
+int nxplayer_getsbcsubformat(int fd)
+{
+  return AUDIO_FMT_SBC;
+}
+#endif
+
 /****************************************************************************
  * Name: nxplayer_fmtfromextension
  *
@@ -775,7 +796,6 @@ static FAR void *nxplayer_playthread(pthread_addr_t pvarg)
   bool                    streaming = true;
   bool                    failed = false;
   struct ap_buffer_info_s buf_info;
-  FAR struct ap_buffer_s  **buffers;
   unsigned int            prio;
 #ifdef CONFIG_DEBUG_FEATURES
   int                     outstanding = 0;
@@ -798,23 +818,11 @@ static FAR void *nxplayer_playthread(pthread_addr_t pvarg)
 
   /* Create array of pointers to buffers */
 
-  buffers = (FAR struct ap_buffer_s **)
-    malloc(buf_info.nbuffers * sizeof(FAR void *));
-  if (buffers == NULL)
-    {
-      /* Error allocating memory for buffer storage! */
-
-      ret = -ENOMEM;
-      running = false;
-      goto err_out;
-    }
+  FAR struct ap_buffer_s *buffers[buf_info.nbuffers];
 
   /* Create our audio pipeline buffers to use for queueing up data */
 
-  for (x = 0; x < buf_info.nbuffers; x++)
-    {
-      buffers[x] = NULL;
-    }
+  memset(buffers, 0, sizeof(buffers));
 
   for (x = 0; x < buf_info.nbuffers; x++)
     {
@@ -1102,6 +1110,13 @@ static FAR void *nxplayer_playthread(pthread_addr_t pvarg)
             audinfo("Play complete.  outstanding=%d\n", outstanding);
             DEBUGASSERT(outstanding == 0);
 #endif
+
+#ifdef CONFIG_AUDIO_MULTI_SESSION
+            ioctl(pplayer->dev_fd, AUDIOIOC_STOP,
+                 (unsigned long)pplayer->session);
+#else
+            ioctl(pplayer->dev_fd, AUDIOIOC_STOP, 0);
+#endif
             running = false;
             break;
 
@@ -1117,27 +1132,20 @@ static FAR void *nxplayer_playthread(pthread_addr_t pvarg)
 err_out:
   audinfo("Clean-up and exit\n");
 
-  if (buffers != NULL)
+  audinfo("Freeing buffers\n");
+  for (x = 0; x < buf_info.nbuffers; x++)
     {
-      audinfo("Freeing buffers\n");
-      for (x = 0; x < buf_info.nbuffers; x++)
+      /* Fill in the buffer descriptor struct to issue a free request */
+
+      if (buffers[x] != NULL)
         {
-          /* Fill in the buffer descriptor struct to issue a free request */
-
-          if (buffers[x] != NULL)
-            {
 #ifdef CONFIG_AUDIO_MULTI_SESSION
-              buf_desc.session = pplayer->session;
+          buf_desc.session = pplayer->session;
 #endif
-              buf_desc.u.buffer = buffers[x];
-              ioctl(pplayer->dev_fd, AUDIOIOC_FREEBUFFER,
-                    (unsigned long)&buf_desc);
-            }
+          buf_desc.u.buffer = buffers[x];
+          ioctl(pplayer->dev_fd, AUDIOIOC_FREEBUFFER,
+                (unsigned long)&buf_desc);
         }
-
-      /* Free the pointers to the buffers */
-
-      free(buffers);
     }
 
   /* Unregister the message queue and release the session */
@@ -1882,7 +1890,7 @@ static int nxplayer_playinternal(FAR struct nxplayer_s *pplayer,
       goto err_out_nodev;
     }
 
-  for (c = 0; c < sizeof(g_dec_ops) / sizeof(g_dec_ops[0]); c++)
+  for (c = 0; c < nitems(g_dec_ops); c++)
     {
       if (g_dec_ops[c].format == filefmt)
         {

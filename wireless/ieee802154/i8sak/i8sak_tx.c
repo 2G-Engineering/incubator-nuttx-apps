@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/ieee802154/i8sak/i8sak_tx.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -276,7 +278,7 @@ static void tx_eventcb(FAR struct ieee802154_primitive_s *primitive,
   else
     {
       printf("i8sak: frame failed to send: %s\n",
-             IEEE802154_STATUS_STRING[primitive->u.dataconf.status]);
+             g_ieee802154_status_string[primitive->u.dataconf.status]);
     }
 
   sem_post(&i8sak->sigsem);

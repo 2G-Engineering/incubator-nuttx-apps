@@ -1,5 +1,7 @@
 /****************************************************************************
- * apps/examples/nxterm/nxhello_listener.c
+ * apps/examples/nxhello/nxhello_listener.c
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -46,7 +48,7 @@ FAR void *nxhello_listener(FAR void *arg)
 
   /* Process events forever */
 
-  for (;;)
+  for (; ; )
     {
       /* Handle the next event.  If we were configured blocking, then
        * we will stay right here until the next event is received.  Since

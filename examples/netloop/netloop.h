@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/netloop/netloop.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,7 +44,6 @@
  * CONFIG_NET_TCP              - Only support on TCP (because read-ahead
  *                               buffering s not yet support for UDP)
  */
-
 
 #ifndef CONFIG_NET
 #  error Network socket support not enabled

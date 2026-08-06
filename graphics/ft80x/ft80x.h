@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/graphics/ft80x/ft80x.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #ifdef CONFIG_GRAPHICS_FT80X
 

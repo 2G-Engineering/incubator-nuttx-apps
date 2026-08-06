@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/fsutils/ipcfg/ipcfg_binary.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,7 +31,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "fsutils/ipcfg.h"
 #include "ipcfg.h"
@@ -152,7 +154,7 @@ static int ipcfg_read_binary(int fd, FAR void *buffer, size_t nbytes)
  * Input Parameters:
  *   fd     - File descriptor of the open file to write to
  *   buffer - Location to write to
- *   nbytes - Number of bytes to wrtie
+ *   nbytes - Number of bytes to write
  *
  * Returned Value:
  *   Zero is returned on success; a negated errno value is returned on any
@@ -263,7 +265,7 @@ static int ipcfg_find_binary(int fd, sa_family_t af)
  *
  * Input Parameters:
  *   path    - The full path to the IP configuration file
- *   ipv4cfg - Location to read IPv4 configration to
+ *   ipv4cfg - Location to read IPv4 configuration to
  *
  * Returned Value:
  *   Zero is returned on success; a negated errno value is returned on any
@@ -314,7 +316,7 @@ errout_with_fd:
  *
  * Input Parameters:
  *   path    - The full path to the IP configuration file
- *   ipv6cfg - Location to read IPv6 configration to
+ *   ipv6cfg - Location to read IPv6 configuration to
  *
  * Returned Value:
  *   Zero is returned on success; a negated errno value is returned on any
@@ -365,7 +367,7 @@ errout_with_fd:
  *
  * Input Parameters:
  *   path    - The full path to the IP configuration file
- *   ipv4cfg - The IPv4 configration to write
+ *   ipv4cfg - The IPv4 configuration to write
  *
  * Returned Value:
  *   Zero is returned on success; a negated errno value is returned on any
@@ -472,7 +474,7 @@ errout_with_fd:
  *
  * Input Parameters:
  *   path    - The full path to the IP configuration file
- *   ipv6cfg - The IPv6 configration to write
+ *   ipv6cfg - The IPv6 configuration to write
  *
  * Returned Value:
  *   Zero is returned on success; a negated errno value is returned on any

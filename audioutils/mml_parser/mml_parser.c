@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/audioutils/mml_parser/mml_parser.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -167,15 +169,33 @@ static int calc_samples(int fs, int tempo, int num, int dots)
 
   switch (num)
     {
-      case 0:  n   = 3; break;
-      case 1:  n   = 2; break;
-      case 2:  n   = 1; break;
-      case 4:  n   = 0; break;
-      case 8:  div = 1; break;
-      case 16: div = 2; break;
-      case 32: div = 3; break;
-      case 64: div = 4; break;
-      default: div = -1; break;
+      case 0:
+        n = 3;
+        break;
+      case 1:
+        n = 2;
+        break;
+      case 2:
+        n = 1;
+        break;
+      case 4:
+        n = 0;
+        break;
+      case 8:
+        div = 1;
+        break;
+      case 16:
+        div = 2;
+        break;
+      case 32:
+        div = 3;
+        break;
+      case 64:
+        div = 4;
+        break;
+      default:
+        div = -1;
+        break;
     }
 
   if (dots <= 4)

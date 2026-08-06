@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/userfs/userfs_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -234,7 +236,7 @@ static int ufstest_open(FAR void *volinfo, FAR const char *relpath,
           file->inuse = 0;
         }
 
-      if ((oflags & (O_WROK | O_APPEND)) == (O_WROK | O_APPEND))
+      if ((oflags & (O_WRONLY | O_APPEND)) == (O_WRONLY | O_APPEND))
         {
           opriv->pos = file->inuse;
         }

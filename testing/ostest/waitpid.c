@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/waitpid.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,7 +37,11 @@
 
 #include "ostest.h"
 
-#ifdef CONFIG_SCHED_WAITPID
+/* REVISIT: This could be implemented for CONFIG_BUILD_KERNEL as well, by
+ * starting a new process instead of using task_create()
+ */
+
+#if defined(CONFIG_SCHED_WAITPID) && !defined(CONFIG_BUILD_KERNEL)
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -120,7 +126,7 @@ static void waitpid_last(void)
   printf("waitpid_last: Waiting for PID=%d with waitpid()\n",
          g_waitpids[NCHILDREN - 1]);
 
-  ret = (int)waitpid(g_waitpids[NCHILDREN - 1], &stat_loc, 0);
+  ret = waitpid(g_waitpids[NCHILDREN - 1], &stat_loc, 0);
   if (ret < 0)
     {
       int errcode = errno;
@@ -392,4 +398,4 @@ int waitpid_test(void)
   return 0;
 }
 
-#endif /* CONFIG_SCHED_WAITPID */
+#endif /* defined(CONFIG_SCHED_WAITPID) && !defined(CONFIG_BUILD_KERNEL) */

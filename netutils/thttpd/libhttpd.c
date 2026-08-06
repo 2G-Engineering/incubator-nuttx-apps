@@ -1,14 +1,13 @@
 /****************************************************************************
  * apps/netutils/thttpd/libhttpd.c
- * HTTP Protocol Library
  *
- *   Copyright (C) 2011, 2013, 2015-2016 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Derived from the file of the same name in the original THTTPD package:
- *
- *   Copyright 1995,1998,1999,2000,2001 by Jef Poskanzer <jef@mail.acme.com>.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ * SPDX-FileCopyrightText: 2015, 2016 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2011, 2013 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2000, 2001 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1998, 1999 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1995 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +42,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/param.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -58,7 +58,7 @@
 #include <signal.h>
 #include <sched.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <fnmatch.h>
 
 #include "netutils/thttpd.h"
@@ -327,7 +327,7 @@ static void send_mime(httpd_conn *hc, int status, const char *title,
           (hc->range_end >= hc->range_start) &&
           ((hc->range_end != length - 1) ||
            (hc->range_start != 0)) &&
-          (hc->range_if == (time_t) - 1 || hc->range_if == hc->sb.st_mtime))
+          (hc->range_if == -1 || hc->range_if == hc->sb.st_mtime))
         {
           partial_content = 1;
           status = 206;
@@ -340,7 +340,7 @@ static void send_mime(httpd_conn *hc, int status, const char *title,
         }
 
       gettimeofday(&now, NULL);
-      if (mod == (time_t)0)
+      if (mod == 0)
         {
           mod = now.tv_sec;
         }
@@ -510,7 +510,7 @@ static int send_err_file(httpd_conn *hc, int status, char *title,
     }
 
   send_mime(hc, status, title, "", extraheads, "text/html; charset=%s",
-            (off_t)-1, (time_t)0);
+            -1, 0);
   for (; ; )
     {
       nread = fread(buf, 1, sizeof(buf) - 1, fp);
@@ -1503,7 +1503,7 @@ static void figure_mime(httpd_conn *hc)
           if (ext_len == enc_tab[i].ext_len &&
               strncasecmp(ext, enc_tab[i].ext, ext_len) == 0)
             {
-              if (n_me_indexes < sizeof(me_indexes) / sizeof(*me_indexes))
+              if (n_me_indexes < nitems(me_indexes))
                 {
                   me_indexes[n_me_indexes] = i;
                   ++n_me_indexes;
@@ -1589,9 +1589,7 @@ static void ls_child(int argc, char **argv)
   FAR httpd_conn *hc = (FAR httpd_conn *)strtoul(argv[1], NULL, 16);
   DIR *dirp;
   struct dirent *de;
-  int namlen;
   static int maxnames = 0;
-  int oldmax;
   int nnames;
   static char *names;
   static char **nameptrs;
@@ -1614,6 +1612,18 @@ static void ls_child(int argc, char **argv)
   time_t now;
   char *timestr;
   int i;
+
+  /* Compiler was warning that dirp was not initialised and it wasn't.
+   * But whether this is correct or not I am not sure.
+   */
+
+  dirp = opendir(hc->expnfilename);
+  if (dirp == NULL)
+    {
+      nerr("ERROR: opendir %s: %d\n", hc->expnfilename, errno);
+      httpd_send_err(hc, 404, err404title, "", err404form, hc->encodedurl);
+      return;
+    }
 
   httpd_unlisten(hc->hs);
   send_mime(hc, 200, ok200title, "", "", "text/html; charset=%s",
@@ -1639,11 +1649,11 @@ static void ls_child(int argc, char **argv)
 
   fputs(html_html, fp);
   fputs(html_hdtitle, fp);
-  fprintf(fp, "Index of %s", hc->encodedurl, hc->encodedurl);
+  fprintf(fp, "Index of %s", hc->encodedurl);
   fputs(html_titlehd, fp);
   fputs(html_body, fp);
   fputs(html_hdr2, fp);
-  fprintf(fp, "Index of %s", hc->encodedurl, hc->encodedurl);
+  fprintf(fp, "Index of %s", hc->encodedurl);
   fputs(html_endhdr2, fp);
   fputs(html_crlf, fp);
   fputs("<PRE>\r\nmode  links  bytes  last-changed  name\r\n<HR>", fp);
@@ -1663,7 +1673,6 @@ static void ls_child(int argc, char **argv)
             }
           else
             {
-              oldmax    = maxnames;
               maxnames *= 2;
               names     = RENEW(names, char, oldmax * PATH_MAX,
                                 maxnames * PATH_MAX);
@@ -1833,7 +1842,7 @@ static void ls_child(int argc, char **argv)
       /* And print. */
 
       fprintf(fp,
-              "%s %3ld  %10lld  %s  <A HREF=\"/%.500s%s\">%s</A>%s%s%s\n",
+              "%s %3d  %10d  %s  <A HREF=\"/%.500s%s\">%s</A>%s%s%s\n",
               modestr, 0, (int16_t)sb.st_size, timestr, encrname,
               S_ISDIR(sb.st_mode) ? "/" : "", nameptrs[i], linkprefix,
               link, fileclass);
@@ -1853,7 +1862,7 @@ static int ls(httpd_conn *hc)
   char arg[16];
   char *argv[1];
 #if CONFIG_THTTPD_CGI_TIMELIMIT > 0
-  ClientData client_data;
+  clientdata client_data;
 #endif
 
   dirp = opendir(hc->expnfilename);
@@ -1890,7 +1899,8 @@ static int ls(httpd_conn *hc)
       argv[0] = arg;
 
       child = task_create("CGI child", CONFIG_THTTPD_CGI_PRIORITY,
-                          CONFIG_THTTPD_CGI_STACKSIZE, ls_child, argv);
+                          CONFIG_THTTPD_CGI_STACKSIZE, (main_t)ls_child,
+                          argv);
       if (child < 0)
         {
           nerr("ERROR: task_create: %d\n", errno);
@@ -2153,13 +2163,14 @@ FAR httpd_server *httpd_initialize(FAR httpd_sockaddr *sa)
 #else
   hs->hostname = httpd_strdup(httpd_ntoa(sa));
 #endif
-  ninfo("hostname: %s\n", hs->hostname);
-
   if (!hs->hostname)
     {
       nerr("ERROR: out of memory copying hostname\n");
+      free_httpd_server(hs);
       return NULL;
     }
+
+  ninfo("hostname: %s\n", hs->hostname);
 
   hs->cgi_count = 0;
 
@@ -2354,7 +2365,8 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
 
   ninfo("accept() new connection on listen_fd %d\n", listen_fd);
   sz = sizeof(sa);
-  hc->conn_fd = accept(listen_fd, (struct sockaddr *)&sa, &sz);
+  hc->conn_fd = accept4(listen_fd, (struct sockaddr *)&sa, &sz, 0);
+
   if (hc->conn_fd < 0)
     {
       if (errno == EWOULDBLOCK)
@@ -2410,8 +2422,8 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
   hc->altdir[0]         = '\0';
 #endif
   hc->buflen = 0;
-  hc->if_modified_since = (time_t) - 1;
-  hc->range_if          = (time_t)-1;
+  hc->if_modified_since = -1;
+  hc->range_if          = -1;
   hc->contentlength     = -1;
   hc->type = "";
 #ifdef CONFIG_THTTPD_VHOST
@@ -2915,7 +2927,7 @@ int httpd_parse_request(httpd_conn *hc)
             {
               cp = &buf[18];
               hc->if_modified_since = tdate_parse(cp);
-              if (hc->if_modified_since == (time_t) - 1)
+              if (hc->if_modified_since == -1)
                 {
                   nerr("ERROR: unparsable time: %s\n", cp);
                 }
@@ -2962,7 +2974,7 @@ int httpd_parse_request(httpd_conn *hc)
             {
               cp = &buf[9];
               hc->range_if = tdate_parse(cp);
-              if (hc->range_if == (time_t) - 1)
+              if (hc->range_if == -1)
                 {
                   nerr("ERROR: unparsable time: %s\n", cp);
                 }
@@ -3284,7 +3296,7 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowp)
 
       /* Check for an index file. */
 
-      for (i = 0; i < sizeof(index_names) / sizeof(char *); ++i)
+      for (i = 0; i < nitems(index_names); ++i)
         {
           httpd_realloc_str(&indexname, &maxindexname,
                             expnlen + 1 + strlen(index_names[i]));
@@ -3510,7 +3522,7 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowp)
       send_mime(hc, 200, ok200title, hc->encodings, "", hc->type,
                 hc->sb.st_size, hc->sb.st_mtime);
     }
-  else if (hc->if_modified_since != (time_t) - 1 &&
+  else if (hc->if_modified_since != -1 &&
            hc->if_modified_since >= hc->sb.st_mtime)
     {
       send_mime(hc, 304, err304title, hc->encodings, "",

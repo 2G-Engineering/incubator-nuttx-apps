@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_dbg.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -27,18 +29,18 @@
 
 #include <nuttx/config.h>
 #include <stdio.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 #ifdef CONFIG_LTE_ALT1250_DEBUG_MSG
-# define err_alt1250(v, ...) nerr(v, ##__VA_ARGS__)
-# define dbg_alt1250(v, ...) ninfo(v, ##__VA_ARGS__)
+#  define err_alt1250(v, ...) nerr(v, ##__VA_ARGS__)
+#  define dbg_alt1250(v, ...) ninfo(v, ##__VA_ARGS__)
 #else
-# define err_alt1250(v, ...)
-# define dbg_alt1250(v, ...)
+#  define err_alt1250(v, ...)
+#  define dbg_alt1250(v, ...)
 #endif
 
 #endif /* __APPS_LTE_ALT1250_ALT1250_DBG_H */

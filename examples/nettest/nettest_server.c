@@ -1,5 +1,7 @@
 /****************************************************************************
- * apps/examples/nettest/nettest-server.c
+ * apps/examples/nettest/nettest_server.c
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -145,7 +147,12 @@ void nettest_server(void)
 
   printf("server: Accepting connections on port %d\n",
          CONFIG_EXAMPLES_NETTEST_SERVER_PORTNO);
+#ifdef __NuttX__
+  acceptsd = accept4(listensd, (struct sockaddr *)&myaddr, &addrlen,
+                     SOCK_CLOEXEC);
+#else
   acceptsd = accept(listensd, (struct sockaddr *)&myaddr, &addrlen);
+#endif
   if (acceptsd < 0)
     {
       printf("server: accept failure: %d\n", errno);

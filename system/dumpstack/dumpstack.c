@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/dumpstack/dumpstack.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -44,6 +46,7 @@ int main(int argc, FAR char *argv[])
 {
   int spid = -1;
   int epid = -1;
+  int tmp = -1;
 
   if (argc == 2)
     {
@@ -58,6 +61,13 @@ int main(int argc, FAR char *argv[])
   if (spid < 0 || epid < 0)
     {
       spid = epid = gettid();
+    }
+
+  if (spid > epid)
+    {
+      tmp = spid;
+      spid = epid;
+      epid = tmp;
     }
 
   do

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/fb/fb_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,6 +34,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <poll.h>
 
 #include <nuttx/video/fb.h>
 #include <nuttx/video/rgbcolors.h>
@@ -55,6 +58,9 @@ struct fb_state_s
   struct fb_overlayinfo_s oinfo;
 #endif
   FAR void *fbmem;
+  FAR void *fbmem2;
+  FAR void *act_fbmem;
+  uint32_t mem2_yoffset;
 };
 
 /****************************************************************************
@@ -88,6 +94,178 @@ static const uint8_t g_rgb8[NCOLORS] =
  ****************************************************************************/
 
 /****************************************************************************
+ * sync_area
+ ****************************************************************************/
+
+static void sync_area(FAR struct fb_state_s *state)
+{
+  if (state->fbmem2 == NULL)
+    {
+      return;
+    }
+
+  if (state->act_fbmem == state->fbmem)
+    {
+      memcpy(state->fbmem, state->fbmem2,
+             state->vinfo.yres * state->pinfo.stride);
+    }
+  else
+    {
+      memcpy(state->fbmem2, state->fbmem,
+             state->vinfo.yres * state->pinfo.stride);
+    }
+}
+
+/****************************************************************************
+ * pan_display
+ ****************************************************************************/
+
+static void pan_display(FAR struct fb_state_s *state)
+{
+  struct pollfd pfd;
+  int ret;
+  pfd.fd = state->fd;
+  pfd.events = POLLOUT;
+
+  ret = poll(&pfd, 1, 0);
+
+  if (ret > 0)
+    {
+      if (state->fbmem2 == NULL)
+        {
+          return;
+        }
+
+      if (state->act_fbmem == state->fbmem)
+        {
+          state->pinfo.yoffset = 0;
+        }
+      else
+        {
+          state->pinfo.yoffset = state->mem2_yoffset;
+        }
+
+      ioctl(state->fd, FBIOPAN_DISPLAY,
+            (unsigned long)(uintptr_t)&state->pinfo);
+
+      state->act_fbmem = state->act_fbmem == state->fbmem ?
+                         state->fbmem2 : state->fbmem;
+    }
+}
+
+/****************************************************************************
+ * fbdev_get_pinfo
+ ****************************************************************************/
+
+static int fbdev_get_pinfo(int fd, FAR struct fb_planeinfo_s *pinfo)
+{
+  if (ioctl(fd, FBIOGET_PLANEINFO, (unsigned long)((uintptr_t)pinfo)) < 0)
+    {
+      int errcode = errno;
+      fprintf(stderr, "ERROR: ioctl(FBIOGET_PLANEINFO) failed: %d\n",
+              errcode);
+      return EXIT_FAILURE;
+    }
+
+  printf("PlaneInfo (plane %d):\n", pinfo->display);
+  printf("    fbmem: %p\n", pinfo->fbmem);
+  printf("    fblen: %zu\n", pinfo->fblen);
+  printf("   stride: %u\n", pinfo->stride);
+  printf("  display: %u\n", pinfo->display);
+  printf("      bpp: %u\n", pinfo->bpp);
+
+  /* Only these pixel depths are supported.  viinfo.fmt is ignored, only
+   * certain color formats are supported.
+   */
+
+  if (pinfo->bpp != 32 && pinfo->bpp != 24 &&
+      pinfo->bpp != 16 && pinfo->bpp != 8 &&
+      pinfo->bpp != 1)
+    {
+      fprintf(stderr, "ERROR: bpp=%u not supported\n", pinfo->bpp);
+      return EXIT_FAILURE;
+    }
+
+  return 0;
+}
+
+/****************************************************************************
+ * fb_init_mem2
+ ****************************************************************************/
+
+static int fb_init_mem2(FAR struct fb_state_s *state)
+{
+  int ret;
+  uintptr_t buf_offset;
+  struct fb_planeinfo_s pinfo;
+  FAR void *fbmem;
+
+  memset(&pinfo, 0, sizeof(pinfo));
+  pinfo.display = state->pinfo.display + 1;
+
+  if ((ret = fbdev_get_pinfo(state->fd, &pinfo)) < 0)
+    {
+      return EXIT_FAILURE;
+    }
+
+  fbmem = mmap(NULL, pinfo.fblen, PROT_READ | PROT_WRITE,
+               MAP_SHARED | MAP_FILE, state->fd, 0);
+
+  if (fbmem == MAP_FAILED)
+    {
+      int errcode = errno;
+      fprintf(stderr, "ERROR: ioctl(FBIOGET_PLANEINFO) failed: %d\n",
+              errcode);
+      return EXIT_FAILURE;
+    }
+
+  /* Check bpp */
+
+  if (pinfo.bpp != state->pinfo.bpp)
+    {
+      fprintf(stderr, "ERROR: fbmem2 is incorrect\n");
+      return -EINVAL;
+    }
+
+  /* Check the buffer address offset,
+   * It needs to be divisible by pinfo.stride
+   */
+
+  buf_offset = fbmem - state->fbmem;
+
+  if ((buf_offset % state->pinfo.stride) != 0)
+    {
+      fprintf(stderr, "ERROR: It is detected that buf_offset(%" PRIuPTR ") "
+              "and stride(%d) are not divisible, please ensure "
+              "that the driver handles the address offset by itself.\n",
+              buf_offset, state->pinfo.stride);
+    }
+
+  /* Calculate the address and yoffset of fbmem2 */
+
+  if (buf_offset == 0)
+    {
+      /* Use consecutive fbmem2. */
+
+      state->mem2_yoffset = state->vinfo.yres;
+      state->fbmem2 = fbmem + state->mem2_yoffset * pinfo.stride;
+      printf("Use consecutive fbmem2 = %p, yoffset = %" PRIu32"\n",
+             state->fbmem2, state->mem2_yoffset);
+    }
+  else
+    {
+      /* Use non-consecutive fbmem2. */
+
+      state->mem2_yoffset = buf_offset / state->pinfo.stride;
+      state->fbmem2 = fbmem;
+      printf("Use non-consecutive fbmem2 = %p, yoffset = %" PRIu32"\n",
+             state->fbmem2, state->mem2_yoffset);
+    }
+
+  return 0;
+}
+
+/****************************************************************************
  * draw_rect
  ****************************************************************************/
 
@@ -99,13 +277,36 @@ static void draw_rect32(FAR struct fb_state_s *state,
   int x;
   int y;
 
-  row = (FAR uint8_t *)state->fbmem + state->pinfo.stride * area->y;
+  row = (FAR uint8_t *)state->act_fbmem + state->pinfo.stride * area->y;
   for (y = 0; y < area->h; y++)
     {
       dest = ((FAR uint32_t *)row) + area->x;
       for (x = 0; x < area->w; x++)
         {
-          *dest++ = g_rgb24[color];
+          *dest++ = g_rgb24[color] | 0xff000000;
+        }
+
+      row += state->pinfo.stride;
+    }
+}
+
+static void draw_rect24(FAR struct fb_state_s *state,
+                        FAR struct fb_area_s *area, int color)
+{
+  FAR uint8_t *dest;
+  FAR uint8_t *row;
+  int x;
+  int y;
+
+  row = (FAR uint8_t *)state->act_fbmem + state->pinfo.stride * area->y;
+  for (y = 0; y < area->h; y++)
+    {
+      dest = ((FAR uint8_t *)row) + area->x * 3;
+      for (x = 0; x < area->w; x++)
+        {
+          *dest++ = g_rgb24[color] & 0xff;
+          *dest++ = (g_rgb24[color] >> 8) & 0xff;
+          *dest++ = (g_rgb24[color] >> 16) & 0xff;
         }
 
       row += state->pinfo.stride;
@@ -120,7 +321,7 @@ static void draw_rect16(FAR struct fb_state_s *state,
   int x;
   int y;
 
-  row = (FAR uint8_t *)state->fbmem + state->pinfo.stride * area->y;
+  row = (FAR uint8_t *)state->act_fbmem + state->pinfo.stride * area->y;
   for (y = 0; y < area->h; y++)
     {
       dest = ((FAR uint16_t *)row) + area->x;
@@ -141,7 +342,7 @@ static void draw_rect8(FAR struct fb_state_s *state,
   int x;
   int y;
 
-  row = (FAR uint8_t *)state->fbmem + state->pinfo.stride * area->y;
+  row = (FAR uint8_t *)state->act_fbmem + state->pinfo.stride * area->y;
   for (y = 0; y < area->h; y++)
     {
       dest = row + area->x;
@@ -171,7 +372,7 @@ static void draw_rect1(FAR struct fb_state_s *state,
 
   /* Calculate the framebuffer address of the first row to draw on */
 
-  row    = (FAR uint8_t *)state->fbmem + state->pinfo.stride * area->y;
+  row    = (FAR uint8_t *)state->act_fbmem + state->pinfo.stride * area->y;
 
   /* Calculate the position of the first complete (with all bits) byte.
    * Then calculate the last byte with all the bits.
@@ -248,6 +449,10 @@ static void draw_rect(FAR struct fb_state_s *state,
         draw_rect32(state, area, color);
         break;
 
+      case 24:
+        draw_rect24(state, area, color);
+        break;
+
       case 16:
         draw_rect16(state, area, color);
         break;
@@ -263,6 +468,10 @@ static void draw_rect(FAR struct fb_state_s *state,
     }
 
 #ifdef CONFIG_FB_UPDATE
+  int yoffset = state->act_fbmem == state->fbmem ?
+                0 : state->mem2_yoffset;
+  area->y += yoffset;
+
   ret = ioctl(state->fd, FBIO_UPDATE,
               (unsigned long)((uintptr_t)area));
   if (ret < 0)
@@ -272,6 +481,11 @@ static void draw_rect(FAR struct fb_state_s *state,
               errcode);
     }
 #endif
+
+  if (state->pinfo.yres_virtual == (state->vinfo.yres * 2))
+    {
+      pan_display(state);
+    }
 }
 
 /****************************************************************************
@@ -372,7 +586,7 @@ int main(int argc, FAR char *argv[])
 
   printf("OverlayInfo (overlay 0):\n");
   printf("    fbmem: %p\n", state.oinfo.fbmem);
-  printf("    fblen: %lu\n", (unsigned long)state.oinfo.fblen);
+  printf("    fblen: %zu\n", state.oinfo.fblen);
   printf("   stride: %u\n", state.oinfo.stride);
   printf("  overlay: %u\n", state.oinfo.overlay);
   printf("      bpp: %u\n", state.oinfo.bpp);
@@ -386,34 +600,22 @@ int main(int argc, FAR char *argv[])
                       state.oinfo.sarea.w, state.oinfo.sarea.h);
   printf("     accl: %" PRIu32 "\n", state.oinfo.accl);
 
-#endif
+  /* select default framebuffer layer */
 
-  ret = ioctl(state.fd, FBIOGET_PLANEINFO,
-              (unsigned long)((uintptr_t)&state.pinfo));
+  ret = ioctl(state.fd, FBIO_SELECT_OVERLAY, FB_NO_OVERLAY);
   if (ret < 0)
     {
       int errcode = errno;
-      fprintf(stderr, "ERROR: ioctl(FBIOGET_PLANEINFO) failed: %d\n",
+      fprintf(stderr, "ERROR: ioctl(FBIO_SELECT_OVERLAY) failed: %d\n",
               errcode);
       close(state.fd);
       return EXIT_FAILURE;
     }
 
-  printf("PlaneInfo (plane 0):\n");
-  printf("    fbmem: %p\n", state.pinfo.fbmem);
-  printf("    fblen: %lu\n", (unsigned long)state.pinfo.fblen);
-  printf("   stride: %u\n", state.pinfo.stride);
-  printf("  display: %u\n", state.pinfo.display);
-  printf("      bpp: %u\n", state.pinfo.bpp);
+#endif
 
-  /* Only these pixel depths are supported.  viinfo.fmt is ignored, only
-   * certain color formats are supported.
-   */
-
-  if (state.pinfo.bpp != 32 && state.pinfo.bpp != 16 &&
-      state.pinfo.bpp != 8  && state.pinfo.bpp != 1)
+  if ((ret = fbdev_get_pinfo(state.fd, &state.pinfo)) < 0)
     {
-      fprintf(stderr, "ERROR: bpp=%u not supported\n", state.pinfo.bpp);
       close(state.fd);
       return EXIT_FAILURE;
     }
@@ -432,7 +634,7 @@ int main(int argc, FAR char *argv[])
   if (state.fbmem == MAP_FAILED)
     {
       int errcode = errno;
-      fprintf(stderr, "ERROR: ioctl(FBIOGET_PLANEINFO) failed: %d\n",
+      fprintf(stderr, "ERROR: mmap() failed: %d\n",
               errcode);
       close(state.fd);
       return EXIT_FAILURE;
@@ -440,8 +642,19 @@ int main(int argc, FAR char *argv[])
 
   printf("Mapped FB: %p\n", state.fbmem);
 
+  /* double buffer mode */
+
+  if (state.pinfo.yres_virtual == (state.vinfo.yres * 2))
+    {
+      if ((ret = fb_init_mem2(&state)) < 0)
+        {
+          goto out;
+        }
+    }
+
   /* Draw some rectangles */
 
+  state.act_fbmem = state.fbmem;
   nsteps = 2 * (NCOLORS - 1) + 1;
   xstep  = state.vinfo.xres / nsteps;
   ystep  = state.vinfo.yres / nsteps;
@@ -465,10 +678,19 @@ int main(int argc, FAR char *argv[])
 
       width  -= (2 * xstep);
       height -= (2 * ystep);
+
+      /* double buffer mode */
+
+      if (state.pinfo.yres_virtual == (state.vinfo.yres * 2))
+        {
+          sync_area(&state);
+        }
     }
 
   printf("Test finished\n");
+  ret = EXIT_SUCCESS;
+out:
   munmap(state.fbmem, state.pinfo.fblen);
   close(state.fd);
-  return EXIT_SUCCESS;
+  return ret;
 }

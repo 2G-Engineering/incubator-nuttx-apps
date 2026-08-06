@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_socket.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -45,7 +47,7 @@
 
 FAR struct usock_s *usocket_search(FAR struct alt1250_s *dev, int usockid)
 {
-  struct usock_s *ret = NULL;
+  FAR struct usock_s *ret = NULL;
 
   dbg_alt1250("%s usockid: %d\n", __func__, usockid);
 

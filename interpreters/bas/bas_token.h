@@ -1,7 +1,8 @@
 /****************************************************************************
  * apps/interpreters/bas/bas_token.h
  *
- *   Copyright (c) 1999-2014 Michael Haardt
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: 1999-2014 Michael Haardt
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -100,7 +101,7 @@ struct Identifier
 {
   struct Symbol *sym;
   enum ValueType defaultType;
-  char name[2/* ... */];
+  char name[0];
 };
 
 struct Next

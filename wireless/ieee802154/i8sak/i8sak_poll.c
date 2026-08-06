@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/ieee802154/i8sak/i8sak_poll.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -174,7 +176,7 @@ static void poll_eventcb(FAR struct ieee802154_primitive_s *primitive,
   else
     {
       printf("i8sak: POLL.request failed: %s\n",
-             IEEE802154_STATUS_STRING[primitive->u.pollconf.status]);
+             g_ieee802154_status_string[primitive->u.pollconf.status]);
     }
 
   sem_post(&i8sak->sigsem);

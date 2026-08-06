@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/rexecd/rexecd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <poll.h>
+#include <syslog.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -80,10 +83,10 @@ static int getstr(int fd, FAR char *buf)
 static FAR void *doit(pthread_addr_t pvarg)
 {
   char buf[REXECD_BUFSIZE];
+  struct pollfd fds[2];
   FAR FILE *fp;
-  int sock = (int)pvarg;
+  int sock = (long)pvarg;
   int ret;
-  int len;
 
   /* we need to read err_sock, user and passwd, but ignore them */
 
@@ -94,31 +97,61 @@ static FAR void *doit(pthread_addr_t pvarg)
   /* we need to read command */
 
   getstr(sock, buf);
-  fp = popen(buf, "r");
+  fp = popen(buf, "r+");
   if (!fp)
     {
       goto errout;
     }
 
+  memset(fds, 0, sizeof(fds));
+  fds[0].fd = fileno(fp);
+  fds[0].events = POLLIN;
+  fds[1].fd = sock;
+  fds[1].events = POLLIN;
+
   while (1)
     {
-      ret = fread(buf, 1, REXECD_BUFSIZE, fp);
+      ret = poll(fds, 2, -1);
       if (ret <= 0)
         {
-          break;
+          continue;
         }
 
-      do
+      if (fds[0].revents & POLLIN)
         {
-          len = write(sock, buf, ret);
-          if (len <= 0)
+          ret = read(fileno(fp), buf, REXECD_BUFSIZE);
+          if (ret <= 0)
             {
               break;
             }
 
-          ret -= len;
+          ret = write(sock, buf, ret);
+          if (ret < 0)
+            {
+              break;
+            }
         }
-      while (ret > 0);
+
+      if (fds[1].revents & POLLIN)
+        {
+          ret = read(sock, buf, REXECD_BUFSIZE);
+          if (ret <= 0)
+            {
+              break;
+            }
+
+          ret = write(fileno(fp), buf, ret);
+          if (ret < 0)
+            {
+              break;
+            }
+        }
+
+      if (((fds[0].revents | fds[1].revents) & POLLHUP) &&
+          ((fds[0].revents | fds[1].revents) & POLLIN) == 0)
+        {
+          break;
+        }
     }
 
   pclose(fp);
@@ -179,18 +212,18 @@ int main(int argc, FAR char **argv)
       default:
       case AF_INET:
         ((FAR struct sockaddr_in *)&addr)->sin_family = AF_INET;
-        ((FAR struct sockaddr_in *)&addr)->sin_port = REXECD_PORT;
+        ((FAR struct sockaddr_in *)&addr)->sin_port = htons(REXECD_PORT);
         ret = sizeof(struct sockaddr_in);
         break;
       case AF_INET6:
         ((FAR struct sockaddr_in6 *)&addr)->sin6_family = AF_INET6;
-        ((FAR struct sockaddr_in6 *)&addr)->sin6_port = REXECD_PORT;
+        ((FAR struct sockaddr_in6 *)&addr)->sin6_port = htons(REXECD_PORT);
         ret = sizeof(struct sockaddr_in6);
         break;
       case AF_RPMSG:
         ((FAR struct sockaddr_rpmsg *)&addr)->rp_family = AF_RPMSG;
         snprintf(((FAR struct sockaddr_rpmsg *)&addr)->rp_name,
-                 RPMSG_SOCKET_NAME_SIZE, "%d", REXECD_PORT);
+                 RPMSG_SOCKET_NAME_SIZE, "%d", htons(REXECD_PORT));
         ret = sizeof(struct sockaddr_rpmsg);
     }
 
@@ -226,7 +259,7 @@ int main(int argc, FAR char **argv)
 
   while (1)
     {
-      sock = accept(serv, NULL, 0);
+      sock = accept4(serv, NULL, 0, SOCK_CLOEXEC);
       if (sock < 0)
         {
           if (errno == EINTR)
@@ -250,6 +283,7 @@ int main(int argc, FAR char **argv)
 attr_out:
   pthread_attr_destroy(&attr);
 err_out:
+  syslog(LOG_ERR, "rexecd failed ret:%d errno:%d\n", ret, errno);
   close(serv);
   return ret;
 }

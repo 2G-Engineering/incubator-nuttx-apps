@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/bmi160/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -19,7 +21,6 @@
 ############################################################################
 
 include $(APPDIR)/Make.defs
--include $(SDKDIR)/Make.defs
 
 # sixaxis built-in application info
 
@@ -29,6 +30,10 @@ STACKSIZE = $(CONFIG_EXAMPLES_SIXAXIS_STACKSIZE)
 
 # sixaxis Example
 
+ifeq ($(CONFIG_EXAMPLES_SIXAXIS_UORB),)
 MAINSRC = sixaxis_main.c
+else
+MAINSRC = sixaxis_uorb_main.c
+endif
 
 include $(APPDIR)/Application.mk

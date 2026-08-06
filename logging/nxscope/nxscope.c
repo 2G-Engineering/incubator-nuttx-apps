@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/logging/nxscope/nxscope.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -148,7 +150,7 @@ static int nxscope_chinfo_send(FAR struct nxscope_s *s, uint8_t ch)
   namelen = strnlen(s->chinfo[ch].name, CHAN_NAMELEN_MAX);
   memcpy(&data[tmp], s->chinfo[ch].name, namelen);
 
-  /* Treminate name wit a null-character */
+  /* Terminate name with a null character */
 
   txlen = tmp  + namelen + 1;
   data[txlen - 1] = '\0';
@@ -353,7 +355,7 @@ static int nxscope_div_req(FAR struct nxscope_s *s,
             {
               _err("ERROR: invalid div bulk dlen = %d\n", dlen);
               ret = -EINVAL;
-               goto errout;
+              goto errout;
             }
 
           /* Write configuration */
@@ -1118,7 +1120,7 @@ int nxscope_recv(FAR struct nxscope_s *s)
 
   /* Handle frame */
 
-  ret = nxscope_recv_handle(s, frame.id, frame.dlen, frame.data);
+  ret = nxscope_recv_handle(s, frame.id, (uint16_t)frame.dlen, frame.data);
   if (ret < 0)
     {
       _err("ERROR: nxscope_recv_handle failed %d\n", ret);

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/ntpc/ntpcstart_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -39,13 +41,20 @@
 
 int main(int argc, FAR char *argv[])
 {
-  int pid = ntpc_start();
+  int pid;
+
+  printf("Starting NTP client...\n");
+  printf("Using NTP servers: %s\n", CONFIG_NETUTILS_NTPCLIENT_SERVER);
+
+  pid = ntpc_start();
   if (pid < 0)
     {
       fprintf(stderr, "ERROR: ntpc_start() failed\n");
       return EXIT_FAILURE;
     }
 
-  printf("Started the NTP daemon as PID=%d\n", pid);
+  printf("NTP client started successfully (task ID: %d)\n", pid);
+  printf("NTP client is now running in the background\n");
+
   return EXIT_SUCCESS;
 }

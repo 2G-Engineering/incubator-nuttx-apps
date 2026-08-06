@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/audioutils/fmsynth_eg.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -85,6 +87,7 @@ extern "C"
 {
 #endif
 
+FAR fmsynth_eg_t *create_fmsyntheg(fmsynth_eg_t *eg);
 FAR fmsynth_eg_t *fmsyntheg_create(void);
 void fmsyntheg_delete(FAR fmsynth_eg_t *eg);
 int fmsyntheg_set_param(FAR fmsynth_eg_t *eg,

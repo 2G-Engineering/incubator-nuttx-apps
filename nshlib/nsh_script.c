@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_script.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,10 +38,18 @@
 #ifndef CONFIG_NSH_DISABLESCRIPT
 
 /****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+#ifdef CONFIG_ETC_ROMFS
+static bool g_nsh_script_initialized;
+#endif
+
+/****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-#if defined(CONFIG_NSH_ROMFSETC) || defined(CONFIG_NSH_ROMFSRC)
+#if defined(CONFIG_ETC_ROMFS) || defined(CONFIG_NSH_ROMFSRC)
 static int nsh_script_redirect(FAR struct nsh_vtbl_s *vtbl,
                                FAR const char *cmd,
                                FAR const char *path,
@@ -51,10 +61,11 @@ static int nsh_script_redirect(FAR struct nsh_vtbl_s *vtbl,
 
   if (CONFIG_NSH_SCRIPT_REDIRECT_PATH[0])
     {
-      fd = open(CONFIG_NSH_SCRIPT_REDIRECT_PATH, 0666);
+      fd = open(CONFIG_NSH_SCRIPT_REDIRECT_PATH,
+                O_WRONLY | O_CREAT | O_TRUNC, 0666);
       if (fd > 0)
         {
-          nsh_redirect(vtbl, fd, save);
+          nsh_redirect(vtbl, 0, fd, fd, save);
         }
     }
 
@@ -64,7 +75,6 @@ static int nsh_script_redirect(FAR struct nsh_vtbl_s *vtbl,
       if (fd > 0)
         {
           nsh_undirect(vtbl, save);
-          close(fd);
         }
     }
 
@@ -111,7 +121,7 @@ int nsh_script(FAR struct nsh_vtbl_s *vtbl, FAR const FAR char *cmd,
 
       /* Open the file containing the script */
 
-      vtbl->np.np_fd = open(fullpath, O_RDOK);
+      vtbl->np.np_fd = open(fullpath, O_RDONLY | O_CLOEXEC);
       if (vtbl->np.np_fd < 0)
         {
           if (log)
@@ -153,7 +163,7 @@ int nsh_script(FAR struct nsh_vtbl_s *vtbl, FAR const FAR char *cmd,
 
           /* Now read the next line from the script file */
 
-          ret = readline_fd(buffer, CONFIG_NSH_LINELEN, vtbl->np.np_fd, -1);
+          ret = readline_fd(buffer, LINE_MAX, vtbl->np.np_fd, -1);
           if (ret >= 0)
             {
               /* Parse process the command.  NOTE:  this is recursive...
@@ -202,7 +212,7 @@ int nsh_script(FAR struct nsh_vtbl_s *vtbl, FAR const FAR char *cmd,
  *
  ****************************************************************************/
 
-#ifdef CONFIG_NSH_ROMFSETC
+#ifdef CONFIG_ETC_ROMFS
 int nsh_sysinitscript(FAR struct nsh_vtbl_s *vtbl)
 {
   /* Since most existing systems only use the NSH_INITPATH script file.
@@ -224,18 +234,17 @@ int nsh_sysinitscript(FAR struct nsh_vtbl_s *vtbl)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_NSH_ROMFSETC
+#ifdef CONFIG_ETC_ROMFS
 int nsh_initscript(FAR struct nsh_vtbl_s *vtbl)
 {
-  static bool initialized;
   bool already;
   int ret = OK;
 
-  /* Atomic test and set of the initialized flag */
+  /* Atomic test and set of the g_nsh_script_initialized flag */
 
   sched_lock();
-  already     = initialized;
-  initialized = true;
+  already                  = g_nsh_script_initialized;
+  g_nsh_script_initialized = true;
   sched_unlock();
 
   /* If we have not already executed the init script, then do so now */
@@ -268,6 +277,6 @@ int nsh_loginscript(FAR struct nsh_vtbl_s *vtbl)
   return nsh_script_redirect(vtbl, "login", NSH_RCPATH, true);
 }
 #endif
-#endif /* CONFIG_NSH_ROMFSETC */
+#endif /* CONFIG_ETC_ROMFS */
 
 #endif /* CONFIG_NSH_DISABLESCRIPT */

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/netutils/mqttc/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -48,6 +50,50 @@ context:: $(MQTTC_UNPACK)
 distclean::
 	$(call DELFILE, $(MQTTC_TARBALL))
 	$(call DELDIR, $(MQTTC_UNPACK))
+endif
+
+ifneq ($(CONFIG_NETUTILS_MQTTC_EXAMPLE),)
+CFLAGS += -Wno-return-type
+
+PRIORITY  = SCHED_PRIORITY_DEFAULT
+STACKSIZE = $(CONFIG_NETUTILS_MQTTC_EXAMPLE_STACKSIZE)
+MODULE    = $(CONFIG_NETUTILS_MQTTC_EXAMPLE)
+
+# MQTT-C mbedtls example source code
+ifneq ($(CONFIG_NETUTILS_MQTTC_WITH_MBEDTLS),)
+PROGNAME  = mqttc_mbedtls_pub
+MAINSRC   = $(MQTTC_UNPACK)$(DELIM)examples$(DELIM)mbedtls_publisher.c
+else
+PROGNAME  = mqttc_posix_pub
+MAINSRC   = $(MQTTC_UNPACK)$(DELIM)examples$(DELIM)simple_publisher.c
+$(MQTTC_UNPACK)$(DELIM)examples$(DELIM)simple_publisher.c_CFLAGS += \
+            -Dopen_nb_socket=pub_open_nb_socket \
+            -Dexit_example=pub_exit_example \
+            -Dpublish_callback=pub_publish_callback \
+            -Dclient_refresher=pub_client_refresher
+
+PROGNAME += mqttc_posix_sub
+MAINSRC  += $(MQTTC_UNPACK)$(DELIM)examples$(DELIM)simple_subscriber.c
+$(MQTTC_UNPACK)$(DELIM)examples$(DELIM)simple_subscriber.c_CFLAGS += \
+            -Dopen_nb_socket=sub_open_nb_socket \
+            -Dexit_example=sub_exit_example \
+            -Dpublish_callback=sub_publish_callback \
+            -Dclient_refresher=sub_client_refresher
+endif
+
+endif
+
+ifneq ($(CONFIG_NETUTILS_MQTTC_TEST),)
+$(MQTTC_UNPACK)$(DELIM)tests.c_CFLAGS += \
+            -I$(APPDIR)$(DELIM)testing$(DELIM)cmocka$(DELIM)cmocka$(DELIM)include \
+            -Dopen_nb_socket=test_open_nb_socket \
+            -Dpublish_callback=test_publish_callback
+
+PRIORITY  = SCHED_PRIORITY_DEFAULT
+STACKSIZE = $(CONFIG_NETUTILS_MQTTC_TEST_STACKSIZE)
+MODULE    = $(CONFIG_NETUTILS_MQTTC_TEST)
+MAINSRC  += $(MQTTC_UNPACK)$(DELIM)tests.c
+PROGNAME += cmocka_mqttc_test
 endif
 
 include $(APPDIR)/Application.mk

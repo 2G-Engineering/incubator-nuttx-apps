@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/nxlooper/nxlooper.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -575,7 +577,7 @@ static void *nxlooper_loopthread(pthread_addr_t pvarg)
 
             if (ret == OK && plooper->loopstate == NXLOOPER_STATE_RECORDING)
               {
-#ifdef CONFIG_O_MULTI_SESSION
+#ifdef CONFIG_AUDIO_MULTI_SESSION
                 ret = ioctl(plooper->playdev_fd, AUDIOIOC_START,
                             (unsigned long)plooper->pplayses);
 #else
@@ -1053,6 +1055,7 @@ int nxlooper_loopback(FAR struct nxlooper_s *plooper, int format,
       goto err_out_record;
     }
 
+  memset(&caps, 0, sizeof(struct audio_caps_s));
   caps.ac_len = sizeof(caps);
   caps.ac_type = AUDIO_TYPE_INPUT;
   caps.ac_subtype = AUDIO_TYPE_QUERY;

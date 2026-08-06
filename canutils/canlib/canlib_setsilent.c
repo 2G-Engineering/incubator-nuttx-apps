@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/canlib/canlib_setsilent.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,16 +24,10 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/config.h>
-
 #include <sys/ioctl.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <fcntl.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
+
 #include <nuttx/can/can.h>
 
 /****************************************************************************
@@ -46,8 +42,8 @@
  *   peripheral never transmits on the bus, but receives all bus traffic.
  *
  * Input Parameter:
- *   fd       - file descriptor of an opened can device
- *   loopback - whether to use loopback mode.
+ *   fd     - file descriptor of an opened can device
+ *   silent - whether to use silent mode.
  *
  * Returned Value:
  *   Zero (OK) is returned on success.  Otherwise -1 (ERROR)

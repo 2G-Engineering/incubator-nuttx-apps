@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/industry/foc/float/foc_vel_odiv.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -213,6 +215,8 @@ static int foc_velocity_div_zero_f32(FAR foc_velocity_f32_t *h)
                            div->cfg.samples,
                            div->cfg.filter,
                            div->cfg.per);
+
+  div->o.speed = 0.0f;
 
   return ret;
 }

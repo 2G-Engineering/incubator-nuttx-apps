@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/mount/ramdisk.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -95,8 +97,8 @@ int create_ramdisk(void)
   ret = mkfatfs(g_source, &g_fmt);
   if (ret < 0)
     {
-      printf("create_ramdisk: Failed to create FAT filesystem on ramdisk at %s\n",
-             g_source);
+      printf("create_ramdisk: Failed to create FAT filesystem on "
+             "ramdisk at %s\n", g_source);
       return ret;
     }
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_usockevent.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -53,7 +55,7 @@
 #define REP_SEND_DACK_RXREADY W_CONTAINER_FREE(11)
 
 /****************************************************************************
- * Public Data Type
+ * Public Types
  ****************************************************************************/
 
 typedef int (*usrsock_reqhandler_t)(FAR struct alt1250_s *dev,

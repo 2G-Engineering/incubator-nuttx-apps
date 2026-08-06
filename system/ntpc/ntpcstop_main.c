@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/ntpc/ntpcstop_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -39,7 +41,11 @@
 
 int main(int argc, FAR char *argv[])
 {
-  int ret = ntpc_stop();
+  int ret = OK;
+
+  printf("Stopping NTP client...\n");
+
+  ret = ntpc_stop();
   if (ret < 0)
     {
       fprintf(stderr, "ERROR: ntpc_stop() failed\n");
