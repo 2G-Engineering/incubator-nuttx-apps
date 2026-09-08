@@ -1,8 +1,9 @@
 /****************************************************************************
  * apps/system/cu/cu.h
  *
- *   Copyright (C) 2014 sysmocom - s.f.m.c. GmbH. All rights reserved.
- *   Author: Harald Welte <hwelte@sysmocom.de>
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2014 sysmocom - s.f.m.c. GmbH. All rights reserved.
+ * SPDX-FileContributor: Harald Welte <hwelte@sysmocom.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,9 +72,9 @@
 
 struct cu_globals_s
 {
-  int infd;              /* Incoming data from serial port */
-  int outfd;             /* Outgoing data to serial port */
+  int devfd;             /* I/O data to serial port */
   int stdfd;             /* I/O data to standard console */
+  int escape;            /* Escape char */
   struct termios devtio; /* Original serial port setting */
   struct termios stdtio; /* Original standard console setting */
   pthread_t listener;    /* Terminal listener thread */

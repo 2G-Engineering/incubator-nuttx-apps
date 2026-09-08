@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_parse.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,6 @@
 #include <string.h>
 #include <errno.h>
 #include <debug.h>
-#include <pthread.h>
 #include <sched.h>
 #include <unistd.h>
 
@@ -39,10 +40,11 @@
 #endif
 
 #include <nuttx/version.h>
-#include "nshlib/nshlib.h"
+#include <nuttx/sched_note.h>
 
 #include "nsh.h"
 #include "nsh_console.h"
+#include "nshlib/nshlib.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -125,18 +127,6 @@
  * Private Types
  ****************************************************************************/
 
-/* These structure describes the parsed command line */
-
-#ifndef CONFIG_NSH_DISABLEBG
-struct cmdarg_s
-{
-  FAR struct nsh_vtbl_s *vtbl;      /* For front-end interaction */
-  int fd;                           /* FD for output redirection */
-  int argc;                         /* Number of arguments in argv */
-  FAR char *argv[MAX_ARGV_ENTRIES]; /* Argument list */
-};
-#endif
-
 /* This structure describes the allocation list */
 
 #ifdef HAVE_MEMLIST
@@ -172,17 +162,10 @@ static void nsh_alist_free(FAR struct nsh_vtbl_s *vtbl,
                            FAR struct nsh_alist_s *alist);
 #endif
 
-#ifndef CONFIG_NSH_DISABLEBG
-static void nsh_releaseargs(struct cmdarg_s *arg);
-static pthread_addr_t nsh_child(pthread_addr_t arg);
-static struct cmdarg_s *nsh_cloneargs(FAR struct nsh_vtbl_s *vtbl,
-               int fd, int argc, FAR char *argv[]);
-#endif
-
 static int nsh_saveresult(FAR struct nsh_vtbl_s *vtbl, bool result);
 static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
-               int argc, FAR char *argv[], FAR const char *redirfile,
-               int oflags);
+               int argc, FAR char *argv[],
+               FAR const struct nsh_param_s *param);
 
 #ifdef CONFIG_NSH_CMDPARMS
 static FAR char *nsh_filecat(FAR struct nsh_vtbl_s *vtbl, FAR char *s1,
@@ -214,7 +197,7 @@ static FAR char *nsh_envexpand(FAR struct nsh_vtbl_s *vtbl,
                FAR char *varname);
 #endif
 
-#if defined(CONFIG_NSH_QUOTE) && defined(CONFIG_NSH_ARGCAT)
+#if defined(CONFIG_NSH_QUOTE)
 static void nsh_dequote(FAR char *cmdline);
 #else
 #  define nsh_dequote(c)
@@ -258,7 +241,7 @@ static int nsh_nice(FAR struct nsh_vtbl_s *vtbl, FAR char **ppcmd,
 
 #ifdef CONFIG_NSH_CMDPARMS
 static int nsh_parse_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
-               FAR const char *redirfile);
+               FAR const struct nsh_param_s *param);
 #endif
 
 static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline);
@@ -267,23 +250,32 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline);
  * Private Data
  ****************************************************************************/
 
-static const char g_token_separator[] = " \t\n";
-static const char g_quote_separator[] = "'\"`";
+static const char   g_token_separator[] = " \t\n";
+static const char   g_quote_separator[] = "'\"`";
 #ifndef NSH_DISABLE_SEMICOLON
-static const char g_line_separator[]  = "\"'#;\n";
+static const char   g_line_separator[]  = "\"'#;\n";
 #endif
 #ifdef CONFIG_NSH_ARGCAT
-static const char g_arg_separator[]   = "`$";
+static const char   g_arg_separator[]   = "`$";
 #endif
-static const char g_redirect1[]       = ">";
-static const char g_redirect2[]       = ">>";
+static const char   g_redirect_out1[]   = ">";
+static const size_t g_redirect_out1_len = sizeof(g_redirect_out1) - 1;
+static const char   g_redirect_out2[]   = ">>";
+static const size_t g_redirect_out2_len = sizeof(g_redirect_out2) - 1;
+static const char   g_redirect_in1[]    = "<";
+static const size_t g_redirect_in1_len  = sizeof(g_redirect_in1) - 1;
+#ifdef CONFIG_NSH_PIPELINE
+static const char   g_pipeline1[]       = "|";
+static const size_t g_pipeline1_len     = sizeof(g_pipeline1) - 1;
+#endif
 #ifdef NSH_HAVE_VARS
-static const char g_exitstatus[]      = "?";
-static const char g_success[]         = "0";
-static const char g_failure[]         = "1";
+static const char   g_exitstatus[]      = "?";
+static const char   g_lastpid[]         = "!";
+static const char   g_success[]         = "0";
+static const char   g_failure[]         = "1";
 #endif
 #ifdef NEED_NULLSTRING
-static const char g_nullstring[]      = "";
+static const char   g_nullstring[]      = "";
 #endif
 
 /****************************************************************************
@@ -320,10 +312,6 @@ const char g_loginsuccess[]      = "\nUser Logged-in!\n";
 const char g_badcredentials[]    = "\nInvalid username or password\n";
 const char g_loginfailure[]      = "Login failed!\n";
 #endif
-
-/* The NSH prompt */
-
-const char g_nshprompt[]         = CONFIG_NSH_PROMPT_STRING;
 
 /* Common, message formats */
 
@@ -444,92 +432,6 @@ static void nsh_alist_free(FAR struct nsh_vtbl_s *vtbl,
 #endif
 
 /****************************************************************************
- * Name: nsh_releaseargs
- ****************************************************************************/
-
-#ifndef CONFIG_NSH_DISABLEBG
-static void nsh_releaseargs(struct cmdarg_s *arg)
-{
-  FAR struct nsh_vtbl_s *vtbl = arg->vtbl;
-  int i;
-
-  /* If the output was redirected, then file descriptor should
-   * be closed.  The created task has its one, independent copy of
-   * the file descriptor
-   */
-
-  if (vtbl->np.np_redirect)
-    {
-      close(arg->fd);
-    }
-
-  /* Released the cloned vtbl instance */
-
-  nsh_release(vtbl);
-
-  /* Release the cloned args */
-
-  for (i = 0; i < arg->argc; i++)
-    {
-      free(arg->argv[i]);
-    }
-
-  free(arg);
-}
-#endif
-
-/****************************************************************************
- * Name: nsh_child
- ****************************************************************************/
-
-#ifndef CONFIG_NSH_DISABLEBG
-static pthread_addr_t nsh_child(pthread_addr_t arg)
-{
-  struct cmdarg_s *carg = (struct cmdarg_s *)arg;
-  int ret;
-
-  _info("BG %s\n", carg->argv[0]);
-
-  /* Execute the specified command on the child thread */
-
-  ret = nsh_command(carg->vtbl, carg->argc, carg->argv);
-
-  /* Released the cloned arguments */
-
-  _info("BG %s complete\n", carg->argv[0]);
-  nsh_releaseargs(carg);
-  return (pthread_addr_t)((uintptr_t)ret);
-}
-#endif
-
-/****************************************************************************
- * Name: nsh_cloneargs
- ****************************************************************************/
-
-#ifndef CONFIG_NSH_DISABLEBG
-static struct cmdarg_s *nsh_cloneargs(FAR struct nsh_vtbl_s *vtbl,
-                                      int fd, int argc, FAR char *argv[])
-{
-  struct cmdarg_s *ret = (struct cmdarg_s *)zalloc(sizeof(struct cmdarg_s));
-  int i;
-
-  if (ret)
-    {
-      ret->vtbl = vtbl;
-      ret->fd   = fd;
-      ret->argc = argc;
-
-      for (i = 0; i < argc; i++)
-        {
-          ret->argv[i] = strdup(argv[i]);
-        }
-    }
-
-  return ret;
-}
-#endif
-
-/****************************************************************************
  * Name: nsh_saveresult
  ****************************************************************************/
 
@@ -598,9 +500,10 @@ static int nsh_saveresult(FAR struct nsh_vtbl_s *vtbl, bool result)
 
 static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
                        int argc, FAR char *argv[],
-                       FAR const char *redirfile, int oflags)
+                       FAR const struct nsh_param_s *param)
 {
-  int fd = -1;
+  int fd_out = STDOUT_FILENO;
+  int fd_in = STDIN_FILENO;
   int ret;
 
   /* DO NOT CHANGE THE ORDERING OF THE FOLLOWING STEPS
@@ -638,7 +541,7 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
    */
 
 #ifdef CONFIG_NSH_BUILTIN_APPS
-  ret = nsh_builtin(vtbl, argv[0], argv, redirfile, oflags);
+  ret = nsh_builtin(vtbl, argv[0], argv, param);
   if (ret >= 0)
     {
       /* nsh_builtin() returned 0 or 1.  This means that the built-in
@@ -675,7 +578,7 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
    */
 
 #ifdef CONFIG_NSH_FILE_APPS
-  ret = nsh_fileapp(vtbl, argv[0], argv, redirfile, oflags);
+  ret = nsh_fileapp(vtbl, argv[0], argv, param);
   if (ret >= 0)
     {
       /* nsh_fileapp() returned 0 or 1.  This means that the built-in
@@ -694,24 +597,6 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
 
 #endif
 
-  /* Redirected output? */
-
-  if (vtbl->np.np_redirect)
-    {
-      /* Open the redirection file.  This file will eventually
-       * be closed by a call to either nsh_release (if the command
-       * is executed in the background) or by nsh_undirect if the
-       * command is executed in the foreground.
-       */
-
-      fd = open(redirfile, oflags, 0666);
-      if (fd < 0)
-        {
-          nsh_error(vtbl, g_fmtcmdfailed, argv[0], "open", NSH_ERRNO);
-          goto errout;
-        }
-    }
-
   /* Handle the case where the command is executed in background.
    * However is app is to be started as built-in new process will
    * be created anyway, so skip this step.
@@ -720,119 +605,109 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
 #ifndef CONFIG_NSH_DISABLEBG
   if (vtbl->np.np_bg)
     {
-      struct sched_param param;
-      struct nsh_vtbl_s *bkgvtbl;
-      struct cmdarg_s *args;
-      pthread_attr_t attr;
-      pthread_t thread;
+      FAR char *sh_argv[4];
+      FAR char *sh_cmd = "sh";
+      FAR char *sh_arg2;
 
-      /* Get a cloned copy of the vtbl with reference count=1.
-       * after the command has been processed, the nsh_release() call
-       * at the end of nsh_child() will destroy the clone.
-       */
+      DEBUGASSERT(strncmp(argv[0], sh_cmd, 3) != 0);
 
-      bkgvtbl = nsh_clone(vtbl);
-      if (!bkgvtbl)
+      sh_arg2 = lib_get_tempbuffer(LINE_MAX);
+      if (sh_arg2 == NULL)
         {
-          goto errout_with_redirect;
+          nsh_error(vtbl, g_fmtcmdoutofmemory, sh_cmd);
+          ret = -errno;
+          goto close_redir;
         }
 
-      /* Create a container for the command arguments */
+      sh_arg2[0] = '\0';
 
-      args = nsh_cloneargs(bkgvtbl, fd, argc, argv);
-      if (!args)
+      for (ret = 0; ret < argc; ret++)
         {
-          nsh_release(bkgvtbl);
-          goto errout_with_redirect;
-        }
+          strlcat(sh_arg2, argv[ret], LINE_MAX);
 
-      /* Handle redirection of output via a file descriptor */
-
-      if (vtbl->np.np_redirect)
-        {
-          nsh_redirect(bkgvtbl, fd, NULL);
-        }
-
-      /* Get the execution priority of this task */
-
-      ret = sched_getparam(0, &param);
-      if (ret != 0)
-        {
-          nsh_error(vtbl, g_fmtcmdfailed, argv[0], "sched_getparm",
-                    NSH_ERRNO);
-
-          /* NOTE: bkgvtbl is released in nsh_relaseargs() */
-
-          nsh_releaseargs(args);
-          goto errout;
-        }
-
-      /* Determine the priority to execute the command */
-
-      if (vtbl->np.np_nice != 0)
-        {
-          int priority = param.sched_priority - vtbl->np.np_nice;
-          if (vtbl->np.np_nice < 0)
+          if (ret < argc - 1)
             {
-              int max_priority = sched_get_priority_max(SCHED_NSH);
-              if (priority > max_priority)
-                {
-                  priority = max_priority;
-                }
+              strcat(sh_arg2, " ");
             }
-          else
-            {
-              int min_priority = sched_get_priority_min(SCHED_NSH);
-              if (priority < min_priority)
-                {
-                  priority = min_priority;
-                }
-            }
-
-          param.sched_priority = priority;
         }
 
-      /* Set up the thread attributes */
+      sh_argv[0] = sh_cmd;
+      sh_argv[1] = "-c";
+      sh_argv[2] = sh_arg2;
+      sh_argv[3] = NULL;
 
-      pthread_attr_init(&attr);
-      pthread_attr_setschedpolicy(&attr, SCHED_NSH);
-      pthread_attr_setschedparam(&attr, &param);
-
-      /* Execute the command as a separate thread at the appropriate
-       * priority.
+      /* np.np_bg still there, try use nsh_builtin or nsh_fileapp to
+       * dispatch the backgroud by sh -c ""
        */
 
-      ret = pthread_create(&thread, &attr, nsh_child, (pthread_addr_t)args);
-      if (ret != 0)
-        {
-          nsh_error(vtbl, g_fmtcmdfailed, argv[0], "pthread_create",
-                    NSH_ERRNO_OF(ret));
-
-          /* NOTE: bkgvtbl is released in nsh_relaseargs() */
-
-          nsh_releaseargs(args);
-          goto errout;
-        }
-
-      /* Detach from the pthread since we are not going to join with it.
-       * Otherwise, we would have a memory leak.
-       */
-
-      pthread_detach(thread);
-
-      nsh_output(vtbl, "%s [%d:%d]\n", argv[0], thread,
-                 param.sched_priority);
+      ret = nsh_execute(vtbl, 4, sh_argv, param);
+      lib_put_tempbuffer(sh_arg2);
+      return ret;
     }
   else
 #endif
     {
       uint8_t save[SAVE_SIZE];
 
-      /* Handle redirection of output via a file descriptor */
+      /* Redirected output? */
 
-      if (vtbl->np.np_redirect)
+      if (vtbl->np.np_redir_out)
         {
-          nsh_redirect(vtbl, fd, save);
+          if (param->file_out)
+            {
+              /* Open the redirection file.  This file will eventually
+               * be closed by a call to either nsh_release (if the command
+               * is executed in the background) or by nsh_undirect if the
+               * command is executed in the foreground.
+               */
+
+              fd_out = open(param->file_out, param->oflags_out, 0666);
+              if (fd_out < 0)
+                {
+                  nsh_error(vtbl, g_fmtcmdfailed, argv[0], "open",
+                            NSH_ERRNO);
+                  ret = errno;
+                  goto close_redir;
+                }
+            }
+          else
+            {
+              fd_out = param->fd_out;
+            }
+        }
+
+      /* Redirected input? */
+
+      if (vtbl->np.np_redir_in)
+        {
+          if (param->file_in)
+            {
+              /* Open the redirection file.  This file will eventually
+               * be closed by a call to either nsh_release (if the command
+               * is executed in the background) or by nsh_undirect if the
+               * command is executed in the foreground.
+               */
+
+              fd_in = open(param->file_in, param->oflags_in, 0);
+              if (fd_in < 0)
+                {
+                  nsh_error(vtbl, g_fmtcmdfailed, argv[0], "open",
+                            NSH_ERRNO);
+                  ret = errno;
+                  goto close_redir;
+                }
+            }
+          else
+            {
+              fd_in = param->fd_in;
+            }
+        }
+
+      /* Handle redirection of stdin/stdout file descriptor */
+
+      if (vtbl->np.np_redir_out || vtbl->np.np_redir_in)
+        {
+          nsh_redirect(vtbl, fd_in, fd_out, save);
         }
 
       /* Then execute the command in "foreground" -- i.e., while the user
@@ -848,37 +723,31 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
        * file descriptor.
        */
 
-      if (vtbl->np.np_redirect)
+      if (vtbl->np.np_redir_out || vtbl->np.np_redir_in)
         {
           nsh_undirect(vtbl, save);
         }
+    }
 
-      /* Mark errors so that it is possible to test for non-zero return
-       * values in nsh scripts.
-       */
+close_redir:
 
-      if (ret < 0)
-        {
-          goto errout;
-        }
+  /* Closing fds opened for redirection if necessary */
+
+  if (fd_out > STDOUT_FILENO)
+    {
+      close(fd_out);
+    }
+
+  if (fd_in > STDIN_FILENO)
+    {
+      close(fd_in);
     }
 
   /* Return success if the command succeeded (or at least, starting of the
    * command task succeeded).
    */
 
-  return nsh_saveresult(vtbl, false);
-
-#ifndef CONFIG_NSH_DISABLEBG
-errout_with_redirect:
-  if (vtbl->np.np_redirect)
-    {
-      close(fd);
-    }
-#endif
-
-errout:
-  return nsh_saveresult(vtbl, true);
+  return nsh_saveresult(vtbl, ret != OK);
 }
 
 /****************************************************************************
@@ -1010,6 +879,16 @@ errout_with_alloc:
 static FAR char *nsh_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
                              FAR char **allocation)
 {
+  struct nsh_param_s param =
+    {
+      .fd_in      = -1,
+      .fd_out     = -1,
+      .oflags_in  = 0,
+      .oflags_out = O_WRONLY | O_CREAT | O_TRUNC,
+      .file_in    = NULL,
+      .file_out   = NULL
+    };
+
   FAR char *tmpfile;
   FAR char *argument;
   int ret;
@@ -1038,7 +917,8 @@ static FAR char *nsh_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
    * options.
    */
 
-  ret = nsh_parse_cmdparm(vtbl, cmdline, tmpfile);
+  param.file_out = tmpfile;
+  ret = nsh_parse_cmdparm(vtbl, cmdline, &param);
   if (ret != OK)
     {
       /* Report the failure */
@@ -1181,15 +1061,15 @@ static FAR char *nsh_aliasexpand(FAR struct nsh_vtbl_s *vtbl,
 
           if ((ptr = strdup(alias->value)) != NULL)
             {
-              /* Set the new command line (expanded alias) */
-
-              cmdline = ptr;
-
               /* Then concatenate the old command line with the new */
 
               ptr = nsh_strcat(vtbl, ptr, " ");
               ptr = nsh_strcat(vtbl, ptr, *saveptr);
               NSH_MEMLIST_ADD(memlist, ptr);
+
+              /* Set the new command line (expanded alias) */
+
+              cmdline = ptr;
 
               /* NULL terminate the new command */
 
@@ -1228,6 +1108,11 @@ static FAR char *nsh_envexpand(FAR struct nsh_vtbl_s *vtbl,
           return (FAR char *)g_success;
         }
     }
+  else if (strcmp(varname, g_lastpid) == 0)
+    {
+      itoa(vtbl->np.np_lastpid, vtbl->np.np_pids, 10);
+      return vtbl->np.np_pids;
+    }
   else
     {
       FAR char *value;
@@ -1265,7 +1150,7 @@ static FAR char *nsh_envexpand(FAR struct nsh_vtbl_s *vtbl,
  * Name: nsh_dequote
  ****************************************************************************/
 
-#if defined(CONFIG_NSH_QUOTE) && defined(CONFIG_NSH_ARGCAT)
+#if defined(CONFIG_NSH_QUOTE)
 static void nsh_dequote(FAR char *cmdline)
 {
   FAR char *ptr;
@@ -1693,10 +1578,12 @@ static FAR char *nsh_argument(FAR struct nsh_vtbl_s *vtbl,
   FAR char *argument   = NULL;
 #ifdef CONFIG_NSH_QUOTE
   FAR char *prev;
-  bool escaped;
+  bool escaped = false;
 #endif
-  bool squote;
-  bool quoted;
+  bool squote = false;
+#ifdef CONFIG_NSH_ALIAS
+  bool quoted = false;
+#endif
 
   /* Find the beginning of the next token */
 
@@ -1723,14 +1610,32 @@ static FAR char *nsh_argument(FAR struct nsh_vtbl_s *vtbl,
       if (*(pbegin + 1) == '>')
         {
           *saveptr = pbegin + 2;
-          argument = (FAR char *)g_redirect2;
+          argument = (FAR char *)g_redirect_out2;
         }
       else
         {
           *saveptr = pbegin + 1;
-          argument = (FAR char *)g_redirect1;
+          argument = (FAR char *)g_redirect_out1;
         }
     }
+
+  /* Does the token begin with '<' -- redirection of input? */
+
+  if (*pbegin == '<')
+    {
+      *saveptr = pbegin + 1;
+      argument = (FAR char *)g_redirect_in1;
+    }
+
+#ifdef CONFIG_NSH_PIPELINE
+  /* Does the token begin with '|' -- pipeline? */
+
+  if (*pbegin == '|')
+    {
+      *saveptr = pbegin + 1;
+      argument = (FAR char *)g_pipeline1;
+    }
+#endif
 
   /* Does the token begin with '#' -- comment */
 
@@ -1752,11 +1657,7 @@ static FAR char *nsh_argument(FAR struct nsh_vtbl_s *vtbl,
        * make sure that we do not break up any quoted substrings.
        */
 
-      squote = false;
-      quoted = false;
 #ifdef CONFIG_NSH_QUOTE
-      escaped = false;
-
       for (prev = NULL, pend = pbegin; *pend != '\0'; prev = pend, pend++)
 #else
       for (pend = pbegin; *pend != '\0'; pend++)
@@ -1787,7 +1688,11 @@ static FAR char *nsh_argument(FAR struct nsh_vtbl_s *vtbl,
 
           /* Are we entering a quoted string ? */
 
+#ifdef CONFIG_NSH_ALIAS
           if ((quoted = (nsh_strchr(g_quote_separator, *pend) != NULL)))
+#else
+          if (nsh_strchr(g_quote_separator, *pend) != NULL)
+#endif
             {
               /* Yes, find the terminator and continue from there */
 
@@ -1796,12 +1701,14 @@ static FAR char *nsh_argument(FAR struct nsh_vtbl_s *vtbl,
                 {
                   /* No terminator found, get out */
 
+#ifndef CONFIG_NSH_DISABLE_ERROR_PRINT
                   char qterm[2];
 
                   qterm[0] = *pend;
                   qterm[1] = '\0';
 
                   nsh_error(vtbl, g_fmtnomatching, qterm, qterm);
+#endif
 
                   return NULL;
                 }
@@ -2413,7 +2320,7 @@ static int nsh_nice(FAR struct nsh_vtbl_s *vtbl, FAR char **ppcmd,
 
 #ifdef CONFIG_NSH_CMDPARMS
 static int nsh_parse_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
-                             FAR const char *redirfile)
+                             FAR const struct nsh_param_s *param)
 {
   NSH_MEMLIST_TYPE memlist;
   NSH_ALIASLIST_TYPE alist;
@@ -2449,8 +2356,8 @@ static int nsh_parse_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
 
   /* Output is always redirected.  Remember the current redirection state */
 
-  redirsave = vtbl->np.np_redirect;
-  vtbl->np.np_redirect = true;
+  redirsave = vtbl->np.np_redir_out;
+  vtbl->np.np_redir_out = true;
 
   /* Parse out the command at the beginning of the line */
 
@@ -2508,8 +2415,7 @@ static int nsh_parse_cmdparm(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline,
 
   /* Then execute the command */
 
-  ret = nsh_execute(vtbl, argc, argv, redirfile,
-                    O_WRONLY | O_CREAT | O_TRUNC);
+  ret = nsh_execute(vtbl, argc, argv, param);
 
   /* Restore the backgrounding and redirection state */
 
@@ -2517,7 +2423,7 @@ exit:
 #ifndef CONFIG_NSH_DISABLEBG
   vtbl->np.np_bg       = bgsave;
 #endif
-  vtbl->np.np_redirect = redirsave;
+  vtbl->np.np_redir_out = redirsave;
 
   NSH_ALIASLIST_FREE(vtbl, &alist);
   NSH_MEMLIST_FREE(&memlist);
@@ -2535,16 +2441,42 @@ exit:
 
 static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
 {
+  struct nsh_param_s param =
+    {
+      .fd_in      = -1,
+      .fd_out     = -1,
+      .oflags_in  = 0,
+      .oflags_out = 0,
+      .file_in    = NULL,
+      .file_out   = NULL
+    };
+
+#ifdef CONFIG_NSH_PIPELINE
+  int pipefd[2] =
+    {
+      -1, -1
+    };
+#endif
+
   NSH_MEMLIST_TYPE memlist;
   NSH_ALIASLIST_TYPE alist;
   FAR char *argv[MAX_ARGV_ENTRIES];
   FAR char *saveptr;
   FAR char *cmd;
-  FAR char *redirfile = NULL;
-  int       oflags = 0;
   int       argc;
   int       ret;
-  bool      redirect_save = false;
+  bool      redirect_out_save = false;
+  bool      redirect_in_save = false;
+#ifdef CONFIG_NSH_PIPELINE
+  bool      bg_save = false;
+#endif
+
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+  char      tracebuf[LINE_MAX + 1];
+
+  strlcpy(tracebuf, cmdline, sizeof(tracebuf));
+  sched_note_beginex(NOTE_TAG_APP, tracebuf);
+#endif
 
   /* Initialize parser state */
 
@@ -2556,7 +2488,8 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
   vtbl->np.np_bg       = false;
 #endif
 
-  vtbl->np.np_redirect = false;
+  vtbl->np.np_redir_out = false;
+  vtbl->np.np_redir_in = false;
 
   /* Parse out the command at the beginning of the line */
 
@@ -2621,16 +2554,13 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
    *   argv[0]:      The command name.
    *   argv[1]:      The beginning of argument (up to
    *                 CONFIG_NSH_MAXARGUMENTS)
-   *   argv[argc-3]: Possibly '>' or '>>'
-   *   argv[argc-2]: Possibly <file>
-   *   argv[argc-1]: Possibly '&'
    *   argv[argc]:   NULL terminating pointer
    *
    * Maximum size is CONFIG_NSH_MAXARGUMENTS+5
    */
 
   argv[0] = cmd;
-  for (argc = 1; argc < MAX_ARGV_ENTRIES - 1; argc++)
+  for (argc = 1; argc < MAX_ARGV_ENTRIES - 1; )
     {
       int isenvvar = 0; /* flag for if an environment variable gets expanded */
 
@@ -2687,6 +2617,174 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
               argv[argc] = pbegin;
             }
         }
+
+      if (!strncmp(argv[argc], g_redirect_out2, g_redirect_out2_len))
+        {
+          FAR char *arg;
+          if (argv[argc][g_redirect_out2_len])
+            {
+              arg = &argv[argc][g_redirect_out2_len];
+            }
+          else
+            {
+              arg = nsh_argument(vtbl, &saveptr, &memlist, NULL, &isenvvar);
+            }
+
+          if (!arg)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, cmd);
+              ret = ERROR;
+              goto dynlist_free;
+            }
+
+          redirect_out_save     = vtbl->np.np_redir_out;
+          vtbl->np.np_redir_out = true;
+          param.oflags_out      = O_WRONLY | O_CREAT | O_APPEND;
+          param.file_out        = nsh_getfullpath(vtbl, arg);
+        }
+      else if (!strncmp(argv[argc], g_redirect_out1, g_redirect_out1_len))
+        {
+          FAR char *arg;
+          if (argv[argc][g_redirect_out1_len])
+            {
+              arg = &argv[argc][g_redirect_out1_len];
+            }
+          else
+            {
+              arg = nsh_argument(vtbl, &saveptr, &memlist, NULL, &isenvvar);
+            }
+
+          if (!arg)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, cmd);
+              ret = ERROR;
+              goto dynlist_free;
+            }
+
+          redirect_out_save     = vtbl->np.np_redir_out;
+          vtbl->np.np_redir_out = true;
+          param.oflags_out      = O_WRONLY | O_CREAT | O_TRUNC;
+          param.file_out        = nsh_getfullpath(vtbl, arg);
+        }
+      else if (!strncmp(argv[argc], g_redirect_in1, g_redirect_in1_len))
+        {
+          FAR char *arg;
+          if (argv[argc][g_redirect_in1_len])
+            {
+              arg = &argv[argc][g_redirect_in1_len];
+            }
+          else
+            {
+              arg = nsh_argument(vtbl, &saveptr, &memlist, NULL, &isenvvar);
+            }
+
+          if (!arg)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, cmd);
+              ret = ERROR;
+              goto dynlist_free;
+            }
+
+          redirect_in_save      = vtbl->np.np_redir_in;
+          vtbl->np.np_redir_in  = true;
+          param.oflags_in       = O_RDONLY;
+          param.file_in         = nsh_getfullpath(vtbl, arg);
+        }
+#ifdef CONFIG_NSH_PIPELINE
+      else if (!strncmp(argv[argc], g_pipeline1, g_pipeline1_len))
+        {
+          FAR char *arg;
+          FAR char *sh_argv[4];
+          FAR char *sh_arg2;
+
+          if (argv[argc][g_pipeline1_len])
+            {
+              arg = &argv[argc][g_pipeline1_len];
+            }
+          else
+            {
+              arg = nsh_argument(vtbl, &saveptr, &memlist, NULL, &isenvvar);
+            }
+
+          if (!arg)
+            {
+              nsh_error(vtbl, g_fmtarginvalid, cmd);
+              ret = ERROR;
+              goto dynlist_free;
+            }
+
+          sh_arg2 = lib_get_tempbuffer(LINE_MAX);
+          if (sh_arg2 == NULL)
+            {
+              nsh_error(vtbl, g_fmtcmdoutofmemory, cmd);
+              ret = -errno;
+              goto dynlist_free;
+            }
+
+          sh_arg2[0] = '\0';
+
+          for (ret = 0; ret < argc; ret++)
+            {
+              strlcat(sh_arg2, argv[ret], LINE_MAX);
+
+              if (ret < argc - 1)
+                {
+                  strcat(sh_arg2, " ");
+                }
+            }
+
+          sh_argv[0] = "sh";
+          sh_argv[1] = "-c";
+          sh_argv[2] = sh_arg2;
+          sh_argv[3] = NULL;
+
+          ret = pipe2(pipefd, 0);
+          if (ret < 0)
+            {
+              lib_put_tempbuffer(sh_arg2);
+              ret = -errno;
+              goto dynlist_free;
+            }
+
+          redirect_out_save = vtbl->np.np_redir_out;
+          vtbl->np.np_redir_out = true;
+          param.fd_out = pipefd[1];
+
+          bg_save = vtbl->np.np_bg;
+          vtbl->np.np_bg = true;
+
+          ret = nsh_execute(vtbl, 4, sh_argv, &param);
+          lib_put_tempbuffer(sh_arg2);
+
+          vtbl->np.np_bg = bg_save;
+
+          if (param.fd_in != -1)
+            {
+              close(param.fd_in);
+              vtbl->np.np_redir_in = redirect_in_save;
+            }
+
+          close(param.fd_out);
+          param.fd_out = -1;
+          vtbl->np.np_redir_out = redirect_out_save;
+
+          redirect_in_save = vtbl->np.np_redir_in;
+          vtbl->np.np_redir_in = true;
+          param.fd_in = pipefd[0];
+
+          argv[0] = arg;
+          argc = 1;
+
+          if (ret == -1)
+            {
+              goto dynlist_free;
+            }
+        }
+#endif
+      else
+        {
+          argc++;
+        }
     }
 
   /* Check if the command should run in background */
@@ -2698,33 +2796,6 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
       argc--;
     }
 #endif
-
-  /* Check if the output was re-directed using > or >> */
-
-  if (argc > 2)
-    {
-      /* Check for redirection to a new file */
-
-      if (strcmp(argv[argc - 2], g_redirect1) == 0)
-        {
-          redirect_save        = vtbl->np.np_redirect;
-          vtbl->np.np_redirect = true;
-          oflags               = O_WRONLY | O_CREAT | O_TRUNC;
-          redirfile            = nsh_getfullpath(vtbl, argv[argc - 1]);
-          argc                -= 2;
-        }
-
-      /* Check for redirection by appending to an existing file */
-
-      else if (strcmp(argv[argc - 2], g_redirect2) == 0)
-        {
-          redirect_save        = vtbl->np.np_redirect;
-          vtbl->np.np_redirect = true;
-          oflags               = O_WRONLY | O_CREAT | O_APPEND;
-          redirfile            = nsh_getfullpath(vtbl, argv[argc - 1]);
-          argc                -= 2;
-        }
-    }
 
   /* Last argument vector must be empty */
 
@@ -2739,21 +2810,47 @@ static int nsh_parse_command(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
 
   /* Then execute the command */
 
-  ret = nsh_execute(vtbl, argc, argv, redirfile, oflags);
+  ret = nsh_execute(vtbl, argc, argv, &param);
+
+dynlist_free:
 
   /* Free any allocated resources */
 
   /* Free the redirected output file path */
 
-  if (redirfile)
+  if (param.file_out)
     {
-      nsh_freefullpath(redirfile);
-      vtbl->np.np_redirect = redirect_save;
+      nsh_freefullpath((char *)param.file_out);
+      vtbl->np.np_redir_out = redirect_out_save;
     }
+#ifdef CONFIG_NSH_PIPELINE
+  else if (param.fd_out != -1)
+    {
+      close(param.fd_out);
+      vtbl->np.np_redir_out = redirect_out_save;
+    }
+#endif
 
-dynlist_free:
+  /* Free the redirected input file path */
+
+  if (param.file_in)
+    {
+      nsh_freefullpath((char *)param.file_in);
+      vtbl->np.np_redir_in = redirect_in_save;
+    }
+#ifdef CONFIG_NSH_PIPELINE
+  else if (param.fd_in != -1)
+    {
+      close(param.fd_in);
+      vtbl->np.np_redir_in = redirect_in_save;
+    }
+#endif
+
   NSH_ALIASLIST_FREE(vtbl, &alist);
   NSH_MEMLIST_FREE(&memlist);
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+  sched_note_endex(NOTE_TAG_APP, tracebuf);
+#endif
   return ret;
 }
 
@@ -2860,26 +2957,41 @@ int nsh_parse(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline)
 
       else /* if (*ptr == '"' || *ptr == '\'') */
         {
-          /* Find the closing quotation mark */
+          FAR char *prev = ptr - 1;
 
-          FAR char *tmp = nsh_strchr(ptr + 1, *ptr);
-          if (!tmp)
+          if (prev >= start && *prev == '\\')
             {
-              /* No closing quotation mark! */
+              /* Support \" and \' in command line */
 
-              char qterm[2];
-
-              qterm[0] = *ptr;
-              qterm[1] = '\0';
-
-              nsh_error(vtbl, g_fmtnomatching, qterm, qterm);
-
-              return ERROR;
+              working++;
             }
+          else
+            {
+              /* Find the closing quotation mark */
 
-          /* Otherwise, continue parsing after the closing quotation mark */
+              FAR char *tmp = nsh_strchr(ptr + 1, *ptr);
+              if (!tmp)
+                {
+                  /* No closing quotation mark! */
 
-          working = ++tmp;
+#ifndef CONFIG_NSH_DISABLE_ERROR_PRINT
+                  char qterm[2];
+
+                  qterm[0] = *ptr;
+                  qterm[1] = '\0';
+
+                  nsh_error(vtbl, g_fmtnomatching, qterm, qterm);
+#endif
+
+                  return ERROR;
+                }
+
+              /* Otherwise, continue parsing after the closing quotation
+               * mark
+               */
+
+              working = ++tmp;
+            }
         }
     }
 

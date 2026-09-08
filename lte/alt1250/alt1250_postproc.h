@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_postproc.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,18 +34,18 @@
 #include "alt1250_usockif.h"
 
 /****************************************************************************
- * Public Data Type
+ * Public Types
  ****************************************************************************/
 
-typedef int (*postproc_hdlr_t)(FAR struct alt1250_s *dev,
+typedef CODE int (*postproc_hdlr_t)(FAR struct alt1250_s *dev,
   FAR struct alt_container_s *reply, FAR struct usock_s *usock,
   FAR int32_t *usock_result, uint32_t *usock_xid,
   FAR struct usock_ackinfo_s *ackinfo, unsigned long arg);
 
 struct postproc_s
 {
-  FAR postproc_hdlr_t hdlr;
+  postproc_hdlr_t hdlr;
   unsigned long priv;
 };
 
-#endif	/* __APPS_LTE_ALT1250_ALT1250_POSTPROC_H */
+#endif /* __APPS_LTE_ALT1250_ALT1250_POSTPROC_H */

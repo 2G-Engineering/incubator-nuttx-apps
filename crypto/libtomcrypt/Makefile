@@ -1,6 +1,8 @@
 ############################################################################
 # apps/crypto/libtomcrypt/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -440,7 +442,8 @@ CSRCS += \
 
 CFLAGS += -DLTC_SOURCE -DLTM_DESC
 CFLAGS += -Wno-deprecated-declarations
-
+CFLAGS += -Dblake2s_init=libtomcrypt_blake2s_init
+CFLAGS += -Dmd5_init=libtomcrypt_md5_init
 #CFLAGS += -Wno-format
 
 ifneq ($(CONFIG_LIBTOMCRYPT_DEMOS),)
@@ -461,6 +464,23 @@ PRIORITY += $(CONFIG_LIBTOMCRYPT_HASHSUM_PRIORITY)
 STACKSIZE += $(CONFIG_LIBTOMCRYPT_HASHSUM_STACKSIZE)
 endif
 
+endif
+
+ifneq ($(CONFIG_LIBTOMCRYPT_TEST),)
+${shell mkdir -p $(BOARD_DIR)/resource/libtomcrypt}
+${shell cp libtomcrypt/tests/*.key $(BOARD_DIR)/resource/libtomcrypt}
+${shell cp libtomcrypt/tests/*.der $(BOARD_DIR)/resource/libtomcrypt}
+CFLAGS += -DKEY_DIR=\"/resource/libtomcrypt\"
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/libtomcrypt/libtomcrypt/tests
+CFLAGS += -Dbase64_decode=libtomcrypt_base64_decode
+CFLAGS += -Dbase64_encode=libtomcrypt_encode
+NEWSRC := $(wildcard libtomcrypt/tests/*.c)
+CSRCS += $(filter-out $(LIBTOMCRYPT_UNPACKNAME)/tests/test.c, $(NEWSRC))
+MAINSRC += $(LIBTOMCRYPT_UNPACKNAME)/tests/test.c
+
+PROGNAME += $(CONFIG_LIBTOMCRYPT_TEST_PROGNAME)
+PRIORITY  += $(CONFIG_LIBTOMCRYPT_TEST_PRIORITY)
+STACKSIZE += $(CONFIG_LIBTOMCRYPT_TEST_STACKSIZE)
 endif
 
 $(LIBTOMCRYPT_ZIP):

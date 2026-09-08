@@ -1,14 +1,11 @@
 /****************************************************************************
  * apps/netutils/dhcpc/dhcpc.c
  *
- *   Copyright (C) 2007, 2009, 2011-2012 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Based heavily on portions of uIP:
- *
- *   Author: Adam Dunkels <adam@dunkels.com>
- *   Copyright (c) 2005, Swedish Institute of Computer Science
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2007, 2009, 2011-2012 Gregory Nutt.
+ * SPDX-FileCopyrightText: 2005, Swedish Institute of Computer Science
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@dunkels.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +41,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/random.h>
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -57,6 +53,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/udp.h>
+#include <nuttx/net/ip.h>
 
 #include "netutils/dhcpc.h"
 #include "netutils/netlib.h"
@@ -267,8 +264,12 @@ static int dhcpc_sendmsg(FAR struct dhcpc_state_s *pdhcpc,
       /* Broadcast DISCOVER message to all servers */
 
       case DHCPDISCOVER:
-        /* REVISIT: We don't need the broadcast flag since we can receive
-         * unicast traffic before being fully configured.
+        /* Socket binded to INADDR_ANY is not intended to receive unicast
+         * traffic before being fully configured, at least dhclient
+         * configured with socket-only won't do so on Linux and BSDs.
+         * We can sometimes receive unicast traffic before being fully
+         * configured, it's good, but not always, so we need to set the
+         * broadcast flag under some situations.
          */
 
         /* Broadcast bit. */
@@ -283,9 +284,6 @@ static int dhcpc_sendmsg(FAR struct dhcpc_state_s *pdhcpc,
       /* Send REQUEST message to the server that sent the *first* OFFER */
 
       case DHCPREQUEST:
-        /* REVISIT: We don't need the broadcast flag since we can receive
-         * unicast traffic before being fully configured.
-         */
 
         /* Broadcast bit. */
 
@@ -518,10 +516,6 @@ FAR void *dhcpc_open(FAR const char *interface, FAR const void *macaddr,
   struct sockaddr_in addr;
   struct timeval tv;
   int ret;
-  const uint8_t default_xid[4] =
-  {
-    0xad, 0xde, 0x12, 0x23
-  };
 
   ninfo("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
         ((uint8_t *)macaddr)[0], ((uint8_t *)macaddr)[1],
@@ -542,15 +536,7 @@ FAR void *dhcpc_open(FAR const char *interface, FAR const void *macaddr,
        * used by another client.
        */
 
-      ret = getrandom(pdhcpc->xid, 4, 0);
-      if (ret != 4)
-        {
-          ret = getrandom(pdhcpc->xid, 4, GRND_RANDOM);
-          if (ret != 4)
-            {
-              memcpy(pdhcpc->xid, default_xid, 4);
-            }
-        }
+      arc4random_buf(pdhcpc->xid, 4);
 
       pdhcpc->interface = interface;
       pdhcpc->maclen    = maclen;
@@ -906,26 +892,26 @@ int dhcpc_request(FAR void *handle, FAR struct dhcpc_state *presult)
       return ERROR;
     }
 
-  ninfo("Got IP address %d.%d.%d.%d\n",
-        (int)((presult->ipaddr.s_addr)       & 0xff),
-        (int)((presult->ipaddr.s_addr >> 8)  & 0xff),
-        (int)((presult->ipaddr.s_addr >> 16) & 0xff),
-        (int)((presult->ipaddr.s_addr >> 24) & 0xff));
-  ninfo("Got netmask %d.%d.%d.%d\n",
-        (int)((presult->netmask.s_addr)       & 0xff),
-        (int)((presult->netmask.s_addr >> 8)  & 0xff),
-        (int)((presult->netmask.s_addr >> 16) & 0xff),
-        (int)((presult->netmask.s_addr >> 24) & 0xff));
-  ninfo("Got DNS server %d.%d.%d.%d\n",
-        (int)((presult->dnsaddr.s_addr)       & 0xff),
-        (int)((presult->dnsaddr.s_addr >> 8)  & 0xff),
-        (int)((presult->dnsaddr.s_addr >> 16) & 0xff),
-        (int)((presult->dnsaddr.s_addr >> 24) & 0xff));
-  ninfo("Got default router %d.%d.%d.%d\n",
-        (int)((presult->default_router.s_addr)       & 0xff),
-        (int)((presult->default_router.s_addr >> 8)  & 0xff),
-        (int)((presult->default_router.s_addr >> 16) & 0xff),
-        (int)((presult->default_router.s_addr >> 24) & 0xff));
+  ninfo("Got IP address %u.%u.%u.%u\n",
+        ip4_addr1(presult->ipaddr.s_addr),
+        ip4_addr2(presult->ipaddr.s_addr),
+        ip4_addr3(presult->ipaddr.s_addr),
+        ip4_addr4(presult->ipaddr.s_addr));
+  ninfo("Got netmask %u.%u.%u.%u\n",
+        ip4_addr1(presult->netmask.s_addr),
+        ip4_addr2(presult->netmask.s_addr),
+        ip4_addr3(presult->netmask.s_addr),
+        ip4_addr4(presult->netmask.s_addr));
+  ninfo("Got DNS server %u.%u.%u.%u\n",
+        ip4_addr1(presult->dnsaddr.s_addr),
+        ip4_addr2(presult->dnsaddr.s_addr),
+        ip4_addr3(presult->dnsaddr.s_addr),
+        ip4_addr4(presult->dnsaddr.s_addr));
+  ninfo("Got default router %u.%u.%u.%u\n",
+        ip4_addr1(presult->default_router.s_addr),
+        ip4_addr2(presult->default_router.s_addr),
+        ip4_addr3(presult->default_router.s_addr),
+        ip4_addr4(presult->default_router.s_addr));
   ninfo("Lease expires in %" PRId32 " seconds\n", presult->lease_time);
   return OK;
 }
@@ -953,6 +939,7 @@ int dhcpc_request_async(FAR void *handle, dhcpc_callback_t callback)
     }
 
   pdhcpc->callback = callback;
+  pdhcpc->cancel   = 0;
   ret = pthread_create(&pdhcpc->thread, NULL, dhcpc_run, pdhcpc);
   if (ret != 0)
     {

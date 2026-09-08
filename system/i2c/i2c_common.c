@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/i2c/i2c_common.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -172,6 +174,10 @@ int i2ctool_common_args(FAR struct i2ctool_s *i2ctool, FAR char **arg)
 
         i2ctool->width = (uint8_t)value;
         return ret;
+
+      case 'z':
+        i2ctool->zerowrite = true;
+        return 1;
 
       default:
         goto invalid_argument;

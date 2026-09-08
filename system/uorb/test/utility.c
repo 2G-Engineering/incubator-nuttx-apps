@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/test/utility.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,58 +34,24 @@
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_UORB
-static void print_orb_test_msg(FAR const struct orb_metadata *meta,
-                               FAR const void *buffer)
-{
-  FAR const struct orb_test_s *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %"PRIu64" (%"PRIu64" us ago) val: %"PRId32"",
-               meta->o_name, message->timestamp, now - message->timestamp,
-               message->val);
-}
-
-static void print_orb_test_medium_msg(FAR const struct orb_metadata *meta,
-                                      FAR const void *buffer)
-{
-  FAR const struct orb_test_medium_s *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %"PRIu64" (%"PRIu64" us ago) val: %"PRId32"",
-               meta->o_name, message->timestamp, now - message->timestamp,
-               message->val);
-}
-
-static void print_orb_test_large_msg(FAR const struct orb_metadata *meta,
-                                     FAR const void *buffer)
-{
-  FAR const struct orb_test_large_s *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %"PRIu64" (%"PRIu64" us ago) val: %"PRId32"",
-               meta->o_name, message->timestamp, now - message->timestamp,
-               message->val);
-}
+static const char orb_test_format[] =
+  "timestamp:%" PRIu64 ",val:%" PRId32 "";
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ORB_DEFINE(orb_test, struct orb_test_s, print_orb_test_msg);
-ORB_DEFINE(orb_multitest, struct orb_test_s, print_orb_test_msg);
-ORB_DEFINE(orb_test_medium, struct orb_test_medium_s,
-           print_orb_test_medium_msg);
-ORB_DEFINE(orb_test_medium_multi, struct orb_test_medium_s,
-           print_orb_test_medium_msg);
+ORB_DEFINE(orb_test, struct orb_test_s, orb_test_format);
+ORB_DEFINE(orb_multitest, struct orb_test_s, orb_test_format);
+ORB_DEFINE(orb_test_medium, struct orb_test_medium_s, orb_test_format);
+ORB_DEFINE(orb_test_medium_multi, struct orb_test_medium_s, orb_test_format);
 ORB_DEFINE(orb_test_medium_wrap_around, struct orb_test_medium_s,
-           print_orb_test_medium_msg);
-ORB_DEFINE(orb_test_medium_queue, struct orb_test_medium_s,
-           print_orb_test_medium_msg);
+           orb_test_format);
+ORB_DEFINE(orb_test_medium_queue, struct orb_test_medium_s, orb_test_format);
 ORB_DEFINE(orb_test_medium_queue_poll, struct orb_test_medium_s,
-           print_orb_test_medium_msg);
-ORB_DEFINE(orb_test_large, struct orb_test_large_s,
-           print_orb_test_large_msg);
+           orb_test_format);
+ORB_DEFINE(orb_test_large, struct orb_test_large_s, orb_test_format);
 
 /****************************************************************************
  * Public Functions

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/ftpc/ftpc_socket.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -260,7 +262,8 @@ int ftpc_sockaccept(FAR struct ftpc_socket_s *acceptor,
     }
 
   addrlen  = sizeof(addr);
-  sock->sd = accept(acceptor->sd, (struct sockaddr *)&addr, &addrlen);
+  sock->sd = accept4(acceptor->sd, (struct sockaddr *)&addr, &addrlen,
+                     SOCK_CLOEXEC);
   if (sock->sd == -1)
     {
       nerr("ERROR: accept() failed: %d\n", errno);

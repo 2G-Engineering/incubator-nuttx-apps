@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/audioutils/fmsynth/fmsynth_eg.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -65,28 +67,38 @@ static int set_egparams(int fs,
  ****************************************************************************/
 
 /****************************************************************************
+ * name: create_fmsyntheg
+ ****************************************************************************/
+
+FAR fmsynth_eg_t *create_fmsyntheg(FAR fmsynth_eg_t *eg)
+{
+  int i;
+
+  if (eg)
+    {
+      eg->state = EGSTATE_RELEASED;
+      eg->state_counter = 0;
+      for (i = 0; i < EGSTATE_MAX; i++)
+        {
+          eg->state_params[i].initval = 0;
+          eg->state_params[i].period = 0;
+        }
+
+      eg->state_params[EGSTATE_RELEASED].initval = FMSYNTH_MAX_EGLEVEL;
+    }
+
+  return eg;
+}
+
+/****************************************************************************
  * name: fmsyntheg_create
  ****************************************************************************/
 
 FAR fmsynth_eg_t *fmsyntheg_create(void)
 {
-  int i;
   FAR fmsynth_eg_t *ret = (FAR fmsynth_eg_t *)malloc(sizeof(fmsynth_eg_t));
 
-  if (ret)
-    {
-      ret->state = EGSTATE_RELEASED;
-      ret->state_counter = 0;
-      for (i = 0; i < EGSTATE_MAX; i++)
-        {
-          ret->state_params[i].initval = 0;
-          ret->state_params[i].period = 0;
-        }
-
-      ret->state_params[EGSTATE_RELEASED].initval = FMSYNTH_MAX_EGLEVEL;
-    }
-
-  return ret;
+  return create_fmsyntheg(ret);
 }
 
 /****************************************************************************

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/industry/foc/foc_common.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -78,6 +80,15 @@ enum foc_angle_type_e
   FOC_ANGLE_TYPE_INVALID = 0,  /* Reserved */
   FOC_ANGLE_TYPE_ELE     = 1,  /* Electrical angle */
   FOC_ANGLE_TYPE_MECH    = 2,  /* Mechanical angle */
+};
+
+/* Open-loop stage */
+
+enum foc_openloop_stage_e
+{
+  FOC_OPENLOOP_ENABLED    = 1,  /* Open-loop enabled */
+  FOC_OPENLOOP_TRANSITION = 2,  /* Open-loop to closed-loop transition */
+  FOC_OPENLOOP_DISABLED   = 3,  /* Open-loop disabled */
 };
 
 /****************************************************************************

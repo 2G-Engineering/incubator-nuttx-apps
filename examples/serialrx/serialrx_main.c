@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/serialrx/serialrx_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -52,7 +54,7 @@ int main(int argc, FAR char *argv[])
 #else
   int fd;
   int cnt;
-  int bytecount = 0;
+
 #endif
 #ifdef CONFIG_EXAMPLES_SERIALRX_PRINTHYPHEN
   int count = 0;
@@ -64,6 +66,7 @@ int main(int argc, FAR char *argv[])
   bool eof = false;
   FAR char *buf;
   FAR char *devpath;
+  int bytecount = 0;
 
   if (argc == 1)
     {

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/can/can_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,7 +36,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <debug.h>
-#include <unistd.h>
 
 #include <nuttx/can/can.h>
 
@@ -69,8 +70,12 @@
 #endif
 
 #ifdef CONFIG_EXAMPLES_CAN_WRITE
-#  ifdef CONFIG_CAN_EXTID
+#  if defined(CONFIG_CAN_EXTID) && defined(CONFIG_CAN_FD)
+#    define OPT_STR ":n:a:b:ehs"
+#  elif defined(CONFIG_CAN_EXTID)
 #    define OPT_STR ":n:a:b:hs"
+#  elif defined(CONFIG_CAN_FD)
+#    define OPT_STR ":n:a:b:eh"
 #  else
 #    define OPT_STR ":n:a:b:h"
 #  endif
@@ -106,6 +111,9 @@ static void show_usage(FAR const char *progname)
 #ifdef CONFIG_CAN_EXTID
           " [-s]"
 #endif
+#ifdef CONFIG_CAN_FD
+          " [-e]"
+#endif
           " [-a <min-id>] [b <max-id>]"
 #endif
           "\n",
@@ -118,6 +126,10 @@ static void show_usage(FAR const char *progname)
 #ifdef CONFIG_EXAMPLES_CAN_WRITE
 #ifdef CONFIG_CAN_EXTID
   fprintf(stderr, "-s: Use standard IDs.  Default: Extended ID\n");
+#endif
+#ifdef CONFIG_CAN_FD
+  fprintf(stderr, "-e: Use extended data length without bit rate switch. "
+          "Default: bit rate switch enabled\n");
 #endif
   fprintf(stderr, "-a <min-id>: The start message id.  Default 1\n");
   fprintf(stderr, "-b <max-id>: The start message id.  Default %d\n",
@@ -139,22 +151,34 @@ int main(int argc, FAR char *argv[])
   struct canioc_bittiming_s bt;
 
 #ifdef CONFIG_EXAMPLES_CAN_WRITE
-  struct can_msg_s txmsg;
+  int msgdlc;
+  struct can_msg_s txmsg =
+  {
+    0
+  };
+
 #ifdef CONFIG_CAN_EXTID
   bool extended = true;
   uint32_t msgid;
 #else
   uint16_t msgid;
 #endif
+#ifdef CONFIG_CAN_FD
+  bool brs = true;
+#endif
   long minid    = 1;
   long maxid    = MAX_ID;
   uint8_t msgdata;
 #endif
-  int msgdlc;
+  int msgbytes;
   int i;
 
 #ifdef CONFIG_EXAMPLES_CAN_READ
-  struct can_msg_s rxmsg;
+  struct can_msg_s rxmsg =
+  {
+    0
+  };
+
 #endif
 
   size_t msgsize;
@@ -180,7 +204,11 @@ int main(int argc, FAR char *argv[])
             extended = false;
             break;
 #endif
-
+#ifdef CONFIG_CAN_FD
+          case 'e':
+            brs = false;
+            break;
+#endif
           case 'a':
             minid = strtol(optarg, NULL, 10);
             if (minid < 1 || minid > maxid)
@@ -299,9 +327,9 @@ int main(int argc, FAR char *argv[])
    */
 
 #ifdef CONFIG_EXAMPLES_CAN_WRITE
-  msgdlc  = 1;
-  msgid   = minid;
-  msgdata = 0;
+  msgbytes = 1;
+  msgid    = minid;
+  msgdata  = 0;
 #endif
 
   for (msgno = 0; !nmsgs || msgno < nmsgs; msgno++)
@@ -316,6 +344,7 @@ int main(int argc, FAR char *argv[])
 
       /* Construct the next TX message */
 
+      msgdlc                 = can_bytes2dlc(msgbytes);
       txmsg.cm_hdr.ch_id     = msgid;
       txmsg.cm_hdr.ch_rtr    = false;
       txmsg.cm_hdr.ch_dlc    = msgdlc;
@@ -325,16 +354,21 @@ int main(int argc, FAR char *argv[])
 #ifdef CONFIG_CAN_EXTID
       txmsg.cm_hdr.ch_extid  = extended;
 #endif
-      txmsg.cm_hdr.ch_unused = 0;
+#ifdef CONFIG_CAN_FD
+      txmsg.cm_hdr.ch_edl    = true;
+      txmsg.cm_hdr.ch_brs    = brs;
+      txmsg.cm_hdr.ch_esi    = false;
+#endif
+      txmsg.cm_hdr.ch_tcf    = 0;
 
-      for (i = 0; i < msgdlc; i++)
+      for (i = 0; i < msgbytes; i++)
         {
           txmsg.cm_data[i] = msgdata + i;
         }
 
       /* Send the TX message */
 
-      msgsize = CAN_MSGLEN(msgdlc);
+      msgsize = CAN_MSGLEN(can_dlc2bytes(msgdlc));
       nbytes = write(fd, &txmsg, msgsize);
       if (nbytes != msgsize)
         {
@@ -364,7 +398,7 @@ int main(int argc, FAR char *argv[])
       printf("  ID: %4" PRI_CAN_ID " DLC: %u\n",
              rxmsg.cm_hdr.ch_id, rxmsg.cm_hdr.ch_dlc);
 
-      msgdlc = rxmsg.cm_hdr.ch_dlc;
+      msgbytes = can_dlc2bytes(rxmsg.cm_hdr.ch_dlc);
 
 #ifdef CONFIG_CAN_ERRORS
       /* Check for error reports */
@@ -440,10 +474,10 @@ int main(int argc, FAR char *argv[])
               goto errout_with_dev;
             }
 
-          if (memcmp(txmsg.cm_data, rxmsg.cm_data, msgdlc) != 0)
+          if (memcmp(txmsg.cm_data, rxmsg.cm_data, msgbytes) != 0)
             {
               printf("ERROR: Data does not match. DLC=%d\n", msgdlc);
-              for (i = 0; i < msgdlc; i++)
+              for (i = 0; i < msgbytes; i++)
                 {
                   printf("  %d: TX 0x%02x RX 0x%02x\n",
                          i, txmsg.cm_data[i], rxmsg.cm_data[i]);
@@ -461,7 +495,7 @@ int main(int argc, FAR char *argv[])
           /* Print the data received */
 
           printf("Data received:\n");
-          for (i = 0; i < msgdlc; i++)
+          for (i = 0; i < msgbytes; i++)
             {
               printf("  %d: 0x%02x\n", i, rxmsg.cm_data[i]);
             }
@@ -473,16 +507,16 @@ int main(int argc, FAR char *argv[])
 
       /* Set up for the next pass */
 
-      msgdata += msgdlc;
+      msgdata += msgbytes;
 
       if (++msgid > maxid)
         {
           msgid = minid;
         }
 
-      if (++msgdlc > CAN_MAXDATALEN)
+      if (++msgbytes > CAN_MAXDATALEN)
         {
-          msgdlc = 1;
+          msgbytes = 1;
         }
 #endif
     }

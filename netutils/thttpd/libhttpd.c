@@ -1,14 +1,13 @@
 /****************************************************************************
  * apps/netutils/thttpd/libhttpd.c
- * HTTP Protocol Library
  *
- *   Copyright (C) 2011, 2013, 2015-2016 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Derived from the file of the same name in the original THTTPD package:
- *
- *   Copyright 1995,1998,1999,2000,2001 by Jef Poskanzer <jef@mail.acme.com>.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ * SPDX-FileCopyrightText: 2015, 2016 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2011, 2013 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2000, 2001 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1998, 1999 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1995 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +42,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/param.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -1503,7 +1503,7 @@ static void figure_mime(httpd_conn *hc)
           if (ext_len == enc_tab[i].ext_len &&
               strncasecmp(ext, enc_tab[i].ext, ext_len) == 0)
             {
-              if (n_me_indexes < sizeof(me_indexes) / sizeof(*me_indexes))
+              if (n_me_indexes < nitems(me_indexes))
                 {
                   me_indexes[n_me_indexes] = i;
                   ++n_me_indexes;
@@ -1853,7 +1853,7 @@ static int ls(httpd_conn *hc)
   char arg[16];
   char *argv[1];
 #if CONFIG_THTTPD_CGI_TIMELIMIT > 0
-  ClientData client_data;
+  clientdata client_data;
 #endif
 
   dirp = opendir(hc->expnfilename);
@@ -2354,7 +2354,8 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
 
   ninfo("accept() new connection on listen_fd %d\n", listen_fd);
   sz = sizeof(sa);
-  hc->conn_fd = accept(listen_fd, (struct sockaddr *)&sa, &sz);
+  hc->conn_fd = accept4(listen_fd, (struct sockaddr *)&sa, &sz,
+                        SOCK_CLOEXEC);
   if (hc->conn_fd < 0)
     {
       if (errno == EWOULDBLOCK)
@@ -3284,7 +3285,7 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowp)
 
       /* Check for an index file. */
 
-      for (i = 0; i < sizeof(index_names) / sizeof(char *); ++i)
+      for (i = 0; i < nitems(index_names); ++i)
         {
           httpd_realloc_str(&indexname, &maxindexname,
                             expnlen + 1 + strlen(index_names[i]));

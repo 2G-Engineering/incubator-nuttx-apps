@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/pwfb/pwfb_internal.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -114,12 +116,12 @@
 
 #ifndef CONFIG_EXAMPLES_PWFB_COLOR3
 #  if CONFIG_EXAMPLES_PWFB_BPP == 24 || CONFIG_EXAMPLES_PWFB_BPP == 32
-#    define CONFIG_EXAMPLES_PWFB_COLOR2 0x00ffecb3
+#    define CONFIG_EXAMPLES_PWFB_COLOR3 0x00ffecb3
 #  elif CONFIG_EXAMPLES_PWFB_BPP == 16
-#    define CONFIG_EXAMPLES_PWFB_COLOR2 0xff76
+#    define CONFIG_EXAMPLES_PWFB_COLOR3 0xff76
 #  else
-#    define CONFIG_EXAMPLES_PWFB_COLOR2 '3'
-#  endif
+#    define CONFIG_EXAMPLES_PWFB_COLOR3 '3'
+# endif
 #endif
 
 #ifndef CONFIG_EXAMPLES_PWFB_TBCOLOR
@@ -140,6 +142,10 @@
 #  else
 #    define CONFIG_EXAMPLES_PWFB_FONTCOLOR 'F'
 #  endif
+#endif
+
+#ifdef CONFIG_EXAMPLES_PWFB_DEFAULT_FONT
+#  define CONFIG_EXAMPLES_PWFB_FONTID FONTID_DEFAULT
 #endif
 
 /* Cursor timing */

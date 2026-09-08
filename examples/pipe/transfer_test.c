@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/pipe/transfer_test.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -139,6 +141,7 @@ static void *transfer_writer(pthread_addr_t pvarg)
   char buffer[WRITE_SIZE];
   int fd = (intptr_t)pvarg;
   int ret;
+  int nbytes;
   int i;
 
   printf("transfer_writer: started\n");
@@ -149,18 +152,23 @@ static void *transfer_writer(pthread_addr_t pvarg)
 
   for (i = 0; i < NWRITES; i++)
     {
-      ret = write(fd, buffer, WRITE_SIZE);
-      if (ret < 0)
+      for (nbytes = 0; nbytes < WRITE_SIZE; )
         {
-          fprintf(stderr, \
-                  "transfer_writer: write failed, errno=%d\n", errno);
-          return (void *)(uintptr_t)1;
-        }
-      else if (ret != WRITE_SIZE)
-        {
-          fprintf(stderr, \
-                  "transfer_writer: Unexpected write size=%d\n", ret);
-          return (void *)(uintptr_t)2;
+          ret = write(fd, buffer + nbytes, WRITE_SIZE - nbytes);
+          if (ret < 0)
+            {
+              fprintf(stderr, \
+                      "transfer_writer: write failed, errno=%d\n", errno);
+              return (void *)(uintptr_t)1;
+            }
+          else if (ret == 0)
+            {
+              fprintf(stderr, \
+                      "transfer_writer: Unexpected zero write size\n");
+              return (void *)(uintptr_t)2;
+            }
+
+          nbytes += ret;
         }
     }
 
@@ -176,21 +184,34 @@ static void *transfer_writer(pthread_addr_t pvarg)
  * Name: transfer_test
  ****************************************************************************/
 
-int transfer_test(int fdin, int fdout)
+int transfer_test(int fdin, int fdout, int boost_reader, int boost_writer)
 {
   pthread_t readerid;
   pthread_t writerid;
+  pthread_attr_t rattr;
+  pthread_attr_t wattr;
   void *value;
   int tmp;
   int ret;
 
   printf("transfer_test: fdin=%d fdout=%d\n", fdin, fdout);
 
+  /* Boost the priority of reader or writer on need */
+
+  pthread_attr_init(&rattr);
+  if (boost_reader)
+    {
+      rattr.priority += 1;
+      printf("transfer_test: Boost priority of transfer_reader"
+             "thread to %d\n", rattr.priority);
+    }
+
   /* Start transfer_reader thread */
 
   printf("transfer_test: Starting transfer_reader thread\n");
-  ret = pthread_create(&readerid, NULL, \
+  ret = pthread_create(&readerid, &rattr,
         transfer_reader, (void *)(intptr_t)fdin);
+  pthread_attr_destroy(&rattr);
   if (ret != 0)
     {
         fprintf(stderr, \
@@ -199,11 +220,22 @@ int transfer_test(int fdin, int fdout)
       return 1;
     }
 
+  /* Boost the priority of reader or writer on need */
+
+  pthread_attr_init(&wattr);
+  if (boost_writer)
+    {
+      wattr.priority += 1;
+      printf("transfer_test: Boost priority of transfer_writer"
+             "thread to %d\n", wattr.priority);
+    }
+
   /* Start transfer_writer thread */
 
   printf("transfer_test: Starting transfer_writer thread\n");
-  ret = pthread_create(&writerid, \
-        NULL, transfer_writer, (void *)(intptr_t)fdout);
+  ret = pthread_create(&writerid, &wattr,
+        transfer_writer, (void *)(intptr_t)fdout);
+  pthread_attr_destroy(&wattr);
   if (ret != 0)
     {
       fprintf(stderr, \

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/lp503x/lp503x_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -623,20 +625,19 @@ static int lp503x_cmd_help(FAR char *parg)
 
 int main(int argc, FAR char *argv[])
 {
+  char buffer[LINE_MAX];
+  FAR char *cmd;
+  FAR char *arg;
   bool running;
-  char buffer[CONFIG_NSH_LINELEN];
   int len;
   int x;
-  char *cmd;
-  char *arg;
 
   fd = open(CONFIG_EXAMPLES_LP503X_DEVPATH, O_CREAT);
   if (fd < 0)
     {
       fprintf(stderr, "ERROR: Failed to open %s: %d\n",
               CONFIG_EXAMPLES_LP503X_DEVPATH, errno);
-              close(fd);
-      return ENODEV;
+      return -ENODEV;
     }
 
   running = true;
@@ -647,7 +648,8 @@ int main(int argc, FAR char *argv[])
 
       /* read a line from the terminal */
 
-      len = readline(buffer, sizeof(buffer), stdin, stdout);
+      len = readline_stream(buffer, sizeof(buffer),
+                            stdin, stdout);
       buffer[len] = '\0';
       if (len > 0)
         {

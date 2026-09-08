@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/camera/camera_bkgd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -95,13 +97,13 @@ static const struct nx_callback_s g_nximagecb =
 
 static struct nximage_data_s g_nximage =
 {
-  NULL,          /* hnx */
-  NULL,          /* hbkgd */
-  false,         /* connected */
-  0,             /* xres */
-  0,             /* yres */
-  false,         /* havpos */
-  { 0 },         /* sem */
+  NULL,               /* hnx */
+  NULL,               /* hbkgd */
+  false,              /* connected */
+  0,                  /* xres */
+  0,                  /* yres */
+  false,              /* havpos */
+  SEM_INITIALIZER(0), /* sem */
 };
 
 /****************************************************************************

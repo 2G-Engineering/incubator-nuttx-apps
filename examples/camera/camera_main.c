@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/camera/camera_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,7 @@
 #include <unistd.h>
 
 #include <nuttx/video/video.h>
+#include <nuttx/video/v4l2_cap.h>
 
 #include "camera_fileutil.h"
 #include "camera_bkgd.h"
@@ -58,6 +61,8 @@
 #define APP_STATE_BEFORE_CAPTURE  (0)
 #define APP_STATE_UNDER_CAPTURE   (1)
 #define APP_STATE_AFTER_CAPTURE   (2)
+
+#define CAMERA_DEV_PATH "/dev/video"
 
 /****************************************************************************
  * Private Types
@@ -500,7 +505,7 @@ int main(int argc, FAR char *argv[])
 
   /* Initialize video driver to create a device file */
 
-  ret = video_initialize("/dev/video");
+  ret = capture_initialize(CAMERA_DEV_PATH);
   if (ret != 0)
     {
       printf("ERROR: Failed to initialize video: errno = %d\n", errno);
@@ -509,7 +514,7 @@ int main(int argc, FAR char *argv[])
 
   /* Open the device file. */
 
-  v_fd = open("/dev/video", 0);
+  v_fd = open(CAMERA_DEV_PATH, 0);
   if (v_fd < 0)
     {
       printf("ERROR: Failed to open video.errno = %d\n", errno);
@@ -675,7 +680,7 @@ int main(int argc, FAR char *argv[])
               {
                 gettimeofday(&now, NULL);
                 timersub(&now, &start, &delta);
-                if (timercmp(&delta, &wait, >))
+                if (timercmp(&delta, &wait, > /* For checkpatch */))
                   {
                     printf("Expire time is pasted. GoTo next state.\n");
                     if (app_state == APP_STATE_BEFORE_CAPTURE)
@@ -758,7 +763,7 @@ exit_this_app:
   free_buffer(buffers_still, STILL_BUFNUM);
 
 exit_without_cleaning_buffer:
-  video_uninitialize();
+  capture_uninitialize(CAMERA_DEV_PATH);
 
 exit_without_cleaning_videodriver:
 #ifdef CONFIG_EXAMPLES_CAMERA_OUTPUT_LCD

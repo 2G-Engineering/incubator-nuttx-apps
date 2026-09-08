@@ -1,6 +1,8 @@
 ############################################################################
 # apps/interpreters/lua/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -60,7 +62,7 @@ endif
 ifeq ($(CONFIG_SYSTEM_READLINE),y)
 CFLAGS += -include "system/readline.h"
 CFLAGS += -D'lua_initreadline(L)=((void)L)'
-CFLAGS += -D'lua_readline(L,b,p)=((void)L,fputs(p,stdout),fflush(stdout),readline(b,LUA_MAXINPUT,stdin,stdout))'
+CFLAGS += -D'lua_readline(L,b,p)=((void)L,fputs(p,stdout),fflush(stdout),readline_stream(b,LUA_MAXINPUT,stdin,stdout))'
 CFLAGS += -D'lua_saveline(L,line)={(void)L;(void)line;}'
 CFLAGS += -D'lua_freeline(L,line)={(void)L;(void)b;}'
 endif

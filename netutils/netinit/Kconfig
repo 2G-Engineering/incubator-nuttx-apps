@@ -1,5 +1,4 @@
 #
-#
 # For a description of the syntax of this configuration file,
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
@@ -118,6 +117,13 @@ config NETINIT_THREAD_PRIORITY
 		This should be set to a priority lower than most tasks.  The network
 		PHY polling is CPU intensive and can interfere with the usability of
 		of threads competing for CPU bandwidth.
+
+config NETINIT_RETRY_MOUNTPATH
+	int "Network initialization retry mount path count"
+	default 0
+	---help---
+		This should be set if the filesystem get mounted after netinit got started.
+		The netinit thread will check for the mount path before continuing.
 
 endif # NETINIT_THREAD
 
@@ -467,6 +473,14 @@ choice
 		If the hardware as no MAC address, then this logic must assign an
 		address to the hardware before it brings the network up.  This
 		choice allows you select the source of that MAC address.
+
+config NETINIT_UIDMAC
+	bool "Board Unique ID"
+	depends on BOARDCTL_UNIQUEID
+	---help---
+		Assign a MAC address based on the board unique ID.
+		CONFIG_BOARDCTL_UNIQUEID_SIZE must be at least 6 bytes for
+		Ethernet, 8 bytes for 6LOWPAN.
 
 config NETINIT_SWMAC
 	bool "Fixed address"

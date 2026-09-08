@@ -1,6 +1,8 @@
 ############################################################################
 # apps/system/libuv/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -25,5 +27,9 @@ CONFIGURED_APPS += $(APPDIR)/system/libuv
 
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/system/libuv/libuv/include
 CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/system/libuv/libuv/include
+
+# define UV_HANDLE_BACKTRACE
+CFLAGS += -DUV_HANDLE_BACKTRACE=CONFIG_LIBUV_HANDLE_BACKTRACE
+CXXFLAGS += -DUV_HANDLE_BACKTRACE=CONFIG_LIBUV_HANDLE_BACKTRACE
 
 endif

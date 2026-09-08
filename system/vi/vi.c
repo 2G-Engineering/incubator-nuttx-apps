@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/vi/vi.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <syslog.h>
@@ -559,6 +560,7 @@ static void vi_write(FAR struct vi_s *vi, FAR const char *buffer,
             {
               fprintf(stderr, "ERROR: write to stdout failed: %d\n",
                       errcode);
+              vi_release(vi);
               exit(EXIT_FAILURE);
             }
         }
@@ -635,6 +637,7 @@ static int vi_getch(FAR struct vi_s *vi)
                 {
                   fprintf(stderr, "ERROR: read from stdin failed: %d\n",
                           errcode);
+                  vi_release(vi);
                   exit(EXIT_FAILURE);
                 }
             }

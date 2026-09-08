@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_routecmds.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -434,7 +436,8 @@ int cmd_addroute(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
   /* Then add the route */
 
-  ret = addroute(sockfd, &target.ipx, &netmask.ipx, &router.ipx);
+  ret = addroute(sockfd, &target.ipx, &netmask.ipx,
+                 &router.ipx, sizeof(router));
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "addroute", NSH_ERRNO);
@@ -676,7 +679,7 @@ int cmd_delroute(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
   /* Then delete the route */
 
-  ret = delroute(sockfd, &target.ipx, &netmask.ipx);
+  ret = delroute(sockfd, &target.ipx, &netmask.ipx, sizeof(target));
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "delroute", NSH_ERRNO);

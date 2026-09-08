@@ -1,5 +1,7 @@
 /****************************************************************************
- * apps/usrsocktest/usrsocktest_remote_disconnect.c
+ * apps/examples/usrsocktest/usrsocktest_remote_disconnect.c
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -972,18 +974,18 @@ TEST_SETUP(remote_disconnect)
 
 TEST_TEAR_DOWN(remote_disconnect)
 {
-  int ret;
+  int unused_data ret;
 
   if (sd >= 0)
     {
       ret = close(sd);
-      assert(ret >= 0);
+      TEST_ASSERT_TRUE(ret >= 0);
     }
 
   if (started)
     {
       ret = usrsocktest_daemon_stop();
-      assert(ret == OK);
+      TEST_ASSERT_EQUAL(ret, OK);
     }
 }
 

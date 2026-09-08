@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/i2c/i2c_reset.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,7 +40,7 @@
  * Name: i2ccmd_reset
  ****************************************************************************/
 
-int i2ccmd_reset(FAR struct i2ctool_s *i2ctool, int argc, char **argv)
+int i2ccmd_reset(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv)
 {
   int ret;
   int fd;

@@ -1,9 +1,8 @@
 /****************************************************************************
  * apps/modbus/nuttx/portother_m.c
  *
- *   FreeModbus Library: NuttX Port
- *   Copyright (c) 2006 Christian Walter <wolti@sil.at>
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2006 Christian Walter <wolti@sil.at>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,7 +83,10 @@ void vMBMasterPortLog(eMBPortLogLevel eLevel, const char * szModule,
   va_list  args;
   FILE    *fOutput = fLogFile == NULL ? stderr : fLogFile;
 
-  static const char *arszLevel2Str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
+  static const char *arszLevel2Str[] =
+  {
+    "ERROR", "WARN", "INFO", "DEBUG"
+  };
 
   i = snprintf(szBuf, NELEMS(szBuf),
                "%s: %s: ", arszLevel2Str[eLevel], szModule);

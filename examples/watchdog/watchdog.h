@@ -1,5 +1,7 @@
 /****************************************************************************
- * apps/examples/examples/watchdog/watchdog.h
+ * apps/examples/watchdog/watchdog.h
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -30,7 +32,9 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
 /* Configuration ************************************************************/
+
 /* CONFIG_NSH_BUILTIN_APPS - Build the WATCHDOG test as an NSH built-in
  *   function.
  * CONFIG_EXAMPLES_WATCHDOG_DEVPATH - The path to the Watchdog device.

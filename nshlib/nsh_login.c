@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_login.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -171,7 +173,7 @@ int nsh_login(FAR struct console_stdio_s *pstate)
 
       /* readline() returns EOF on failure */
 
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
+      ret = readline_fd(pstate->cn_line, LINE_MAX,
                         INFD(pstate), OUTFD(pstate));
       if (ret != EOF)
         {
@@ -207,8 +209,7 @@ int nsh_login(FAR struct console_stdio_s *pstate)
         }
 
       password[0] = '\0';
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
-                        INFD(pstate), -1);
+      ret = readline_fd(pstate->cn_line, LINE_MAX, INFD(pstate), -1);
 
       /* Enable echo again after password */
 

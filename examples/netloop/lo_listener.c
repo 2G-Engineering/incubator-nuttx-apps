@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/netloop/lo_listener.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -182,7 +184,7 @@ static inline bool net_connection(struct net_listener_s *nls)
       printf("lo_listener: Accepting new connection on sd=%d\n",
              nls->listensd);
 
-      sd = accept(nls->listensd, NULL, NULL);
+      sd = accept4(nls->listensd, NULL, NULL, SOCK_CLOEXEC);
       if (sd < 0)
         {
           printf("lo_listener: accept failed: %d\n", errno);

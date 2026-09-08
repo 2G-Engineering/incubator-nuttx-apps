@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/spi/spi_exch.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -154,6 +156,13 @@ int spicmd_exch(FAR struct spitool_s *spitool, int argc, FAR char **argv)
   seq.ntrans = 1;
   seq.trans = &trans;
 
+#ifdef CONFIG_SPI_DELAY_CONTROL
+  seq.a = 0;
+  seq.b = 0;
+  seq.i = 0;
+  seq.c = 0;
+#endif
+
   trans.deselect = true;
 #ifdef CONFIG_SPI_CMDDATA
   trans.cmd = spitool->command;
@@ -162,6 +171,9 @@ int spicmd_exch(FAR struct spitool_s *spitool, int argc, FAR char **argv)
   trans.nwords = spitool->count;
   trans.txbuffer = txdata;
   trans.rxbuffer = rxdata;
+#ifdef CONFIG_SPI_HWFEATURES
+  trans.hwfeat = 0;
+#endif
 
   ret = spidev_transfer(fd, &seq);
 

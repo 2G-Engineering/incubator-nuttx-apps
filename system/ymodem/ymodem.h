@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/ymodem/ymodem.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -50,6 +52,8 @@ struct ymodem_ctx_s
   CODE int (*packet_handler)(FAR struct ymodem_ctx_s *ctx);
   size_t custom_size;
   FAR void *priv;
+  uint8_t interval;
+  int retry;
 
   /* Public data */
 

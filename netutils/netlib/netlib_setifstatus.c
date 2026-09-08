@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_setifstatus.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -117,8 +119,6 @@ int netlib_ifdown(const char *ifname)
           strlcpy(req.ifr_name, ifname, IFNAMSIZ);
 
           /* Perform the ioctl to ifup flag */
-
-          req.ifr_flags |= IFF_DOWN;
 
           ret = ioctl(sockfd, SIOCSIFFLAGS, (unsigned long)&req);
           close(sockfd);

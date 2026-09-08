@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/input/input.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -224,7 +226,7 @@ static int input_utouch_swipe(int argc, char **argv)
       DELAY_MS(interval);
     }
 
-  input_utouch_move(fd, 0, 0, TOUCH_UP);
+  input_utouch_move(fd, x1, y1, TOUCH_UP);
   close(fd);
   return 0;
 }

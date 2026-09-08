@@ -1,22 +1,12 @@
 /****************************************************************************
- * apps/netutitls/smtp/smtp.c
- * smtp SMTP E-mail sender
+ * apps/netutils/smtp/smtp.c
  *
- *   Copyright (C) 2007, 2009, 2011, 2015, 2020 Gregory Nutt. All rights
- *     reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Heavily leveraged from uIP 1.0 which also has a BSD-like license:
- *
- * The Simple Mail Transfer Protocol (SMTP) as defined by RFC821 is
- * the standard way of sending and transferring e-mail on the
- * Internet. This simple example implementation is intended as an
- * example of how to implement protocols in uIP, and is able to send
- * out e-mail but has not been extensively tested.
- *
- *   Author: Adam Dunkels <adam@dunkels.com>
- *   Copyright (c) 2004, Adam Dunkels.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2015, 2020 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2007, 2009, 2011, Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2004, Adam Dunkels. All rights reserved.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@dunkels.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -258,7 +248,8 @@ static inline int smtp_send_message(int sockfd, struct smtp_state *psmtp)
       return ERROR;
     }
 
-  if (send(sockfd, g_smtpcrnlperiodcrnl, strlen(g_smtpcrnlperiodcrnl), 0) < 0)
+  if (send(sockfd, g_smtpcrnlperiodcrnl,
+      strlen(g_smtpcrnlperiodcrnl), 0) < 0)
     {
       return ERROR;
     }
@@ -350,7 +341,8 @@ int smtp_send(void *handle, const char *to, const char *cc, const char *from,
   net_ipv4addr_copy(server.sin_addr.s_addr, psmtp->smtpserver);
   server.sin_port = psmtp->port;
 
-  if (connect(sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) < 0)
+  if (connect(sockfd, (struct sockaddr *)&server,
+      sizeof(struct sockaddr_in)) < 0)
     {
       close(sockfd);
       return ERROR;
@@ -368,7 +360,8 @@ void *smtp_open(void)
 {
   /* Allocate the handle */
 
-  struct smtp_state *psmtp = (struct smtp_state *)malloc(sizeof(struct smtp_state));
+  struct smtp_state *psmtp =
+    (struct smtp_state *)malloc(sizeof(struct smtp_state));
   if (psmtp)
     {
       /* Initialize the handle */

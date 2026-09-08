@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_getarptab.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -153,8 +155,12 @@ ssize_t netlib_get_arptable(FAR struct arpreq *arptab,
   if (nsent < 0)
     {
       int errcode = errno;
-      fprintf(stderr, "ERROR: send() failed: %d\n", errcode);
-      ret = -errcode;
+      if (errcode != ENOENT)
+        {
+          fprintf(stderr, "ERROR: send() failed: %d\n", errcode);
+          ret = -errcode;
+        }
+
       goto errout_with_socket;
     }
 

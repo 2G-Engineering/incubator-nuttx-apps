@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/audioutils/fmsynth_op.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -52,6 +54,7 @@ typedef struct fmsynth_op_s
   struct fmsynth_op_s *cascadeop;
   struct fmsynth_op_s *parallelop;
 
+  int own_allocate;
   FAR int *feedback_ref;
   int feedback_val;
   int feedbackrate;
@@ -75,6 +78,8 @@ extern "C"
 int fmsynthop_set_samplerate(int fs);
 
 FAR fmsynth_op_t *fmsynthop_create(void);
+FAR fmsynth_op_t *create_fmsynthop(FAR fmsynth_op_t *op,
+                                   FAR fmsynth_eg_t *eg);
 void fmsynthop_delete(FAR fmsynth_op_t *op);
 int fmsynthop_select_opfunc(FAR fmsynth_op_t *op, int type);
 int fmsynthop_set_envelope(FAR fmsynth_op_t *op,

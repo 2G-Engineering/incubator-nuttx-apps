@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/mtdpart/mtdpart_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -221,7 +223,7 @@ int main(int argc, FAR char *argv[])
   partsize    = nblocks * geo.blocksize;
 
   printf("  No. partitions: %u\n", CONFIG_EXAMPLES_MTDPART_NPARTITIONS);
-  printf("  Partition size: %ju Blocks (%lu bytes)\n", (uintmax_t)nblocks,
+  printf("  Partition size: %ju Blocks (%zu bytes)\n", (uintmax_t)nblocks,
          partsize);
 
   /* Now create MTD FLASH partitions */

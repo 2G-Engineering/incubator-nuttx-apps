@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/oneshot/oneshot_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,6 +36,7 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include <nuttx/clock.h>
 #include <nuttx/timers/oneshot.h>
 
 /****************************************************************************
@@ -208,8 +211,8 @@ int main(int argc, FAR char *argv[])
         {
           /* Wait for the maximum */
 
-          printf("Starting oneshot timer with delay %llu microseconds\n",
-                 maxus);
+          printf("Starting oneshot timer with delay %" PRId64
+                 " microseconds\n", maxus);
 
           start.ts.tv_sec  = ts.tv_sec;
           start.ts.tv_nsec = ts.tv_nsec;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/nshlib/nshlib.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -64,6 +66,25 @@
 #else
 #  define SCHED_NSH SCHED_FIFO
 #endif
+
+struct nsh_param_s
+{
+  /* Redirect input/output through `fd` OR `path_name`
+   *
+   * Select one:
+   * 1. Using fd_in/fd_out as oldfd for dup2() if greater than -1.
+   * 2. Using file_in/file_out as full path to the file if it is
+   *    not NULL, and oflags_in/oflags_out as flags for open().
+   */
+
+  int fd_in;
+  int fd_out;
+
+  int oflags_in;
+  int oflags_out;
+  FAR const char *file_in;
+  FAR const char *file_out;
+};
 
 /****************************************************************************
  * Public Data

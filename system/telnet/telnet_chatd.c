@@ -1,23 +1,12 @@
 /****************************************************************************
  * apps/system/telnet/telnet_chatd.c
  *
- * Leveraged from libtelnet, https://github.com/seanmiddleditch/libtelnet.
- * Modified and re-released under the BSD license:
- *
- *   Copyright (C) 2017 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * The original authors of libtelnet are listed below.  Per their licesne,
- * "The author or authors of this code dedicate any and all copyright
- * interest in this code to the public domain. We make this dedication for
- * the benefit of the public at large and to the detriment of our heirs and
- * successors.  We intend this dedication to be an overt act of
- * relinquishment in perpetuity of all present and future rights to this
- * code under copyright law."
- *
- *   Author: Sean Middleditch <sean@sourcemud.org>
- *   (Also listed in the AUTHORS file are Jack Kelly <endgame.dos@gmail.com>
- *   and Katherine Flavel <kate@elide.org>)
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2017 Gregory Nutt. All rights reserved.
+ * SPDX-FileContributor: Sean Middleditch <sean@sourcemud.org>
+ * SPDX-FileContributor: Jack Kelly <endgame.dos@gmail.com>
+ * SPDX-FileContributor: Katherine Flavel <kate@elide.org>
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +37,21 @@
  *
  ****************************************************************************/
 
+/* Leveraged from libtelnet, https://github.com/seanmiddleditch/libtelnet.
+ * Modified and re-released under the BSD license.
+ *
+ * The original authors of libtelnet are listed below.  Per their licesne,
+ * "The author or authors of this code dedicate any and all copyright
+ * interest in this code to the public domain. We make this dedication for
+ * the benefit of the public at large and to the detriment of our heirs and
+ * successors.  We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * code under copyright law."
+ *
+ *   Author: Sean Middleditch <sean@sourcemud.org>
+ *   (Also listed in the AUTHORS file are Jack Kelly <endgame.dos@gmail.com>
+ *   and Katherine Flavel <kate@elide.org>)
+ */
 /****************************************************************************
  * Included Files
  ****************************************************************************/
@@ -118,15 +122,15 @@ static void cleanup_exit(void)
           close(g_users[i].sock);
           free(g_users[i].name);
           telnet_free(g_users[i].telnet);
-      }
+        }
     }
 
   exit(1);
 }
 
 static void linebuffer_push(char *buffer, size_t size, int *linepos,
-                            char ch, void (*cb) (const char *line, int overflow,
-                                                 void *ud), void *ud)
+                            char ch, void (*cb) (const char *line,
+                            int overflow, void *ud), void *ud)
 {
   /* CRLF -- line terminator */
 
@@ -272,7 +276,8 @@ static void _online(const char *line, int overflow, void *ud)
   _message(user->name, line);
 }
 
-static void _input(struct user_s *user, const char *buffer, unsigned int size)
+static void _input(struct user_s *user, const char *buffer,
+                   unsigned int size)
 {
   unsigned int i;
 
@@ -329,6 +334,7 @@ static void _event_handler(struct telnet_s *telnet,
       break;
 
     default:
+
       /* Ignore */
 
       break;
@@ -383,7 +389,8 @@ int main(int argc, FAR char *argv[])
   /* Reuse address option */
 
   ret = 1;
-  setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (void *)&ret, sizeof(ret));
+  setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (void *)&ret,
+             sizeof(ret));
 
   /* Bind to listening addr/port */
 
@@ -414,7 +421,7 @@ int main(int argc, FAR char *argv[])
 
   /* Loop for ever */
 
-  for (;;)
+  for (; ; )
     {
       /* Prepare for poll */
 
@@ -448,8 +455,8 @@ int main(int argc, FAR char *argv[])
           /* Accept the sock */
 
           addrlen = sizeof(addr);
-          if ((ret = accept(listen_sock, (struct sockaddr *)&addr,
-                           &addrlen)) == -1)
+          if ((ret = accept4(listen_sock, (struct sockaddr *)&addr,
+                             &addrlen, SOCK_CLOEXEC)) == -1)
             {
               fprintf(stderr, "accept() failed: %d\n", errno);
               cleanup_exit();
@@ -477,12 +484,14 @@ int main(int argc, FAR char *argv[])
           /* Init, welcome */
 
           g_users[i].sock = ret;
-          g_users[i].telnet = telnet_init(g_telopts, _event_handler, 0, &g_users[i]);
+          g_users[i].telnet = telnet_init(g_telopts, _event_handler, 0,
+                                          &g_users[i]);
           telnet_negotiate(g_users[i].telnet, TELNET_WILL,
                            TELNET_TELOPT_COMPRESS2);
           telnet_printf(g_users[i].telnet, "Enter name: ");
 
-          telnet_negotiate(g_users[i].telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
+          telnet_negotiate(g_users[i].telnet, TELNET_WILL,
+                           TELNET_TELOPT_ECHO);
         }
 
       /* Read from client */
@@ -498,7 +507,8 @@ int main(int argc, FAR char *argv[])
 
           if (pfd[i].revents & (POLLIN | POLLERR | POLLHUP))
             {
-              if ((ret = recv(g_users[i].sock, buffer, sizeof(buffer), 0)) > 0)
+              if ((ret =
+                       recv(g_users[i].sock, buffer, sizeof(buffer), 0)) > 0)
                 {
                   telnet_recv(g_users[i].telnet, buffer, ret);
                 }

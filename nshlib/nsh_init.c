@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_init.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -106,14 +108,18 @@ void nsh_initialize(void)
 #if defined (CONFIG_NSH_SYMTAB)
   struct boardioc_symtab_s symdesc;
 #endif
-#if defined(CONFIG_NSH_ROMFSETC) && !defined(CONFIG_NSH_DISABLESCRIPT)
+#if defined(CONFIG_ETC_ROMFS) && !defined(CONFIG_NSH_DISABLESCRIPT)
   FAR struct console_stdio_s *pstate;
 #endif
 
-#if defined(CONFIG_NSH_READLINE) && defined(CONFIG_READLINE_TABCOMPLETION)
-  /* Configure the NSH prompt */
+  /* populate NSH prompt string */
 
-  readline_prompt(g_nshprompt);
+  nsh_update_prompt();
+
+#if defined(CONFIG_NSH_READLINE) && defined(CONFIG_READLINE_TABCOMPLETION)
+  /* Configure readline prompt */
+
+  readline_prompt(nsh_prompt());
 
 #  ifdef CONFIG_READLINE_HAVE_EXTMATCH
   /* Set up for tab completion on NSH commands */
@@ -121,10 +127,6 @@ void nsh_initialize(void)
   readline_extmatch(&g_nsh_extmatch);
 #  endif
 #endif
-
-  /* Mount the /etc filesystem */
-
-  (void)nsh_romfsetc();
 
 #ifdef CONFIG_NSH_USBDEV_TRACE
   /* Initialize any USB tracing options that were requested */
@@ -135,7 +137,7 @@ void nsh_initialize(void)
 #if defined(CONFIG_NSH_SYMTAB)
   /* Make sure that we are using our symbol table */
 
-  symdesc.symtab   = (FAR struct symtab_s *)CONFIG_NSH_SYMTAB_ARRAYNAME; /* Discard 'const' */
+  symdesc.symtab   = CONFIG_NSH_SYMTAB_ARRAYNAME;
   symdesc.nsymbols = CONFIG_NSH_SYMTAB_COUNTNAME;
 
   boardctl(BOARDIOC_APP_SYMTAB, (uintptr_t)&symdesc);
@@ -147,7 +149,7 @@ void nsh_initialize(void)
   boardctl(BOARDIOC_INIT, 0);
 #endif
 
-#if defined(CONFIG_NSH_ROMFSETC) && !defined(CONFIG_NSH_DISABLESCRIPT)
+#if defined(CONFIG_ETC_ROMFS) && !defined(CONFIG_NSH_DISABLESCRIPT)
   pstate = nsh_newconsole(false);
 
   /* Execute the system init script */
@@ -167,7 +169,7 @@ void nsh_initialize(void)
   boardctl(BOARDIOC_FINALINIT, 0);
 #endif
 
-#if defined(CONFIG_NSH_ROMFSETC) && !defined(CONFIG_NSH_DISABLESCRIPT)
+#if defined(CONFIG_ETC_ROMFS) && !defined(CONFIG_NSH_DISABLESCRIPT)
   /* Execute the start-up script */
 
   nsh_initscript(&pstate->cn_vtbl);

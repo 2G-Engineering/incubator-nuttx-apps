@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_ioctl_fwupdate.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -445,7 +447,7 @@ int usockreq_ioctl_fwupdate(FAR struct alt1250_s *dev,
                              ltecmd->outparamlen);
       set_container_postproc(container, postproc_hdlr, postproc_priv);
 
-      ret = altdevice_send_command(dev->altfd, container, usock_result);
+      ret = altdevice_send_command(dev, dev->altfd, container, usock_result);
 
       if (IS_NEED_CONTAINER_FREE(ret))
         {

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/dhcpd/dhcpd_daemon.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -112,11 +114,6 @@ int dhcpd_daemon(int argc, FAR char *argv[], bool daemon)
 
   addr.s_addr = HTONL(CONFIG_NETUTILS_DHCPD_ROUTERIP);
   netlib_set_ipv4addr(devname, &addr);
-
-  /* Set up the default router address */
-
-  addr.s_addr = HTONL(CONFIG_NETUTILS_DHCPD_ROUTERIP);
-  netlib_set_dripv4addr(devname, &addr);
 
   /* Setup the subnet mask */
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/uORB/uORB.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,10 +27,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <stdio.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
+#include <string.h>
 
+#include <nuttx/streams.h>
 #include <uORB/uORB.h>
 
 /****************************************************************************
@@ -58,6 +62,7 @@ static int orb_advsub_open(FAR const struct orb_metadata *meta, int flags,
   char path[ORB_PATH_MAX];
   int fd;
   int ret;
+  int err;
 
   snprintf(path, ORB_PATH_MAX, ORB_SENSOR_PATH"%s%d", meta->o_name,
            instance);
@@ -69,12 +74,12 @@ static int orb_advsub_open(FAR const struct orb_metadata *meta, int flags,
   if (fd < 0)
     {
       struct sensor_reginfo_s reginfo;
-      reginfo.path    = path;
+      strlcpy(reginfo.path, path, NAME_MAX);
       reginfo.esize   = meta->o_size;
       reginfo.nbuffer = queue_size;
       reginfo.persist = !!(flags & SENSOR_PERSIST);
 
-      fd = open(ORB_USENSOR_PATH, O_WRONLY);
+      fd = open(ORB_USENSOR_PATH, O_WRONLY | O_CLOEXEC);
       if (fd < 0)
         {
           return fd;
@@ -83,8 +88,9 @@ static int orb_advsub_open(FAR const struct orb_metadata *meta, int flags,
       /* Register new device node */
 
       ret = ioctl(fd, SNIOC_REGISTER, (unsigned long)(uintptr_t)&reginfo);
+      err = errno;
       close(fd);
-      if (ret < 0 && ret != -EEXIST)
+      if (ret < 0 && err != EEXIST)
         {
           return ret;
         }
@@ -95,7 +101,7 @@ static int orb_advsub_open(FAR const struct orb_metadata *meta, int flags,
           return fd;
         }
 
-      if (ret != -EEXIST)
+      if (err != EEXIST)
         {
           ioctl(fd, SNIOC_SET_USERPRIV, (unsigned long)(uintptr_t)meta);
         }
@@ -225,6 +231,16 @@ int orb_get_state(int fd, FAR struct orb_state *state)
   return ret;
 }
 
+int orb_get_events(int fd, FAR unsigned int *events)
+{
+  if (!events)
+    {
+      return -EINVAL;
+    }
+
+  return ioctl(fd, SNIOC_GET_EVENTS, (unsigned long)(uintptr_t)events);
+}
+
 int orb_check(int fd, FAR bool *updated)
 {
   return ioctl(fd, SNIOC_UPDATED, (unsigned long)(uintptr_t)updated);
@@ -235,6 +251,11 @@ int orb_ioctl(int fd, int cmd, unsigned long arg)
   return ioctl(fd, cmd, arg);
 }
 
+int orb_flush(int fd)
+{
+  return ioctl(fd, SNIOC_FLUSH, 0);
+}
+
 int orb_set_interval(int fd, unsigned interval)
 {
   return ioctl(fd, SNIOC_SET_INTERVAL, (unsigned long)interval);
@@ -242,17 +263,27 @@ int orb_set_interval(int fd, unsigned interval)
 
 int orb_get_interval(int fd, FAR unsigned *interval)
 {
-  struct sensor_state_s tmp;
+  struct sensor_ustate_s tmp;
   int ret;
 
-  ret = ioctl(fd, SNIOC_GET_STATE, (unsigned long)(uintptr_t)&tmp);
+  ret = ioctl(fd, SNIOC_GET_USTATE, (unsigned long)(uintptr_t)&tmp);
   if (ret < 0)
     {
       return ret;
     }
 
-  *interval = tmp.min_interval;
+  *interval = tmp.interval;
   return ret;
+}
+
+int orb_set_info(int fd, FAR const orb_info_t *info)
+{
+  return ioctl(fd, SNIOC_SET_INFO, (unsigned long)(uintptr_t)info);
+}
+
+int orb_get_info(int fd, FAR orb_info_t *info)
+{
+  return ioctl(fd, SNIOC_GET_INFO, (unsigned long)(uintptr_t)info);
 }
 
 int orb_set_batch_interval(int fd, unsigned batch_interval)
@@ -262,16 +293,16 @@ int orb_set_batch_interval(int fd, unsigned batch_interval)
 
 int orb_get_batch_interval(int fd, FAR unsigned *batch_interval)
 {
-  struct sensor_state_s tmp;
+  struct sensor_ustate_s tmp;
   int ret;
 
-  ret = ioctl(fd, SNIOC_GET_STATE, (unsigned long)(uintptr_t)&tmp);
+  ret = ioctl(fd, SNIOC_GET_USTATE, (unsigned long)(uintptr_t)&tmp);
   if (ret < 0)
     {
       return ret;
     }
 
-  *batch_interval = tmp.min_latency;
+  *batch_interval = tmp.latency;
   return ret;
 }
 
@@ -320,3 +351,37 @@ int orb_group_count(FAR const struct orb_metadata *meta)
 
   return instance;
 }
+
+#ifdef CONFIG_DEBUG_UORB
+int orb_sscanf(FAR const char *buf, FAR const char *format, FAR void *data)
+{
+  struct lib_meminstream_s meminstream;
+  int lastc;
+
+  lib_meminstream(&meminstream, buf, strlen(buf));
+  return lib_bscanf(&meminstream.common, &lastc, format, data);
+}
+
+void orb_info(FAR const char *format, FAR const char *name,
+              FAR const void *data)
+{
+  struct lib_stdoutstream_s stdoutstream;
+  struct va_format vaf;
+
+  vaf.fmt = format;
+  vaf.va  = (va_list *)data;
+
+  lib_stdoutstream(&stdoutstream, stdout);
+  lib_sprintf(&stdoutstream.common, "%s(now:%" PRIu64 "):%pB\n",
+              name, orb_absolute_time(), &vaf);
+}
+
+int orb_fprintf(FAR FILE *stream, FAR const char *format,
+                FAR const void *data)
+{
+  struct lib_stdoutstream_s stdoutstream;
+
+  lib_stdoutstream(&stdoutstream, stream);
+  return lib_bsprintf(&stdoutstream.common, format, data);
+}
+#endif

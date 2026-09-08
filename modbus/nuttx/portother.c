@@ -1,9 +1,8 @@
 /****************************************************************************
  * apps/modbus/nuttx/portother.c
  *
- * FreeModbus Library: NuttX Port
- * Copyright (c) 2006 Christian Walter <wolti@sil.at>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2006 Christian Walter <wolti@sil.at>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -74,17 +73,22 @@ void vMBPortLogFile(FILE * fNewLogFile)
   fLogFile = fNewLogFile;
 }
 
-void vMBPortLog(eMBPortLogLevel eLevel, const char * szModule, const char * szFmt, ...)
+#ifndef CONFIG_MODBUS_DISABLE_LOG
+void vMBPortLog(eMBPortLogLevel eLevel, const char * szModule,
+                const char * szFmt, ...)
 {
   char     szBuf[512];
   int      i;
   va_list  args;
   FILE    *fOutput = fLogFile == NULL ? stderr : fLogFile;
 
-  static const char *arszLevel2Str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
+  static const char *arszLevel2Str[] =
+  {
+     "ERROR", "WARN", "INFO", "DEBUG"
+   };
 
-  i = snprintf(szBuf, NELEMS(szBuf), "%s: %s: ", arszLevel2Str[eLevel], szModule);
-
+  i = snprintf(szBuf, NELEMS(szBuf), "%s: %s: ",
+               arszLevel2Str[eLevel], szModule);
   if (i != 0)
     {
       va_start(args, szFmt);
@@ -100,13 +104,15 @@ void vMBPortLog(eMBPortLogLevel eLevel, const char * szModule, const char * szFm
         }
     }
 }
+#endif
 
 void vMBPortEnterCritical(void)
 {
   int ret = pthread_mutex_lock(&xLock);
   if (ret != 0)
     {
-      vMBPortLog(MB_LOG_ERROR, "OTHER", "Locking primitive failed: %d\n", ret);
+      vMBPortLog(MB_LOG_ERROR, "OTHER",
+                 "Locking primitive failed: %d\n", ret);
     }
 }
 
@@ -115,6 +121,7 @@ void vMBPortExitCritical(void)
   int ret = pthread_mutex_unlock(&xLock);
   if (ret != 0)
     {
-      vMBPortLog(MB_LOG_ERROR, "OTHER", "Locking primitive failed: %d\n", ret);
+      vMBPortLog(MB_LOG_ERROR,
+                 "OTHER", "Locking primitive failed: %d\n", ret);
     }
 }

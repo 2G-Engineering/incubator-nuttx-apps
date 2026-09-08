@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/termcurses/tcurses_vt100.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1500,11 +1502,11 @@ FAR struct termcurses_s *tcurses_vt100_initialize(int in_fd, int out_fd)
 
               priv->lflag = cfg.c_lflag;
 
-              /* If ECHO enabled, disable it */
+              /* If ECHO and ICANON enabled, disable it */
 
-              if (cfg.c_lflag & ECHO)
+              if (cfg.c_lflag & (ECHO | ICANON))
                 {
-                  cfg.c_lflag &= ~ECHO;
+                  cfg.c_lflag &= ~(ECHO | ICANON);
                   tcsetattr(priv->in_fd, TCSANOW, &cfg);
                 }
             }
@@ -1546,9 +1548,10 @@ static int tcurses_vt100_terminate(FAR struct termcurses_s *dev)
 
       if (isatty(priv->in_fd))
         {
-          if (tcgetattr(priv->in_fd, &cfg) == 0 && priv->lflag & ECHO)
+          if ((priv->lflag & (ECHO | ICANON))
+              && tcgetattr(priv->in_fd, &cfg) == 0)
             {
-              cfg.c_lflag |= ECHO;
+              cfg.c_lflag = priv->lflag;
               tcsetattr(priv->in_fd, TCSANOW, &cfg);
             }
         }

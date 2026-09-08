@@ -1,14 +1,11 @@
 /****************************************************************************
  * apps/netutils/thttpd/timers.c
- * Simple Timer Routines
  *
- *   Copyright (C) 2009 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Derived from the file of the same name in the original THTTPD package:
- *
- *   Copyright © 1995,1998,2000 by Jef Poskanzer <jef@mail.acme.com>.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ * SPDX-FileCopyrightText: 2009 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 1998, 2000 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileCopyrightText: 1995 by Jef Poskanzer <jef@mail.acme.com>.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -57,20 +54,20 @@
  * Private Data
  ****************************************************************************/
 
-static Timer *timers[HASH_SIZE];
-static Timer *free_timers;
+static timer *timers[HASH_SIZE];
+static timer *free_timers;
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ClientData JunkClientData;
+clientdata junkclientdata;
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
 
-static unsigned int hash(Timer *tmr)
+static unsigned int hash(timer *tmr)
 {
   /* We can hash on the trigger time, even though it can change over the
    * life of a timer via the periodic bit.
@@ -82,11 +79,11 @@ static unsigned int hash(Timer *tmr)
           (unsigned int)tmr->time.tv_usec) % HASH_SIZE;
 }
 
-static void l_add(Timer *tmr)
+static void l_add(timer *tmr)
 {
   int h = tmr->hash;
-  register Timer *tmr2;
-  register Timer *tmr2prev;
+  register timer *tmr2;
+  register timer *tmr2prev;
 
   tmr2 = timers[h];
   if (tmr2 == NULL)
@@ -139,7 +136,7 @@ static void l_add(Timer *tmr)
     }
 }
 
-static void l_remove(Timer *tmr)
+static void l_remove(timer *tmr)
 {
   int h = tmr->hash;
 
@@ -158,7 +155,7 @@ static void l_remove(Timer *tmr)
     }
 }
 
-static void l_resort(Timer *tmr)
+static void l_resort(timer *tmr)
 {
   /* Remove the timer from its old list. */
 
@@ -189,10 +186,10 @@ void tmr_init(void)
   free_timers = NULL;
 }
 
-Timer *tmr_create(struct timeval *now, TimerProc *timer_proc,
-                  ClientData client_data, long msecs, int periodic)
+timer *tmr_create(struct timeval *now, timerproc *timer_proc,
+                  clientdata client_data, long msecs, int periodic)
 {
-  Timer *tmr;
+  timer *tmr;
 
   if (free_timers != NULL)
     {
@@ -201,7 +198,7 @@ Timer *tmr_create(struct timeval *now, TimerProc *timer_proc,
     }
   else
     {
-      tmr = (Timer*)httpd_malloc(sizeof(Timer));
+      tmr = (timer *)httpd_malloc(sizeof(timer));
       if (!tmr)
         {
           return NULL;
@@ -244,7 +241,7 @@ long tmr_mstimeout(struct timeval *now)
   int gotone;
   long msecs;
   long m;
-  register Timer *tmr;
+  register timer *tmr;
 
   gotone = 0;
   msecs  = 0;
@@ -288,8 +285,8 @@ long tmr_mstimeout(struct timeval *now)
 void tmr_run(struct timeval *now)
 {
   int h;
-  Timer *tmr;
-  Timer *next;
+  timer *tmr;
+  timer *next;
 
   for (h = 0; h < HASH_SIZE; ++h)
     {
@@ -331,7 +328,7 @@ void tmr_run(struct timeval *now)
     }
 }
 
-void tmr_cancel(Timer *tmr)
+void tmr_cancel(timer *tmr)
 {
   /* Remove it from its active list. */
 
@@ -346,13 +343,13 @@ void tmr_cancel(Timer *tmr)
 
 void tmr_cleanup(void)
 {
-  Timer *tmr;
+  timer *tmr;
 
   while (free_timers != NULL)
     {
       tmr = free_timers;
       free_timers = tmr->next;
-      httpd_free((void*)tmr);
+      httpd_free((void *)tmr);
     }
 }
 

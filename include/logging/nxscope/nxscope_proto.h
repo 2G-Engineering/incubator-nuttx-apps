@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/logging/nxscope/nxscope_proto.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,14 @@
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
+#ifdef __cplusplus
+#define EXTERN extern "C"
+extern "C"
+{
+#else
+#define EXTERN extern
+#endif
 
 /* Nxscope frame handler */
 
@@ -100,6 +110,11 @@ int nxscope_proto_ser_init(FAR struct nxscope_proto_s *proto, FAR void *cfg);
  ****************************************************************************/
 
 void nxscope_proto_ser_deinit(FAR struct nxscope_proto_s *proto);
+#endif
+
+#undef EXTERN
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __APPS_INCLUDE_LOGGING_NXSCOPE_NXSCOPE_PROTO_H */

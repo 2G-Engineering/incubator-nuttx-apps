@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/rexec/rexec.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,6 +24,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <sys/poll.h>
 #include <sys/types.h>
 #include <getopt.h>
 #include <netdb.h>
@@ -82,10 +85,11 @@ static void usage(FAR const char *progname)
 static int do_rexec(FAR struct rexec_arg_s *arg)
 {
   char buffer[REXEC_BUFSIZE];
+  struct pollfd fds[2];
   int sock;
   int ret;
 
-  sock = rexec_af(&arg->host, arg->port, arg->user,
+  sock = rexec_af(&arg->host, htons(arg->port), arg->user,
                   arg->password, arg->command,
                   NULL, arg->af);
   if (sock < 0)
@@ -93,16 +97,52 @@ static int do_rexec(FAR struct rexec_arg_s *arg)
       return sock;
     }
 
+  memset(fds, 0, sizeof(fds));
+  fds[0].fd = sock;
+  fds[0].events = POLLIN;
+  fds[1].fd = STDIN_FILENO;
+  fds[1].events = POLLIN;
+
   while (1)
     {
-      ret = read(sock, buffer, REXEC_BUFSIZE);
+      ret = poll(fds, 2, -1);
       if (ret <= 0)
         {
-          break;
+          continue;
         }
 
-      ret = write(STDOUT_FILENO, buffer, ret);
-      if (ret < 0)
+      if (fds[0].revents & POLLIN)
+        {
+          ret = read(sock, buffer, REXEC_BUFSIZE);
+          if (ret <= 0)
+            {
+              break;
+            }
+
+          ret = write(STDOUT_FILENO, buffer, ret);
+          if (ret < 0)
+            {
+              break;
+            }
+        }
+
+      if (fds[1].revents & POLLIN)
+        {
+          ret = read(STDIN_FILENO, buffer, REXEC_BUFSIZE);
+          if (ret <= 0)
+            {
+              break;
+            }
+
+          ret = write(sock, buffer, ret);
+          if (ret < 0)
+            {
+              break;
+            }
+        }
+
+      if (((fds[0].revents | fds[1].revents) & POLLHUP) &&
+          ((fds[0].revents | fds[1].revents) & POLLIN) == 0)
         {
           break;
         }
@@ -115,7 +155,7 @@ static int do_rexec(FAR struct rexec_arg_s *arg)
 
 int main(int argc, FAR char **argv)
 {
-  char cmd[CONFIG_NSH_LINELEN];
+  char cmd[LINE_MAX];
   struct rexec_arg_s arg;
   int option;
   int i;
