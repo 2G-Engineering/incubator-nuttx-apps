@@ -24,14 +24,16 @@
  * Included Files
  ****************************************************************************/
 
-#if defined(__NuttX__)
+#ifdef __NuttX__
 #include <nuttx/config.h>
 #endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifdef __NuttX__
 #include <debug.h>
+#endif
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -79,7 +81,7 @@ struct dd_s
   uint32_t     nsectors;   /* Number of sectors to transfer */
   uint32_t     skip;       /* The number of sectors skipped on input */
   uint32_t     seek;       /* The number of sectors seeked on output */
-  int          oflags;     /* The open flags on output deivce */
+  int          oflags;     /* The open flags on output device */
   bool         eof;        /* true: The end of the input or output file has been hit */
   size_t       sectsize;   /* Size of one sector */
   size_t       nbytes;     /* Number of valid bytes in the buffer */
@@ -246,11 +248,15 @@ static int dd_verify(FAR struct dd_s *dd)
 
       if (memcmp(dd->buffer, buffer, dd->nbytes) != 0)
         {
+#ifdef __NuttX__
           char msg[32];
           snprintf(msg, sizeof(msg), "infile sector %d", sector);
           lib_dumpbuffer(msg, dd->buffer, dd->nbytes);
           snprintf(msg, sizeof(msg), "\noutfile sector %d", sector);
           lib_dumpbuffer(msg, buffer, dd->nbytes);
+#else
+          printf("%s: sector %d differs unexpectedly\n", g_dd, sector);
+#endif
           ret = ERROR;
           break;
         }
