@@ -6,7 +6,7 @@
 config EXAMPLES_DRONECAN
 	tristate "DroneCAN example"
 	default n
-	depends on CANUTILS_LIBDRONECAN && SYSTEM_TIME64
+	depends on CANUTILS_LIBDRONECAN
 	---help---
 		Enable the LIBDRONECAN example
 

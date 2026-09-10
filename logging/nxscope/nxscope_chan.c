@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <endian.h>
 #include <errno.h>
 #include <string.h>
@@ -332,7 +332,6 @@ static int nxscope_put_vector(FAR uint8_t *buff, uint8_t type, FAR void *val,
           break;
         }
 
-#ifdef CONFIG_HAVE_LONG_LONG
       case NXSCOPE_TYPE_UINT64:
       case NXSCOPE_TYPE_INT64:
       case NXSCOPE_TYPE_DOUBLE:
@@ -358,7 +357,6 @@ static int nxscope_put_vector(FAR uint8_t *buff, uint8_t type, FAR void *val,
 
           break;
         }
-#endif
 
       case NXSCOPE_TYPE_CHAR:
         {

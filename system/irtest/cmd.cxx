@@ -31,6 +31,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <unistd.h>
 
 #include "enum.hpp"
@@ -226,7 +227,8 @@ CMD1(close_device, size_t, index)
 
 CMD1(write_data, size_t, index)
 {
-  unsigned int data[CONFIG_SYSTEM_IRTEST_MAX_SIRDATA];
+  uint32_t data[CONFIG_SYSTEM_IRTEST_MAX_SIRDATA];
+  uint32_t tmp;
 
   if (index >= CONFIG_SYSTEM_IRTEST_MAX_NIRDEV)
     {
@@ -236,7 +238,7 @@ CMD1(write_data, size_t, index)
   int size = 0;
   for (; size < CONFIG_SYSTEM_IRTEST_MAX_SIRDATA; size++)
     {
-      unsigned int tmp = get_next_arg < unsigned int > ();
+      tmp = get_next_arg < uint32_t > ();
       if (tmp == 0)
         {
           break;
@@ -245,19 +247,30 @@ CMD1(write_data, size_t, index)
       data[size] = tmp;
     }
 
+  /* Avoid silently truncating long write_data commands. */
+
+  if (size == CONFIG_SYSTEM_IRTEST_MAX_SIRDATA)
+    {
+      tmp = get_next_arg < uint32_t > ();
+      if (tmp != 0)
+        {
+          return -E2BIG;
+        }
+    }
+
   /* lirc require the odd length */
 
   if (size % 2 == 0)
     {
       int result = write(g_irdevs[index], data,
-                         sizeof(unsigned int) * (size - 1));
+                         sizeof(uint32_t) * (size - 1));
       usleep(data[size - 1]);
       return result;
     }
   else
     {
       return write(g_irdevs[index], data,
-                   sizeof(unsigned int) * size);
+                   sizeof(uint32_t) * size);
     }
 }
 
@@ -268,20 +281,20 @@ CMD2(read_data, size_t, index, size_t, size)
       return ERROR;
     }
 
-  unsigned int data[size];
+  uint32_t data[size];
   int result = read(g_irdevs[index], data, sizeof(data));
   if (result > 0)
     {
-      result /= sizeof(unsigned int);
+      result /= sizeof(uint32_t);
       for (int i = 0; i < result; i++)
         {
           if (i + 1 == result)
             {
-              printf("%d\n", data[i]);
+              printf("%" PRIu32 "\n", data[i]);
             }
           else
             {
-              printf("%d, ", data[i]);
+              printf("%" PRIu32 ", ", data[i]);
             }
         }
     }

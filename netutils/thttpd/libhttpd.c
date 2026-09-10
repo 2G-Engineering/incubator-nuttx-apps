@@ -58,7 +58,7 @@
 #include <signal.h>
 #include <sched.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <fnmatch.h>
 
 #include "netutils/thttpd.h"
@@ -327,7 +327,7 @@ static void send_mime(httpd_conn *hc, int status, const char *title,
           (hc->range_end >= hc->range_start) &&
           ((hc->range_end != length - 1) ||
            (hc->range_start != 0)) &&
-          (hc->range_if == (time_t) - 1 || hc->range_if == hc->sb.st_mtime))
+          (hc->range_if == -1 || hc->range_if == hc->sb.st_mtime))
         {
           partial_content = 1;
           status = 206;
@@ -340,7 +340,7 @@ static void send_mime(httpd_conn *hc, int status, const char *title,
         }
 
       gettimeofday(&now, NULL);
-      if (mod == (time_t)0)
+      if (mod == 0)
         {
           mod = now.tv_sec;
         }
@@ -510,7 +510,7 @@ static int send_err_file(httpd_conn *hc, int status, char *title,
     }
 
   send_mime(hc, status, title, "", extraheads, "text/html; charset=%s",
-            (off_t)-1, (time_t)0);
+            -1, 0);
   for (; ; )
     {
       nread = fread(buf, 1, sizeof(buf) - 1, fp);
@@ -2163,13 +2163,14 @@ FAR httpd_server *httpd_initialize(FAR httpd_sockaddr *sa)
 #else
   hs->hostname = httpd_strdup(httpd_ntoa(sa));
 #endif
-  ninfo("hostname: %s\n", hs->hostname);
-
   if (!hs->hostname)
     {
       nerr("ERROR: out of memory copying hostname\n");
+      free_httpd_server(hs);
       return NULL;
     }
+
+  ninfo("hostname: %s\n", hs->hostname);
 
   hs->cgi_count = 0;
 
@@ -2421,8 +2422,8 @@ int httpd_get_conn(httpd_server *hs, int listen_fd, httpd_conn *hc)
   hc->altdir[0]         = '\0';
 #endif
   hc->buflen = 0;
-  hc->if_modified_since = (time_t) - 1;
-  hc->range_if          = (time_t)-1;
+  hc->if_modified_since = -1;
+  hc->range_if          = -1;
   hc->contentlength     = -1;
   hc->type = "";
 #ifdef CONFIG_THTTPD_VHOST
@@ -2926,7 +2927,7 @@ int httpd_parse_request(httpd_conn *hc)
             {
               cp = &buf[18];
               hc->if_modified_since = tdate_parse(cp);
-              if (hc->if_modified_since == (time_t) - 1)
+              if (hc->if_modified_since == -1)
                 {
                   nerr("ERROR: unparsable time: %s\n", cp);
                 }
@@ -2973,7 +2974,7 @@ int httpd_parse_request(httpd_conn *hc)
             {
               cp = &buf[9];
               hc->range_if = tdate_parse(cp);
-              if (hc->range_if == (time_t) - 1)
+              if (hc->range_if == -1)
                 {
                   nerr("ERROR: unparsable time: %s\n", cp);
                 }
@@ -3521,7 +3522,7 @@ int httpd_start_request(httpd_conn *hc, struct timeval *nowp)
       send_mime(hc, 200, ok200title, hc->encodings, "", hc->type,
                 hc->sb.st_size, hc->sb.st_mtime);
     }
-  else if (hc->if_modified_since != (time_t) - 1 &&
+  else if (hc->if_modified_since != -1 &&
            hc->if_modified_since >= hc->sb.st_mtime)
     {
       send_mime(hc, 304, err304title, hc->encodings, "",

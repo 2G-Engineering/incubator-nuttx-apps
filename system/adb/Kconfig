@@ -95,7 +95,7 @@ config ADBD_FRAME_MAX
 
 config ADBD_TCP_SERVER
 	bool "Network socket transport support"
-	depends on NET_TCP
+	depends on NET_TCP_NO_STACK || NET_TCPBACKLOG
 	default n
 	---help---
 		Run adb daemon on network socket.
@@ -174,6 +174,7 @@ config ADBD_SHELL_SERVICE
 	depends on SYSTEM_NSH
 	depends on LIBC_EXECFUNCS
 	depends on PSEUDOTERM
+	depends on SCHED_CHILD_STATUS
 	default n
 	---help---
 		Enable "adb shell" feature.
@@ -199,19 +200,12 @@ config ADBD_SOCKET_SERVICE
 	---help---
 		Enable "adb forward|reverse" feature.
 
-config ADBD_BOARD_INIT
-	bool "Board initialization"
-	depends on BOARDCTL
-	default n
-	---help---
-		Setup board before running adb daemon.
-
 config ADBD_USB_BOARDCTL
 	bool "USB Board Control"
 	depends on BOARDCTL
 	depends on ADBD_USB_SERVER
 	select BOARDCTL_USBDEVCTRL
-	default ADBD_BOARD_INIT
+	default y
 	---help---
 		Connect usbdev before running adb daemon.
 

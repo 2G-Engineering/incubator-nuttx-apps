@@ -57,7 +57,7 @@ void test_nuttx_syscall_time01(FAR void **state)
 
       /* check return code */
 
-      assert_int_not_equal(ret, (time_t)-1);
+      assert_int_not_equal(ret, -1);
     }
 }
 

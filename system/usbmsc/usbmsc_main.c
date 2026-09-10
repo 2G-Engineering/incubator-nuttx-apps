@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <unistd.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/usb/usbdev.h>
 #include <nuttx/usb/usbmsc.h>
@@ -581,7 +581,7 @@ int main(int argc, FAR char *argv[])
              num_luns, luns[num_luns].path);
 
       ret = usbmsc_bindlun(handle, luns[num_luns].path, 0, 0, 0,
-                           luns[num_luns].flags & O_WROK ? false : true);
+                           luns[num_luns].flags & O_WRONLY ? false : true);
       if (ret < 0)
         {
           printf("mcsonn_main: usbmsc_bindlun failed for LUN %d using %s: "

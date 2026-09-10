@@ -20,10 +20,5 @@
 #
 # ##############################################################################
 
-if(CONFIG_EXAMPLES_ELF)
-  nuttx_add_application(NAME elf INCLUDES ${CMAKE_CURRENT_SOURCE_DIR} SRCS
-                        elf_main.c)
-
-  # TODO: tests
-
-endif()
+nuttx_add_subdirectory()
+nuttx_generate_kconfig(MENUDESC "Elf")

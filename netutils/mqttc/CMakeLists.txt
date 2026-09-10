@@ -1,24 +1,24 @@
-############################################################################
+# ##############################################################################
 # apps/netutils/mqttc/CMakeLists.txt
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.  The
-# ASF licenses this file to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance with the
-# License.  You may obtain a copy of the License at
+# Licensed to the Apache Software Foundation (ASF) under one or more contributor
+# license agreements.  See the NOTICE file distributed with this work for
+# additional information regarding copyright ownership.  The ASF licenses this
+# file to you under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License.  You may obtain a copy of
+# the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-# License for the specific language governing permissions and limitations
-# under the License.
+# License for the specific language governing permissions and limitations under
+# the License.
 #
-############################################################################
+# ##############################################################################
 
 if(CONFIG_NETUTILS_MQTTC)
 
@@ -33,7 +33,7 @@ if(CONFIG_NETUTILS_MQTTC)
     FetchContent_Declare(
       mqttc_fetch
       URL ${MQTTC_URL}/${CONFIG_NETUTILS_MQTTC_VERSION}.tar.gz SOURCE_DIR
-          ${MQTTC_DIR} BINARY_DIR ${CMAKE_BINARY_DIR}/apps/netutils/mqttc/MQTT-C
+          ${MQTTC_DIR} BINARY_DIR ${NUTTX_APPS_BINDIR}/netutils/mqttc/MQTT-C
       DOWNLOAD_NO_PROGRESS true
       TIMEOUT 30)
 
@@ -44,9 +44,8 @@ if(CONFIG_NETUTILS_MQTTC)
     endif()
 
     execute_process(
-      COMMAND
-        sh -c
-        "cat 0001_add_connection_status.patch | patch -s -N -d $(MQTTC_DIR) -p1"
+      COMMAND patch -s -N -d ${MQTTC_DIR} -p1 -i
+              ${CMAKE_CURRENT_LIST_DIR}/0001_add_connection_status.patch
       WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
   endif()
 
@@ -65,6 +64,10 @@ if(CONFIG_NETUTILS_MQTTC)
   target_sources(mqttc PRIVATE ${CSRCS})
   target_compile_options(mqttc PRIVATE ${CFLAGS})
 
+  if(CONFIG_NETUTILS_MQTTC_WITH_MBEDTLS AND CONFIG_CRYPTO_MBEDTLS)
+    nuttx_add_dependencies(TARGET mqttc DEPENDS mbedtls)
+  endif()
+
   if(CONFIG_NETUTILS_MQTTC_EXAMPLE)
     if(CONFIG_NETUTILS_MQTTC_WITH_MBEDTLS)
       nuttx_add_application(
@@ -79,7 +82,8 @@ if(CONFIG_NETUTILS_MQTTC)
         COMPILE_FLAGS
         ${CFLAGS}
         DEPENDS
-        mqttc)
+        mqttc
+        mbedtls)
     else()
       set(MQTT_PUB_CFLAGS
           ${CFLAGS}
@@ -123,5 +127,25 @@ if(CONFIG_NETUTILS_MQTTC)
         DEPENDS
         mqttc)
     endif()
+  endif()
+
+  if(CONFIG_NETUTILS_MQTTC_TEST)
+    set(MQTT_TEST_CFLAGS ${CFLAGS} -Dopen_nb_socket=test_open_nb_socket
+                         -Dpublish_callback=test_publish_callback)
+
+    nuttx_add_application(
+      NAME
+      cmocka_mqttc_test
+      STACKSIZE
+      ${CONFIG_NETUTILS_MQTTC_TEST_STACKSIZE}
+      PRIORITY
+      ${SCHED_PRIORITY_DEFAULT}
+      SRCS
+      ${MQTTC_DIR}/tests.c
+      COMPILE_FLAGS
+      ${MQTT_TEST_CFLAGS}
+      DEPENDS
+      cmocka
+      mqttc)
   endif()
 endif()

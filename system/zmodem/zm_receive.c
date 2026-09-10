@@ -675,7 +675,7 @@ static int zmr_filename(FAR struct zm_state_s *pzm)
 
   pzmr->filesize  = (off_t)filesize;
 #ifdef CONFIG_SYSTEM_ZMODEM_TIMESTAMPS
-  pzmr->timestamp = (time_t)timestamp;
+  pzmr->timestamp = timestamp;
 #endif
 
   /* Check if we need to send the CRC */

@@ -32,7 +32,8 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
+#include <sys/boardctl.h>
 
 #include <arch/board/board.h>
 #include <nuttx/nx/nx.h>
@@ -248,7 +249,7 @@ int nximage_initialize(void)
     }
 
   /* Start a separate thread to listen for server events.
-   * For simplicity, use defaul thread attribute.
+   * For simplicity, use default thread attribute.
    */
 
   ret = pthread_create(&thread, NULL, nximage_listener, NULL);
@@ -306,21 +307,28 @@ void nximage_draw(FAR void *image, int w, int h)
   FAR struct nxgl_rect_s dest;
   FAR const void *src[CONFIG_NX_NPLANES];
   int ret;
+  int dest_w;
+  int dest_h;
 
   origin.x = 0;
   origin.y = 0;
 
-  /* Set up the destination to whole LCD screen */
+  /* Clip destination to the smaller of image size and screen size */
+
+  dest_w = w < g_nximage.xres ? w : g_nximage.xres;
+  dest_h = h < g_nximage.yres ? h : g_nximage.yres;
 
   dest.pt1.x = 0;
   dest.pt1.y = 0;
-  dest.pt2.x = g_nximage.xres - 1;
-  dest.pt2.y = g_nximage.yres - 1;
+  dest.pt2.x = dest_w - 1;
+  dest.pt2.y = dest_h - 1;
 
   src[0] = image;
 
+  /* stride must match the source image width, not the screen width */
+
   ret = nx_bitmap(g_nximage.hbkgd, &dest, src, &origin,
-                  g_nximage.xres * sizeof(nxgl_mxpixel_t));
+                  w * sizeof(nxgl_mxpixel_t));
   if (ret < 0)
     {
       printf("nximage_image: nx_bitmap failed: %d\n", errno);

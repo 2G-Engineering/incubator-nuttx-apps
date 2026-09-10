@@ -41,7 +41,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/drivers/ramdisk.h>
 
@@ -197,6 +197,8 @@ int main(int argc, FAR char *argv[])
   setenv("PYTHONHOME", "/usr/local", 1);
 
   setenv("PYTHON_BASIC_REPL", "1", 1);
+
+  setenv("PYTHONPATH", CONFIG_INTERPRETERS_CPYTHON_PYTHONPATH, 1);
 
   return py_bytesmain(argc, argv);
 }

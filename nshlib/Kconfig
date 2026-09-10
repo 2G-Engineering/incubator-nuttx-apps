@@ -9,7 +9,7 @@ config NSH_LIBRARY
 	bool "NSH Library"
 	default n
 	select NETUTILS_NETLIB if NET
-	select BOARDCTL if (!NSH_DISABLE_MKRD && !DISABLE_MOUNTPOINT) || NSH_ARCHINIT
+	select BOARDCTL if (!NSH_DISABLE_MKRD && !DISABLE_MOUNTPOINT)
 	select BOARDCTL_MKRD if !NSH_DISABLE_MKRD && !DISABLE_MOUNTPOINT
 	---help---
 		Build the NSH support library.  This is used, for example, by
@@ -68,6 +68,24 @@ config NSH_PROMPT_STRING
 	---help---
 		Provide the shell prompt string with size limit NSH_PROMPT_MAX.
 		default is "nsh> ".
+
+config NSH_PROMPT_STRING_ROOT
+	string "Prompt string for effective root (euid=0)"
+	default ""
+	depends on SCHED_USER_IDENTITY
+	---help---
+		If non-empty, NSH uses this prompt when the effective UID is zero.
+		If empty, the prompt from NSH_PROMPT_STRING (or ENV/HOSTNAME) is used.
+		Set explicitly for multi-user shells (for example, "nsh# ").
+
+config NSH_PROMPT_STRING_USER
+	string "Prompt string for non-root effective UID"
+	default ""
+	depends on SCHED_USER_IDENTITY
+	---help---
+		If non-empty, NSH uses this prompt when the effective UID is non-zero.
+		If empty, the prompt from NSH_PROMPT_STRING (or ENV/HOSTNAME) is used.
+		Set explicitly for multi-user shells (for example, "nsh$ ").
 
 config NSH_PROMPT_MAX
 	int "Maximum Size of Prompt String"
@@ -242,6 +260,14 @@ config NSH_BUILTIN_APPS
 		more information).  This options requires support for builtin
 		applications (BUILTIN).
 
+config NSH_BUILTIN_AS_COMMAND
+	bool "Run builtin apps as command"
+	default n
+	depends on BUILTIN
+	---help---
+		Enable to run builtin application directly without creating
+		a separate thread.
+
 config NSH_FILE_APPS
 	bool "Enable execution of program files"
 	default n
@@ -333,6 +359,31 @@ config NSH_DISABLE_CD
 	bool "Disable cd"
 	default DEFAULT_SMALL
 
+config NSH_DISABLE_CHMOD
+	bool "Disable chmod"
+	default DEFAULT_SMALL
+	depends on FS_PERMISSION
+
+config NSH_DISABLE_CHOWN
+	bool "Disable chown"
+	default DEFAULT_SMALL
+	depends on FS_PERMISSION
+
+config NSH_DISABLE_SU
+	bool "Disable su"
+	default DEFAULT_SMALL
+	depends on SCHED_USER_IDENTITY
+
+config NSH_DISABLE_ID
+	bool "Disable id"
+	default DEFAULT_SMALL
+	depends on SCHED_USER_IDENTITY
+
+config NSH_DISABLE_WHOAMI
+	bool "Disable whoami"
+	default DEFAULT_SMALL
+	depends on SCHED_USER_IDENTITY
+
 config NSH_DISABLE_CP
 	bool "Disable cp"
 	default DEFAULT_SMALL
@@ -405,7 +456,7 @@ config NSH_DISABLE_HELP
 
 config NSH_DISABLE_ERROR_PRINT
 	bool "Disable NSH Error Printing"
-	default DEFAULT_SMALL
+	default n
 
 config NSH_DISABLE_HEXDUMP
 	bool "Disable hexdump"
@@ -413,6 +464,10 @@ config NSH_DISABLE_HEXDUMP
 
 config NSH_DISABLE_IFCONFIG
 	bool "Disable ifconfig"
+	default DEFAULT_SMALL || !FS_PROCFS || FS_PROCFS_EXCLUDE_NET
+
+config NSH_DISABLE_VCONFIG
+	bool "Disable vconfig"
 	default DEFAULT_SMALL || !FS_PROCFS || FS_PROCFS_EXCLUDE_NET
 
 config NSH_DISABLE_IFUPDOWN
@@ -1104,16 +1159,6 @@ config NSH_USBDEV_TRACEINTERRUPTS
 endif # NSH_USBDEV_TRACE
 endmenu # USB Device Trace Support
 
-config NSH_ARCHINIT
-	bool "Have architecture-specific initialization"
-	default n
-	select BOARDCTL
-	---help---
-		Set if your board provides architecture specific initialization
-		via the board-interface function boardctl().  The boardctl()
-		function will be called early in NSH initialization to allow
-		board logic to do such things as configure MMC/SD slots.
-
 menu "Networking Configuration"
 	depends on NET
 
@@ -1246,6 +1291,19 @@ config NSH_LOGIN_FAILCOUNT
 	default 3
 	---help---
 		Number of login retry attempts.
+
+config NSH_LOGIN_SETUID
+	bool "Set user identity after successful login"
+	default y
+	depends on SCHED_USER_IDENTITY
+	---help---
+		After a successful NSH login, look up the authenticated user name
+		in the passwd database and call setuid()/setgid() so that the shell
+		session runs with that user's credentials.
+
+		When CONFIG_LIBC_PASSWD_FILE is enabled, any user listed in the
+		passwd file may be selected.  Otherwise only the built-in "root"
+		account is supported.
 
 config NSH_PLATFORM_CHALLENGE
 	bool "Platform challenge"

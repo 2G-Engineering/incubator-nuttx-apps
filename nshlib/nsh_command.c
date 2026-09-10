@@ -168,6 +168,14 @@ static const struct cmdmap_s g_cmdmap[] =
   CMD_MAP("cd",       cmd_cd,       1, 2, "[<dir-path>|-|~|..]"),
 #endif
 
+#if defined(CONFIG_FS_PERMISSION) && !defined(CONFIG_NSH_DISABLE_CHMOD)
+  CMD_MAP("chmod",    cmd_chmod,    3, 3, "<octal-mode> <path>"),
+#endif
+
+#if defined(CONFIG_FS_PERMISSION) && !defined(CONFIG_NSH_DISABLE_CHOWN)
+  CMD_MAP("chown",    cmd_chown,    3, 3, "[<uid>][:<gid>] <path>"),
+#endif
+
 #ifndef CONFIG_NSH_DISABLE_CP
   CMD_MAP("cp",       cmd_cp,       3, 4, "[-r] <source-path> <dest-path>"),
 #endif
@@ -248,6 +256,10 @@ static const struct cmdmap_s g_cmdmap[] =
   CMD_MAP("free",     cmd_free,     1, 1, NULL),
 #endif
 
+#if defined(CONFIG_SCHED_USER_IDENTITY) && !defined(CONFIG_NSH_DISABLE_ID)
+  CMD_MAP("id",       cmd_id,       1, 1, NULL),
+#endif
+
 #ifdef CONFIG_DEBUG_MM
 #  ifndef CONFIG_NSH_DISABLE_MEMDUMP
   CMD_MAP("memdump",  cmd_memdump,
@@ -286,6 +298,10 @@ static const struct cmdmap_s g_cmdmap[] =
     "[dr|gw|gateway <dr-address>] [netmask <net-mask>|prefixlen <len>] "
     "[dns <dns-address>] [hw <hw-mac>]"),
 #  endif
+#  if defined(CONFIG_NET_VLAN) && !defined(CONFIG_NSH_DISABLE_VCONFIG)
+  CMD_MAP("vconfig", cmd_vconfig, 3, 5,
+    "[add iface-name vlan-id [pcp]]|[rem vlan-name]"),
+#  endif
 #  ifndef CONFIG_NSH_DISABLE_IFUPDOWN
   CMD_MAP("ifdown",   cmd_ifdown,   2, 2, "<interface>"),
   CMD_MAP("ifup",     cmd_ifup,     2, 2, "<interface>"),
@@ -298,14 +314,6 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #ifdef HAVE_IRQINFO
   CMD_MAP("irqinfo",  cmd_irqinfo,  1, 1, NULL),
-#endif
-
-#ifndef CONFIG_NSH_DISABLE_KILL
-  CMD_MAP("kill",     cmd_kill,     2, 3, "[-<signal>] <pid>"),
-#endif
-
-#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PKILL)
-  CMD_MAP("pkill",     cmd_pkill,     2, 3, "[-<signal>] <name>"),
 #endif
 
 #ifndef CONFIG_DISABLE_MOUNTPOINT
@@ -326,9 +334,15 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #ifndef CONFIG_DISABLE_MOUNTPOINT
 #  if defined(CONFIG_MTD_LOOP) && !defined(CONFIG_NSH_DISABLE_LOMTD)
+#    ifndef CONFIG_MTD_CONFIG_NONE
+  CMD_MAP("lomtd",    cmd_lomtd,    3, 10,
+    "[-d <dev-path>] | [[-o <offset>] [-e <erase-size>] "
+    "[-b <sect-size>] [-c <configdata>] <dev-path> <file-path>]]"),
+#    else
   CMD_MAP("lomtd",    cmd_lomtd,    3, 9,
     "[-d <dev-path>] | [[-o <offset>] [-e <erase-size>] "
     "[-b <sect-size>] <dev-path> <file-path>]]"),
+#    endif
 #  endif
 #endif
 
@@ -535,7 +549,7 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #if defined(CONFIG_RPTUN) && !defined(CONFIG_NSH_DISABLE_RPTUN)
   CMD_MAP("rptun",    cmd_rptun,    2, 7,
-    "<start|stop|reset|panic|dump|ping> <path|all>"
+    "<start|stop|reset|panic|dump|ping|test> <path|all>"
     " [value|times length ack sleep]"),
 #endif
 
@@ -561,6 +575,10 @@ static const struct cmdmap_s g_cmdmap[] =
 #endif
 #endif /* CONFIG_NSH_DISABLE_SET */
 
+#if defined(CONFIG_SCHED_USER_IDENTITY) && !defined(CONFIG_NSH_DISABLE_SU)
+  CMD_MAP("su",       cmd_su,       1, 2, "[<username>]"),
+#endif
+
 #ifndef CONFIG_NSH_DISABLE_SHUTDOWN
 #if defined(CONFIG_BOARDCTL_POWEROFF) && defined(CONFIG_BOARDCTL_RESET)
   CMD_MAP("shutdown", cmd_shutdown, 1, 2, "[--reboot]"),
@@ -571,8 +589,22 @@ static const struct cmdmap_s g_cmdmap[] =
 #endif
 #endif
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
+#ifndef CONFIG_NSH_DISABLE_KILL
+  CMD_MAP("kill",     cmd_kill,     2, 3, "[-<signal>] <pid>"),
+#endif
+
+#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PKILL)
+  CMD_MAP("pkill",     cmd_pkill,     2, 3, "[-<signal>] <name>"),
+#endif
+
 #ifndef CONFIG_NSH_DISABLE_SLEEP
   CMD_MAP("sleep",    cmd_sleep,    2, 2, "<sec>"),
+#endif
+
+#ifndef CONFIG_NSH_DISABLE_USLEEP
+  CMD_MAP("usleep",   cmd_usleep,   2, 2, "<usec>"),
+#endif
 #endif
 
 #if !defined(CONFIG_NSH_DISABLESCRIPT) && !defined(CONFIG_NSH_DISABLE_SOURCE)
@@ -580,7 +612,7 @@ static const struct cmdmap_s g_cmdmap[] =
 #endif
 
 #if defined(CONFIG_BOARDCTL_SWITCH_BOOT) && !defined(CONFIG_NSH_DISABLE_SWITCHBOOT)
-  CMD_MAP("swtichboot", cmd_switchboot, 2, 2, "<image path>"),
+  CMD_MAP("switchboot", cmd_switchboot, 2, 2, "<image path>"),
 #endif
 
 #if !defined(CONFIG_NSH_DISABLESCRIPT) && !defined(CONFIG_NSH_DISABLE_TEST)
@@ -611,6 +643,10 @@ static const struct cmdmap_s g_cmdmap[] =
 #  endif
 #endif
 
+#if defined(CONFIG_SCHED_USER_IDENTITY) && !defined(CONFIG_NSH_DISABLE_WHOAMI)
+  CMD_MAP("whoami",   cmd_whoami,   1, 1, NULL),
+#endif
+
 #ifndef CONFIG_NSH_DISABLE_UNAME
 #  ifdef CONFIG_NET
   CMD_MAP("uname",    cmd_uname,    1, 7, "[-a | -imnoprsv]"),
@@ -621,7 +657,7 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #if !defined(CONFIG_DISABLE_MOUNTPOINT)
 #  ifndef CONFIG_NSH_DISABLE_UMOUNT
-  CMD_MAP("umount",   cmd_umount,   2, 2, "<dir-path>"),
+  CMD_MAP("umount",   cmd_umount,   2, 3, "[-f] <dir-path>"),
 #  endif
 #endif
 
@@ -651,10 +687,6 @@ static const struct cmdmap_s g_cmdmap[] =
 #  ifndef CONFIG_NSH_DISABLE_USERDEL
   CMD_MAP("userdel",  cmd_userdel,  2, 2, "<username>"),
 #  endif
-#endif
-
-#ifndef CONFIG_NSH_DISABLE_USLEEP
-  CMD_MAP("usleep",   cmd_usleep,   2, 2, "<usec>"),
 #endif
 
 #ifndef CONFIG_NSH_DISABLE_WATCH
@@ -1213,10 +1245,14 @@ static int cmd_expr(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
 int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
 {
-  const struct cmdmap_s *cmdmap;
-  const char            *cmd;
-  nsh_cmd_t              handler = cmd_unrecognized;
-  int                    ret;
+  const struct cmdmap_s  *cmdmap;
+  const char             *cmd;
+  nsh_cmd_t               handler = cmd_unrecognized;
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+  const struct builtin_s *builtin;
+  int                     index;
+#endif
+  int                     ret;
 
   /* The form of argv is:
    *
@@ -1227,6 +1263,23 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
    */
 
   cmd = argv[0];
+
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+  /* Check if the command is available in the builtin list */
+
+  index = builtin_isavail(cmd);
+
+  if (index > 0)
+    {
+      /* Get the builtin structure by index */
+
+      builtin = builtin_for_index(index);
+      if (builtin != NULL)
+        {
+          return (builtin->main)(argc, (FAR char **)argv);
+        }
+    }
+#endif
 
   /* See if the command is one that we understand */
 

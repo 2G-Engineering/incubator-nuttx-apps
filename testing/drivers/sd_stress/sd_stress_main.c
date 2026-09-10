@@ -47,12 +47,14 @@
  * Included Files
  ****************************************************************************/
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -94,7 +96,7 @@ static void usage(void)
 
 static bool create_dir(const char *path)
 {
-  int ret = mkdir(TEMPDIR, S_IRWXU | S_IRWXG | S_IRWXO);
+  int ret = mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
 
   if (ret < 0)
     {
@@ -108,7 +110,7 @@ static bool create_dir(const char *path)
 
 static bool remove_dir(const char *path)
 {
-  int ret = rmdir(TEMPDIR2);
+  int ret = rmdir(path);
 
   if (ret < 0)
     {
@@ -118,6 +120,94 @@ static bool remove_dir(const char *path)
     }
 
   return true;
+}
+
+static bool is_temp_file(const char *name, const char *prefix)
+{
+  size_t prefix_len = strlen(prefix);
+  int i;
+
+  if (strncmp(name, prefix, prefix_len) != 0)
+    {
+      return false;
+    }
+
+  for (i = 0; i < 3; i++)
+    {
+      char ch = name[prefix_len + i];
+
+      if (ch < '0' || ch > '9')
+        {
+          return false;
+        }
+    }
+
+  return name[prefix_len + i] == '\0';
+}
+
+static bool cleanup_dir(const char *path, const char *name)
+{
+  FAR DIR *dir;
+  FAR struct dirent *entry;
+  char filepath[MAX_PATH_LEN];
+  int ret;
+
+  dir = opendir(path);
+  if (dir == NULL)
+    {
+      if (errno == ENOENT)
+        {
+          return true;
+        }
+
+      printf("opendir %s failed, errno: %d -> %s\n",
+             path, errno, strerror(errno));
+      return false;
+    }
+
+  while ((entry = readdir(dir)) != NULL)
+    {
+      if (strcmp(entry->d_name, ".") == 0 ||
+          strcmp(entry->d_name, "..") == 0)
+        {
+          continue;
+        }
+
+      if (!is_temp_file(entry->d_name, name))
+        {
+          printf("%s contains unexpected entry %s\n", path, entry->d_name);
+          closedir(dir);
+          return false;
+        }
+
+      ret = snprintf(filepath, sizeof(filepath), "%s/%s",
+                     path, entry->d_name);
+      if (ret < 0 || (size_t)ret >= sizeof(filepath))
+        {
+          printf("path name too long\n");
+          closedir(dir);
+          return false;
+        }
+
+      ret = unlink(filepath);
+      if (ret < 0)
+        {
+          printf("unlink %s failed, ret: %d, errno %d -> %s\n",
+                 filepath, ret, errno, strerror(errno));
+          closedir(dir);
+          return false;
+        }
+    }
+
+  ret = closedir(dir);
+  if (ret < 0)
+    {
+      printf("closedir %s failed, ret: %d, errno %d -> %s\n",
+             path, ret, errno, strerror(errno));
+      return false;
+    }
+
+  return remove_dir(path);
 }
 
 static bool create_files(const char *dir, const char *name,
@@ -134,7 +224,7 @@ static bool create_files(const char *dir, const char *name,
 
   if (!read_bytes)
     {
-      printf("malloc failed for read bytes bufffer\n");
+      printf("malloc failed for read bytes buffer\n");
       return false;
     }
 
@@ -143,6 +233,7 @@ static bool create_files(const char *dir, const char *name,
   if (path_len + 5 >= MAX_PATH_LEN)
     {
       printf("path name too long\n");
+      free(read_bytes);
       return false;
     }
 
@@ -160,7 +251,7 @@ static bool create_files(const char *dir, const char *name,
           bytes[j] = (bytes[j] + i) & 0xff;
         }
 
-      int fd = open(path, O_CREAT | O_RDWR);
+      int fd = open(path, O_CREAT | O_RDWR, 0666);
 
       if (fd < 0)
         {
@@ -177,7 +268,7 @@ static bool create_files(const char *dir, const char *name,
           printf("write %s failed, ret: %d, errno %d -> %s\n",
                  path, ret, errno, strerror(errno));
           passed = false;
-          break;
+          goto close_file;
         }
 
       ret = lseek(fd, 0, SEEK_SET);
@@ -187,7 +278,7 @@ static bool create_files(const char *dir, const char *name,
           printf("lseek %s failed, ret: %d, errno %d -> %s\n",
                  path, ret, errno, strerror(errno));
           passed = false;
-          break;
+          goto close_file;
         }
 
       ret = read(fd, read_bytes, num_bytes);
@@ -197,16 +288,17 @@ static bool create_files(const char *dir, const char *name,
           printf("read %s failed, ret: %d, errno %d -> %s\n",
                  path, ret, errno, strerror(errno));
           passed = false;
-          break;
+          goto close_file;
         }
 
       if (memcmp(read_bytes, bytes, num_bytes) != 0)
         {
           printf("read and write buffers are not the same\n");
           passed = false;
-          break;
+          goto close_file;
         }
 
+close_file:
       ret = close(fd);
 
       if (ret < 0)
@@ -214,6 +306,11 @@ static bool create_files(const char *dir, const char *name,
           printf("close %s failed, ret: %d, errno %d -> %s\n",
                  path, ret, errno, strerror(errno));
           passed = false;
+          break;
+        }
+
+      if (!passed)
+        {
           break;
         }
     }
@@ -282,8 +379,8 @@ static uint64_t get_time_delta(const struct timespec *start,
                                const struct timespec *end)
 {
   uint64_t elapsed;
-  elapsed = (((uint64_t)end->tv_sec * NSEC_PER_SEC) + end->tv_nsec);
-  elapsed -= (((uint64_t)start->tv_sec * NSEC_PER_SEC) + start->tv_nsec);
+  elapsed = (end->tv_sec * NSEC_PER_SEC) + end->tv_nsec;
+  elapsed -= (start->tv_sec * NSEC_PER_SEC) + start->tv_nsec;
   return elapsed / 1000;
 }
 
@@ -371,6 +468,12 @@ int main(int argc, char *argv[])
     }
 
   total_time = 0;
+
+  if (!cleanup_dir(TEMPDIR, TEMPFILE) || !cleanup_dir(TEMPDIR2, TEMPFILE))
+    {
+      free(bytes);
+      return -1;
+    }
 
   for (size_t i = 0; i < num_runs; ++i)
     {

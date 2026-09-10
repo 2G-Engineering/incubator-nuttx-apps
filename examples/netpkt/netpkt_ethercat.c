@@ -26,10 +26,13 @@
 
 #include <nuttx/config.h>
 
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 
 #include <net/if.h>
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netpacket/packet.h>
 #include <sys/socket.h>
@@ -66,7 +69,7 @@ int main(int argc, FAR const char *argv[])
   int num_packets = 0;
   int len;
   int ifindex;
-  int sockfd = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
+  int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
   if (sockfd == -1)
     {
@@ -96,6 +99,7 @@ int main(int argc, FAR const char *argv[])
 
   addr.sll_family = AF_PACKET;
   addr.sll_ifindex = ifindex;
+  addr.sll_protocol = htons(ETH_P_ALL);
   if (bind(sockfd, (FAR const struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
       perror("ERROR: binding socket failed");
@@ -115,9 +119,9 @@ int main(int argc, FAR const char *argv[])
 
       len = recvfrom(sockfd, recvbuff, 100, 0, NULL, NULL);
       clock_gettime(CLOCK_REALTIME, &recv_time);
-      printf("Data recv: %d bytes, spent time %ld ns\n", len,
-              (recv_time.tv_sec - send_time.tv_sec) * NSEC_PER_SEC +
-              recv_time.tv_nsec - send_time.tv_nsec);
+      printf("Data recv: %d bytes, spent time %jd ns\n", len,
+             (intmax_t)(recv_time.tv_sec - send_time.tv_sec) *
+             NSEC_PER_SEC + recv_time.tv_nsec - send_time.tv_nsec);
       usleep(1000);
     }
 

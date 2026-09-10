@@ -64,15 +64,11 @@ void test_nuttx_fs_fsync01(FAR void **state)
   int fd;
   int rval;
   int ret;
-  struct fs_testsuites_state_s *test_state;
-
-  test_state = (struct fs_testsuites_state_s *)*state;
 
   /* open file */
 
   fd = open(TESTFILE, O_RDWR | O_CREAT, 0700);
   assert_true(fd > 0);
-  test_state->fd1 = fd;
 
   for (int i = 0; i < 20; i++)
     {
@@ -86,6 +82,8 @@ void test_nuttx_fs_fsync01(FAR void **state)
       ret = fsync(fd);
       assert_int_equal(ret, 0);
     }
+
+  close(fd);
 }
 
 /****************************************************************************
@@ -102,7 +100,7 @@ void test_nuttx_fs_fsync02(FAR void **state)
   int ret;
   char *buf = NULL;
   int bufsize = 4096;
-  ssize_t writen = 0;
+  ssize_t written = 0;
   struct statfs statfsbuf;
   struct fs_testsuites_state_s *test_state;
   struct mallinfo mem_info;
@@ -118,7 +116,6 @@ void test_nuttx_fs_fsync02(FAR void **state)
 
   fd = open(TESTFILE, O_CREAT | O_RDWR, 0777);
   assert_true(fd > 0);
-  test_state->fd1 = fd;
 
   /* call fstatfs() */
 
@@ -154,8 +151,8 @@ void test_nuttx_fs_fsync02(FAR void **state)
 
   /* do write */
 
-  writen = write(fd, buf, bufsize);
-  assert_int_in_range(writen, 1, bufsize);
+  written = write(fd, buf, bufsize);
+  assert_int_in_range(written, 1, bufsize);
 
   /* refresh to storage */
 
@@ -165,4 +162,5 @@ void test_nuttx_fs_fsync02(FAR void **state)
 
   ret = fstatfs(fd, &statfsbuf);
   assert_int_equal(ret, 0);
+  close(fd);
 }

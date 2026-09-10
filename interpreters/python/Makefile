@@ -23,7 +23,7 @@
 include $(APPDIR)/Make.defs
 
 CPYTHON_URL ?= "https://github.com/python/cpython/archive"
-CPYTHON_VERSION = $(patsubst "%",%,$(strip $(CONFIG_INTERPRETER_CPYTHON_VERSION)))
+CPYTHON_VERSION = $(patsubst "%",%,$(strip $(CONFIG_INTERPRETERS_CPYTHON_VERSION)))
 CPYTHON_VERSION_MINOR=$(basename $(CPYTHON_VERSION))
 CPYTHON_ZIP = v$(CPYTHON_VERSION).zip
 
@@ -84,6 +84,13 @@ $(CPYTHON_UNPACKNAME): $(CPYTHON_ZIP)
 	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0012-hack-place-_PyRuntime-structure-into-PSRAM-bss-regio.patch
 	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0013-transform-functions-used-by-NuttX-to-lowercase.patch
 	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0014-insert-prefix-to-list_length-to-avoid-symbol-collisi.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0015-keep-ensurepip-in-stdlib-archive.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0016-fix-timezone-offset-check-when-time-t-is-unsigned.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0017-stdlib-zip-keep-pydecimal-and-trim-tooling-extras.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0018-ignore-chmod-on-nuttx-like-wasi.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0019-undef-get_errno-set_errno-to-avoid-nuttx-macro-coll.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0020-ctypes-skip-pythonapi-on-nuttx.patch
+	$(Q) patch -p1 -d $(CPYTHON_UNPACKNAME) < patch$(DELIM)0021-posixmodule-ignore-utime-enosys-on-nuttx.patch
 
 $(HOSTPYTHON):
 	mkdir -p $(HOSTBUILD)
@@ -92,6 +99,7 @@ $(HOSTPYTHON):
 			cd $(HOSTBUILD) && $(CPYTHON_PATH)/configure \
 			 --with-pydebug \
 			 --prefix=$(HOSTINSTALL) \
+			 --disable-test-modules \
 		 )
 	$(MAKE) -C $(HOSTBUILD) install
 
@@ -123,6 +131,9 @@ $(SETUP_LOCAL):
 ifneq ($(CONFIG_ARCH_HAVE_FORK),y)
 	@echo "_posixsubprocess" >> $@
 endif
+ifneq ($(CONFIG_LIBC_DLFCN),y)
+	@echo "_ctypes" >> $@
+endif
 
 # For the Python's `configure` script, please consider the following
 # when building for NuttX:
@@ -152,7 +163,7 @@ $(TARGETBUILD)/Makefile: $(HOSTPYTHON) $(CONFIG_SITE) $(SETUP_LOCAL)
 			AR="$(AR)" \
 			ARFLAGS=" " \
 			MACHDEP="$(MACHDEP)" \
-			OPT="-g -O0 -Wall" \
+			OPT="-Os" \
 			CONFIG_SITE="$(CONFIG_SITE)" \
 			$(CPYTHON_PATH)/configure \
 			 --prefix=${TARGETINSTALL} \
@@ -163,19 +174,50 @@ $(TARGETBUILD)/Makefile: $(HOSTPYTHON) $(CONFIG_SITE) $(SETUP_LOCAL)
 			 --without-mimalloc \
 			 --without-pymalloc \
 			 --disable-test-modules \
+			 --with-ensurepip=no \
 		)
+	$(Q) sed -i 's/^#define HAVE_LIBB2 1/\/* #undef HAVE_LIBB2 *\//' $(TARGETBUILD)/pyconfig.h
+	$(Q) sed -i 's/-lb2//g' $(TARGETBUILD)/Makefile
 
 $(TARGETLIBPYTHON): $(TARGETBUILD)/Makefile
+ifeq ($(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP),y)
+	$(Q) mkdir -p $(CPYTHON_PATH)/Lib/ensurepip/_bundled
+	$(Q) ( \
+		PIP_WHEEL_VERSION=$$($(HOSTPYTHON) -c "import ensurepip; print(ensurepip._PIP_VERSION)"); \
+		PIP_WHEEL=$(CPYTHON_PATH)/Lib/ensurepip/_bundled/pip-$${PIP_WHEEL_VERSION}-py3-none-any.whl; \
+		if [ ! -f "$${PIP_WHEEL}" ]; then \
+			echo "Fetching pip wheel $${PIP_WHEEL_VERSION} for ensurepip bundle"; \
+			$(HOSTPYTHON) -m pip download --only-binary=:all: --no-deps --dest $(CPYTHON_PATH)/Lib/ensurepip/_bundled pip==$${PIP_WHEEL_VERSION}; \
+		fi; \
+		echo "Pre-compiling pip wheel with build Python (must match embedded CPython version)"; \
+		$(HOSTPYTHON) $(CURDIR)/repack_wheel_add_pyc.py "$${PIP_WHEEL}"; \
+	)
+endif
 	$(MAKE) -C $(TARGETBUILD) regen-frozen
 	$(MAKE) -C $(TARGETBUILD) libpython$(CPYTHON_VERSION_MINOR).a wasm_stdlib
 	$(Q) ( cp $(TARGETBUILD)/libpython$(CPYTHON_VERSION_MINOR).a $(TARGETLIBPYTHON) )
 	$(Q) $(UNPACK) $(TARGETMODULESPACK) -d $(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)
+ifeq ($(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP),y)
+	$(Q) mkdir -p $(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)/site-packages
+	$(Q) ( \
+		set -e; \
+		BUNDLED_DIR=$(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)/ensurepip/_bundled; \
+		SITE_PACKAGES=$(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)/site-packages; \
+		: > "$${SITE_PACKAGES}/bundled_wheels.pth"; \
+		for wheel in $${BUNDLED_DIR}/*.whl; do \
+			[ -f "$${wheel}" ] || continue; \
+			whl_name=$$(basename "$${wheel}"); \
+			echo "Pre-installing wheel via zipimport into target sys.path: $${whl_name}"; \
+			echo "../ensurepip/_bundled/$${whl_name}" >> "$${SITE_PACKAGES}/bundled_wheels.pth"; \
+		done; \
+	)
+endif
 
-MODULE    = $(CONFIG_INTERPRETER_CPYTHON)
+MODULE    = $(CONFIG_INTERPRETERS_CPYTHON)
 
-PROGNAME  += $(CONFIG_INTERPRETER_CPYTHON_PROGNAME)
-PRIORITY  += $(CONFIG_INTERPRETER_CPYTHON_PRIORITY)
-STACKSIZE += $(CONFIG_INTERPRETER_CPYTHON_STACKSIZE)
+PROGNAME  += $(CONFIG_INTERPRETERS_CPYTHON_PROGNAME)
+PRIORITY  += $(CONFIG_INTERPRETERS_CPYTHON_PRIORITY)
+STACKSIZE += $(CONFIG_INTERPRETERS_CPYTHON_STACKSIZE)
 
 MAINSRC += python_wrapper.c
 

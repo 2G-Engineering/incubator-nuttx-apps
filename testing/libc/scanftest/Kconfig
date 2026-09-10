@@ -11,8 +11,7 @@ config TESTING_SCANFTEST
 		Enable sscanf() test
 
 		For all tests to be successful, you need to enable
-		CONFIG_LIBC_FLOATINGPOINT, CONFIG_LIBC_LONG_LONG and
-		CONFIG_LIBC_SCANSET in addition.
+		CONFIG_LIBC_FLOATINGPOINT and CONFIG_LIBC_SCANSET in addition.
 
 if TESTING_SCANFTEST
 

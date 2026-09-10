@@ -113,7 +113,7 @@ void test_nuttx_syscall_fcntl01(FAR void **state)
   flags = fcntl(fd[2], F_GETFL, 0);
   assert_false((flags & (O_NDELAY | O_APPEND | O_WRONLY)) == 0);
 
-  /* Check that flags are not cummulative */
+  /* Check that flags are not cumulative */
 
   assert_false(fcntl(fd[2], F_SETFL, 0) == -1);
 
@@ -306,7 +306,7 @@ void test_nuttx_syscall_fcntl06(FAR void **state)
 
   sprintf(fname, "fcntl06_%d", gettid());
 
-  fd = open(fname, O_RDWR | O_CREAT);
+  fd = open(fname, O_RDWR | O_CREAT, 0700);
   assert_true(fd > 0);
 
   for (lc = 0; lc < 10; lc++)

@@ -49,6 +49,12 @@ unsigned long ERR_peek_last_error(void);
 void ERR_error_string_n(unsigned long e, char *buf, size_t len);
 void ERR_free_strings(void);
 char *ERR_error_string(unsigned long e, char *buf);
+void ERR_clear_error(void);
+unsigned long ERR_get_error(void);
+void ERR_remove_state(unsigned long pid);
+int ERR_load_crypto_strings(void);
+void ERR_print_errors_cb(int (*cb)(const char *str, size_t len, void *u),
+                         void *u);
 
 #ifdef __cplusplus
 }

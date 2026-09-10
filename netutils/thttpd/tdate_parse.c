@@ -41,7 +41,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "tdate_parse.h"
 
@@ -348,7 +348,7 @@ time_t tdate_parse(char *str)
 #endif /* Day of week not yet supported by NuttX */
   else
     {
-      return (time_t) - 1;
+      return -1;
     }
 
   if (tm.tm_year > 1900)

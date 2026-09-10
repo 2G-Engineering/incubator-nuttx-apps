@@ -28,6 +28,10 @@ CSRCS  = nsh_init.c nsh_parse.c nsh_console.c nsh_script.c nsh_system.c
 CSRCS += nsh_command.c nsh_fscmds.c nsh_proccmds.c nsh_mmcmds.c
 CSRCS += nsh_timcmds.c nsh_envcmds.c nsh_syscmds.c nsh_dbgcmds.c nsh_prompt.c
 
+ifeq ($(CONFIG_SCHED_USER_IDENTITY),y)
+CSRCS += nsh_identity.c
+endif
+
 CSRCS += nsh_session.c
 ifeq ($(CONFIG_NSH_CONSOLE_LOGIN),y)
 CSRCS += nsh_login.c
@@ -36,7 +40,9 @@ endif
 CSRCS += nsh_fsutils.c
 
 ifeq ($(CONFIG_NSH_BUILTIN_APPS),y)
+ifneq ($(CONFIG_NSH_BUILTIN_AS_COMMAND),y)
 CSRCS += nsh_builtin.c
+endif
 endif
 
 ifeq ($(CONFIG_NSH_FILE_APPS),y)
