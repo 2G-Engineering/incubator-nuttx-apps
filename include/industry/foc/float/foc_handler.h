@@ -147,6 +147,11 @@ struct foc_control_ops_f32_s
 
   CODE void (*state_get)(FAR foc_handler_f32_t *h,
                          FAR struct foc_state_f32_s *state);
+
+  /* Get data struct */
+
+  CODE FAR struct foc_data_f32_s* (*data_get)(FAR foc_handler_f32_t *h);
+
 };
 
 /* FOC handler operations */

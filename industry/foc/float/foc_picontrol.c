@@ -74,6 +74,7 @@ static void foc_control_current_run_f32(FAR foc_handler_f32_t *h,
                                         FAR ab_frame_f32_t *v_ab_mod);
 static void foc_control_state_get_f32(FAR foc_handler_f32_t *h,
                                       FAR struct foc_state_f32_s *state);
+static FAR struct foc_data_f32_s* foc_control_data_get_f32(FAR foc_handler_f32_t *h);
 
 /****************************************************************************
  * Public Data
@@ -90,6 +91,7 @@ struct foc_control_ops_f32_s g_foc_control_pi_f32 =
   .voltage_run = foc_control_voltage_run_f32,
   .current_run = foc_control_current_run_f32,
   .state_get   = foc_control_state_get_f32,
+  .data_get    = foc_control_data_get_f32,
 };
 
 /****************************************************************************
@@ -420,4 +422,17 @@ static void foc_control_state_get_f32(FAR foc_handler_f32_t *h,
   /* Copy modulation scale */
 
   state->mod_scale = foc->data.vab_mod_scale;
+}
+
+static FAR struct foc_data_f32_s* foc_control_data_get_f32(FAR foc_handler_f32_t *h)
+{
+  FAR struct foc_picontrol_f32_s *foc = NULL;
+
+  DEBUGASSERT(h);
+  DEBUGASSERT(h->control);
+
+  /* Get controller data */
+
+  foc = h->control;
+  return &foc->data;
 }
