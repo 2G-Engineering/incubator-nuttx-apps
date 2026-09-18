@@ -82,9 +82,28 @@ struct foc_angle_ops_f32_s
 
   CODE int (*dir)(FAR foc_angle_f32_t *h, float dir);
 
+  /* Offset */
+
+  CODE int (*offset)(FAR foc_angle_f32_t *h, float offset);
+
+  /* Get Offset */
+  CODE int (*get_offset)(FAR foc_angle_f32_t *h, float *offset);
+
   /* Run angle handler */
 
   CODE int (*run)(FAR foc_angle_f32_t *h,
+                  FAR struct foc_angle_in_f32_s *in,
+                  FAR struct foc_angle_out_f32_s *out);
+
+  /* Run angle handler (phase 1) */
+
+  CODE int (*run1)(FAR foc_angle_f32_t *h,
+                  FAR struct foc_angle_in_f32_s *in,
+                  FAR struct foc_angle_out_f32_s *out);
+
+  /* Run angle handler (phase 2) */
+
+  CODE int (*run2)(FAR foc_angle_f32_t *h,
                   FAR struct foc_angle_in_f32_s *in,
                   FAR struct foc_angle_out_f32_s *out);
 };
@@ -210,6 +229,18 @@ int foc_angle_cfg_f32(FAR foc_angle_f32_t *h, FAR void *cfg);
 int foc_angle_zero_f32(FAR foc_angle_f32_t *h);
 
 /****************************************************************************
+ * Name: foc_angle_offset_f32
+ ****************************************************************************/
+
+int foc_angle_offset_f32(FAR foc_angle_f32_t *h, float offset);
+
+/****************************************************************************
+ * Name: foc_angle_get_offset_f32
+ ****************************************************************************/
+
+int foc_angle_get_offset_f32(FAR foc_angle_f32_t *h, float *offset);
+
+/****************************************************************************
  * Name: foc_angle_dir_f32
  ****************************************************************************/
 
@@ -220,6 +251,20 @@ int foc_angle_dir_f32(FAR foc_angle_f32_t *h, float dir);
  ****************************************************************************/
 
 int foc_angle_run_f32(FAR foc_angle_f32_t *h,
+                      FAR struct foc_angle_in_f32_s *in,
+                      FAR struct foc_angle_out_f32_s *out);
+/****************************************************************************
+ * Name: foc_angle_run1_f32
+ ****************************************************************************/
+
+int foc_angle_run1_f32(FAR foc_angle_f32_t *h,
+                      FAR struct foc_angle_in_f32_s *in,
+                      FAR struct foc_angle_out_f32_s *out);
+/****************************************************************************
+ * Name: foc_angle_run2_f32
+ ****************************************************************************/
+
+int foc_angle_run2_f32(FAR foc_angle_f32_t *h,
                       FAR struct foc_angle_in_f32_s *in,
                       FAR struct foc_angle_out_f32_s *out);
 

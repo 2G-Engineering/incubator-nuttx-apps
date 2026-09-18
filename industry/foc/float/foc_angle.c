@@ -150,6 +150,44 @@ int foc_angle_zero_f32(FAR foc_angle_f32_t *h)
 }
 
 /****************************************************************************
+ * Name: foc_angle_offset_f32
+ *
+ * Description:
+ *   Set the FOC angle handler offset (float32)
+ *
+ * Input Parameter:
+ *   h   - pointer to FOC angle handler
+ *   offset - the target position offset (0 to 2 pi)
+ *
+ ****************************************************************************/
+
+int foc_angle_offset_f32(FAR foc_angle_f32_t *h, float offset)
+{
+  DEBUGASSERT(h);
+
+  return h->ops->offset(h, offset);
+}
+
+/****************************************************************************
+ * Name: foc_angle_offset_f32
+ *
+ * Description:
+ *   Get the FOC angle handler offset (float32)
+ *
+ * Input Parameter:
+ *   h   - pointer to FOC angle handler
+ *   offset - pointer to the position offset
+ *
+ ****************************************************************************/
+
+int foc_angle_get_offset_f32(FAR foc_angle_f32_t *h, float *offset)
+{
+  DEBUGASSERT(h);
+
+  return h->ops->get_offset(h, offset);
+}
+
+/****************************************************************************
  * Name: foc_angle_dir_f32
  *
  * Description:
@@ -191,4 +229,56 @@ int foc_angle_run_f32(FAR foc_angle_f32_t *h,
   /* Run angle handler */
 
   return h->ops->run(h, in, out);
+}
+
+/****************************************************************************
+ * Name: foc_angle_run1_f32
+ *
+ * Description:
+ *   Process the FOC angle handler data (float32)
+ *
+ * Input Parameter:
+ *   h   - pointer to FOC angle handler
+ *   in  - pointer to FOC angle handler input data
+ *   out - pointer to FOC angle handler output data
+ *
+ ****************************************************************************/
+
+int foc_angle_run1_f32(FAR foc_angle_f32_t *h,
+                      FAR struct foc_angle_in_f32_s *in,
+                      FAR struct foc_angle_out_f32_s *out)
+{
+  DEBUGASSERT(h);
+  DEBUGASSERT(in);
+  DEBUGASSERT(out);
+
+  /* Run angle handler */
+
+  return h->ops->run1(h, in, out);
+}
+
+/****************************************************************************
+ * Name: foc_angle_run2_f32
+ *
+ * Description:
+ *   Process the FOC angle handler data (float32)
+ *
+ * Input Parameter:
+ *   h   - pointer to FOC angle handler
+ *   in  - pointer to FOC angle handler input data
+ *   out - pointer to FOC angle handler output data
+ *
+ ****************************************************************************/
+
+int foc_angle_run2_f32(FAR foc_angle_f32_t *h,
+                      FAR struct foc_angle_in_f32_s *in,
+                      FAR struct foc_angle_out_f32_s *out)
+{
+  DEBUGASSERT(h);
+  DEBUGASSERT(in);
+  DEBUGASSERT(out);
+
+  /* Run angle handler */
+
+  return h->ops->run2(h, in, out);
 }
