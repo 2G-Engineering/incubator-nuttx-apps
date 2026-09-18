@@ -58,7 +58,12 @@ struct foc_routine_align_cb_b16_s
 struct foc_routine_align_cfg_b16_s
 {
   struct foc_routine_align_cb_b16_s cb;           /* Align routine callbacks */
-  b16_t                             volt;         /* Align voltage */
+  union {
+    b16_t                           volt;         /* Align voltage */
+    b16_t                           curr;         /* Align current */
+
+  };
+  int                               mode;         /* FOC mode for alignment */
   int                               offset_steps; /* Offset alignment steps */
 };
 

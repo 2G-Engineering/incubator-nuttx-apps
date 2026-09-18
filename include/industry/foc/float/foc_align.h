@@ -58,7 +58,11 @@ struct foc_routine_align_cb_f32_s
 struct foc_routine_align_cfg_f32_s
 {
   struct foc_routine_align_cb_f32_s cb;           /* Align routine callbacks */
-  float                             volt;         /* Align voltage */
+  union {
+    float                           volt;         /* Align voltage */
+    float                           curr;         /* Align current */
+  };
+  int                               mode;         /* FOC mode for alignment */
   int                               offset_steps; /* Offset alignment steps */
 };
 

@@ -260,7 +260,7 @@ static int foc_align_index_run_b16(FAR struct foc_align_b16_s *align,
       out->vdq_comp.q = 0;
       out->vdq_comp.d = 0;
       out->angle      = align->index_angle;
-      out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+      out->foc_mode   = align->cfg.mode;
 
       /* Increase counter */
 
@@ -329,7 +329,7 @@ static int foc_align_offset_run_b16(FAR struct foc_align_b16_s *align,
       out->vdq_comp.q = 0;
       out->vdq_comp.d = 0;
       out->angle      = FOC_ALIGN_ANGLE;
-      out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+      out->foc_mode   = align->cfg.mode;
 
       /* Increase counter */
 
@@ -649,7 +649,7 @@ int foc_align_dir_run_b16(FAR struct foc_align_b16_s *align,
   out->vdq_comp.q = 0;
   out->vdq_comp.d = 0;
   out->angle      = align->dir_angle;
-  out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+  out->foc_mode   = align->cfg.mode;
 
 errout:
 

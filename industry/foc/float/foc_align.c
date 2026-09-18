@@ -50,7 +50,7 @@
 #define ALIGN_DIR_ANGLE_HOLD_2 (2*M_PI/3)
 #define ALIGN_DIR_ANGLE_HOLD_3 (M_PI)
 #define ALIGN_DIR_ANGLE_HOLD_4 (4*M_PI/3)
-#define ALIGN_DIR_HOLD_CNTR    (10)
+#define ALIGN_DIR_HOLD_CNTR    (50000)
 
 /* IDLE steps */
 
@@ -260,7 +260,7 @@ static int foc_align_index_run_f32(FAR struct foc_align_f32_s *align,
       out->vdq_comp.q = 0.0f;
       out->vdq_comp.d = 0.0f;
       out->angle      = align->index_angle;
-      out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+      out->foc_mode   = align->cfg.mode;
 
       /* Increase counter */
 
@@ -329,7 +329,7 @@ static int foc_align_offset_run_f32(FAR struct foc_align_f32_s *align,
       out->vdq_comp.q = 0.0f;
       out->vdq_comp.d = 0.0f;
       out->angle      = FOC_ALIGN_ANGLE;
-      out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+      out->foc_mode   = align->cfg.mode;
 
       /* Increase counter */
 
@@ -340,7 +340,7 @@ static int foc_align_offset_run_f32(FAR struct foc_align_f32_s *align,
 
   if (ret == FOC_ROUTINE_RUN_DONE)
     {
-      align->final.offset = in->angle;
+      foc_angle_get_offset_f32(align->cfg.cb.priv, &align->final.offset);
     }
 
 errout:
@@ -399,6 +399,8 @@ static void foc_align_dir_move_f32(FAR struct foc_align_f32_s *align,
 static void foc_align_dir_hold_f32(FAR struct foc_align_f32_s *align,
                                    float dir, bool last, bool diff)
 {
+  float tmp = 0.0f;
+
   DEBUGASSERT(align);
 
   /* Lock angle */
@@ -419,19 +421,23 @@ static void foc_align_dir_hold_f32(FAR struct foc_align_f32_s *align,
 
       if (diff == true)
         {
+          tmp = align->angle_now - align->angle_last;
+          angle_norm_2pi(&tmp, -M_PI_F, M_PI_F);
           if (dir == DIR_CW)
             {
-              align->diff_cw += (align->angle_now - align->angle_last);
+              align->diff_cw += tmp;
             }
           else if (dir == DIR_CCW)
             {
-              align->diff_ccw += (align->angle_now - align->angle_last);
+              align->diff_ccw += tmp;
             }
           else
             {
               DEBUGASSERT(0);
             }
         }
+
+      FOCLIBLOG("step: %d, angle: %f, last: %f, diff_cw: %f, diff_ccw: %f\n", align->dir_step, align->angle_now, align->angle_last, align->diff_cw, align->diff_ccw);
 
       /* Store last angle */
 
@@ -649,7 +655,7 @@ int foc_align_dir_run_f32(FAR struct foc_align_f32_s *align,
   out->vdq_comp.q = 0.0f;
   out->vdq_comp.d = 0.0f;
   out->angle      = align->dir_angle;
-  out->foc_mode   = FOC_HANDLER_MODE_VOLTAGE;
+  out->foc_mode   = align->cfg.mode;
 
 errout:
 
@@ -840,7 +846,7 @@ int foc_routine_align_run_f32(FAR foc_routine_f32_t *r,
   DEBUGASSERT(in);
   DEBUGASSERT(out);
 
-  /* Get aling data */
+  /* Get align data */
 
   DEBUGASSERT(r->data);
   a = r->data;
