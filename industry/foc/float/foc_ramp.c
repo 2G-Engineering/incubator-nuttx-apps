@@ -55,19 +55,26 @@ int foc_ramp_init_f32(FAR struct foc_ramp_f32_s *ramp, float per,
   DEBUGASSERT(ramp);
   DEBUGASSERT(per > 0);
   DEBUGASSERT(thr > 0);
-  DEBUGASSERT(acc > 0);
-  DEBUGASSERT(dec > 0);
 
   ramp->per          = per;
   ramp->ramp_thr     = thr;
-  ramp->ramp_acc     = acc;
-  ramp->ramp_dec     = dec;
-  ramp->ramp_acc_per = (ramp->ramp_acc * ramp->per);
-  ramp->ramp_dec_per = (ramp->ramp_dec * ramp->per);
+  foc_ramp_update_acc_f32(ramp, acc, dec);
 
   return OK;
 }
 
+int foc_ramp_update_acc_f32(FAR struct foc_ramp_f32_s *ramp, float acc, float dec) {
+    DEBUGASSERT(ramp);
+    DEBUGASSERT(acc > 0);
+    DEBUGASSERT(dec > 0);
+
+    ramp->ramp_acc     = acc;
+    ramp->ramp_dec     = dec;
+    ramp->ramp_acc_per = (ramp->ramp_acc * ramp->per);
+    ramp->ramp_dec_per = (ramp->ramp_dec * ramp->per);
+
+    return OK;
+}
 /****************************************************************************
  * Name: foc_ramp_run_f32
  *
