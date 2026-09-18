@@ -165,6 +165,25 @@ int foc_dev_getinfo(int fd, FAR struct foc_info_s *info)
 }
 
 /****************************************************************************
+ * Name: foc_dev_pwm_off
+ ****************************************************************************/
+
+int foc_dev_pwm_off(int fd, bool off)
+{
+  int ret = OK;
+
+  ret = ioctl(fd, MTRIOC_PWM_OFF, &off);
+
+  if (ret != OK)
+    {
+      FOCLIBERR("ERROR: MTRIOC_PWM_OFF failed %d!\n", errno);
+      ret = -errno;
+    }
+
+  return ret;
+}
+
+/****************************************************************************
  * Name: foc_cfg_print
  ****************************************************************************/
 
