@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/tcpdump/tcpdump.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -27,9 +29,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <net/if.h>
+#include <net/if_arp.h>
 #include <netpacket/packet.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -48,7 +52,10 @@
 
 #define DEFAULT_SNAPLEN 262144
 
-#define LINKTYPE_ETHERNET 1
+/* https://www.tcpdump.org/linktypes.html */
+
+#define LINKTYPE_ETHERNET 1   /* IEEE 802.3 Ethernet */
+#define LINKTYPE_RAW      101 /* Raw IP */
 
 /****************************************************************************
  * Private Types
@@ -86,6 +93,7 @@ struct tcpdump_cfgs_s
   int fd;
   int sd;
   uint32_t snaplen;
+  uint32_t linktype;
 };
 
 /****************************************************************************
@@ -111,7 +119,7 @@ static void sigexit(int signo)
  * Name: write_filehdr
  ****************************************************************************/
 
-static int write_filehdr(int fd, uint32_t snaplen)
+static int write_filehdr(int fd, uint32_t snaplen, uint32_t linktype)
 {
   /* No need to change byte order of any field, reader will swap all fields
    * if magic number is in swapped order.
@@ -125,7 +133,7 @@ static int write_filehdr(int fd, uint32_t snaplen)
       0,                     /* thiszone */
       0,                     /* sigfigs */
       snaplen,               /* snaplen */
-      LINKTYPE_ETHERNET      /* linktype */
+      linktype               /* linktype */
     };
 
   /* Write hdr into file. */
@@ -204,6 +212,30 @@ static int socket_open(int ifindex)
 }
 
 /****************************************************************************
+ * Name: get_linktype
+ ****************************************************************************/
+
+static uint32_t get_linktype(FAR const char *ifname)
+{
+  struct ifreq req;
+  uint32_t ret = LINKTYPE_RAW;
+  int sockfd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
+  if (sockfd >= 0)
+    {
+      strlcpy(req.ifr_name, ifname, IFNAMSIZ);
+      if (ioctl(sockfd, SIOCGIFHWADDR, (unsigned long)&req) >= 0 &&
+          req.ifr_hwaddr.sa_family == ARPHRD_ETHER)
+        {
+          ret = LINKTYPE_ETHERNET;
+        }
+
+      close(sockfd);
+    }
+
+  return ret;
+}
+
+/****************************************************************************
  * Name: do_capture
  ****************************************************************************/
 
@@ -215,7 +247,7 @@ static void do_capture(FAR const struct tcpdump_cfgs_s *cfgs)
 
   /* Write file header */
 
-  if (write_filehdr(cfgs->fd, cfgs->snaplen) < 0)
+  if (write_filehdr(cfgs->fd, cfgs->snaplen, cfgs->linktype) < 0)
     {
       return;
     }
@@ -306,12 +338,14 @@ int main(int argc, FAR char *argv[])
       cfgs.snaplen = DEFAULT_SNAPLEN;
     }
 
+  cfgs.linktype = get_linktype(args.interface->sval[0]);
+
   do_capture(&cfgs);
 
   close(cfgs.sd);
   close(cfgs.fd);
 
 out:
-  arg_freetable((FAR void **)&args, sizeof(args) / sizeof(FAR void *));
+  arg_freetable((FAR void **)&args, 1);
   return 0;
 }

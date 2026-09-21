@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/readline/readline_fd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,12 +30,13 @@
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
+#include <termios.h>
 
 #include "system/readline.h"
 #include "readline.h"
 
 /****************************************************************************
- * Private Type Declarations
+ * Private Types
  ****************************************************************************/
 
 struct readline_s
@@ -205,6 +208,19 @@ ssize_t readline_fd(FAR char *buf, int buflen, int infd, int outfd)
   UNUSED(outfd);
 
   struct readline_s vtbl;
+  struct termios cfg;
+  ssize_t ret;
+
+  if (isatty(infd))
+    {
+      tcgetattr(infd, &cfg);
+      if (cfg.c_lflag & ICANON)
+        {
+          cfg.c_lflag &= ~ICANON;
+          tcsetattr(infd, TCSANOW, &cfg);
+          cfg.c_lflag |= ICANON;
+        }
+    }
 
   /* Set up the vtbl structure */
 
@@ -219,5 +235,12 @@ ssize_t readline_fd(FAR char *buf, int buflen, int infd, int outfd)
 
   /* The let the common readline logic do the work */
 
-  return readline_common(&vtbl.vtbl, buf, buflen);
+  ret = readline_common(&vtbl.vtbl, buf, buflen);
+
+  if (isatty(infd) && (cfg.c_lflag & ICANON))
+    {
+      tcsetattr(infd, TCSANOW, &cfg);
+    }
+
+  return ret;
 }

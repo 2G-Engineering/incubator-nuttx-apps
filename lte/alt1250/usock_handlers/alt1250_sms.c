@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_sms.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -172,7 +174,7 @@ static int send_smsinit_command(FAR struct alt1250_s *dev,
   set_container_response(container, &dummy_output, 1);
   set_container_postproc(container, func, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -197,7 +199,7 @@ static int send_smsfin_command(FAR struct alt1250_s *dev,
   set_container_response(container, &dummy_output, 1);
   set_container_postproc(container, func, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -239,7 +241,7 @@ static int send_smssend_command(FAR struct alt1250_s *dev,
   set_container_response(container, USOCKET_REP_RESPONSE(usock), idx);
   set_container_postproc(container, postproc_smssend, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -270,7 +272,7 @@ static int send_smsdelete_command(FAR struct alt1250_s *dev,
   set_container_response(container, &dummy_output, 1);
   set_container_postproc(container, postproc_smsdelete, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -286,7 +288,7 @@ static int send_smsreportrecv_command(FAR struct alt1250_s *dev,
 
   set_container_ids(&container, 0, LTE_CMDID_SMS_REPORT_RECV);
 
-  return altdevice_send_command(dev->altfd, &container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, &container, usock_result);
 }
 
 /****************************************************************************
@@ -728,7 +730,7 @@ int alt1250_sms_init(FAR struct alt1250_s *dev, FAR struct usock_s *usock,
   if (IS_SMS_UNAVAIL_FWVERSION(dev))
     {
       dbg_alt1250("This ALT1250 FW version does not support SMS.\n");
-      *usock_result = -ENOTSUP;
+      *usock_result = -EAFNOSUPPORT;
       return REP_SEND_ACK_WOFREE;
     }
 

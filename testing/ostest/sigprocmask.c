@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/sigprocmask.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -44,11 +46,11 @@
 
 static int g_some_signals[NSIGNALS] =
 {
-  1,
-  3,
-  5,
-  7,
-  9
+  SIGHUP,
+  SIGQUIT,
+  SIGTRAP,
+  SIGBUS,
+  SIGUSR1
 };
 
 /****************************************************************************
@@ -100,13 +102,19 @@ void sigprocmask_test(void)
     {
       int signo = g_some_signals[i];
 
-      ret = sigaddset(&newmask, signo);
-      if (ret != OK)
+      /* SIGKILL and SIGSTOP should not be added to signal mask */
+
+      if (signo != SIGKILL && signo != SIGSTOP)
         {
-          int errcode = errno;
-          printf("sigprocmask_test: ERROR sigaddset failed: %d\n", errcode);
-          ASSERT(false);
-          goto errout_with_mask;
+          ret = sigaddset(&newmask, signo);
+          if (ret != OK)
+            {
+              int errcode = errno;
+              printf("sigprocmask_test: ERROR sigaddset failed: %d\n",
+                errcode);
+              ASSERT(false);
+              goto errout_with_mask;
+            }
         }
 
       ret = sighold(signo);
@@ -187,6 +195,46 @@ void sigprocmask_test(void)
   /* Now get the modified mask */
 
   ret = sigprocmask(SIG_SETMASK, NULL, &currmask);
+  if (ret != OK)
+    {
+      int errcode = errno;
+      printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
+      goto errout_with_mask;
+    }
+
+  /* SIGKILL and SIGSTOP should never be added to signal mask,
+   * so delete them from newmask before comparing.
+   */
+
+  ret = sigdelset(&newmask, SIGKILL);
+  if (ret != OK)
+    {
+      int errcode = errno;
+      printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
+      goto errout_with_mask;
+    }
+
+  ret = sigdelset(&newmask, SIGSTOP);
+  if (ret != OK)
+    {
+      int errcode = errno;
+      printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
+      goto errout_with_mask;
+    }
+
+  ret = sigdelset(&currmask, SIGKILL);
+  if (ret != OK)
+    {
+      int errcode = errno;
+      printf("sigprocmask_test: ERROR sigprocmask failed: %d\n", errcode);
+      ASSERT(false);
+      goto errout_with_mask;
+    }
+
+  ret = sigdelset(&currmask, SIGSTOP);
   if (ret != OK)
     {
       int errcode = errno;

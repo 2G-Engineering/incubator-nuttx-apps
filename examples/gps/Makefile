@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/gps/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -28,7 +30,7 @@ STACKSIZE = $(CONFIG_EXAMPLES_GPS_STACKSIZE)
 MODULE = $(CONFIG_EXAMPLES_GPS)
 
 # GPS Example
-CFLAGS += -I$(APPDIR)$(DELIM)gpsutils$(DELIM)minmea
+
 MAINSRC = gps_main.c
 
 include $(APPDIR)/Application.mk

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/elf/tests/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -49,7 +51,9 @@ ifeq ($(CONFIG_EXAMPLES_ELF_ROMFS),y)
   FSIMG_DIR = $(TESTS_DIR)/$(FSIMG_SUBDIR)
   ROMFS_IMG = $(TESTS_DIR)/romfs.img
   FSIMG_SRC = $(TESTS_DIR)/romfs.c
-else
+endif
+
+ifeq ($(CONFIG_EXAMPLES_ELF_CROMFS),y)
   NXTOOLDIR = $(TOPDIR)/tools
   GENCROMFSSRC = gencromfs.c
   GENCROMFSEXE = gencromfs$(HOSTEXEEXT)
@@ -57,6 +61,19 @@ else
   FSIMG_SUBDIR = cromfs
   FSIMG_DIR = $(TESTS_DIR)/$(FSIMG_SUBDIR)
   FSIMG_SRC = $(TESTS_DIR)/cromfs.c
+endif
+
+ifeq ($(CONFIG_EXAMPLES_ELF_EXTERN),y)
+  FSIMG_SUBDIR = extfs
+  FSIMG_DIR = $(TESTS_DIR)/$(FSIMG_SUBDIR)
+endif
+
+# generate the romfs image in case the fs type is romfs
+# the FSIMG_SRC is not actually generated.
+
+ifeq ($(CONFIG_EXAMPLES_ELF_FSTYPE), "romfs")
+  ROMFS_IMG = $(TESTS_DIR)/romfs.img
+  FSIMG_SRC = $(TESTS_DIR)/romfs.c
 endif
 
 define DIR_template
@@ -85,9 +102,12 @@ $(ROMFS_IMG): install
 
 $(FSIMG_SRC): $(ROMFS_IMG)
 	$(Q) (cd $(TESTS_DIR) && echo "#include <nuttx/compiler.h>" >$@ && \
-		xxd -i romfs.img | sed -e "s/^unsigned char/const unsigned char aligned_data(4)/g" >>$@)
+		xxd -i romfs.img | sed -e "s/^unsigned char/const unsigned char aligned_data(4)/g" | \
+		sed -e "s/romfs_img/elf_romfs_img/g" >>$@)
 
-else
+endif
+
+ifeq ($(CONFIG_EXAMPLES_ELF_CROMFS),y)
 # Make sure that the NuttX gencromfs tool has been built
 
 $(NXTOOLDIR)/$(GENCROMFSEXE): $(NXTOOLDIR)/$(GENCROMFSSRC)
@@ -98,6 +118,19 @@ $(NXTOOLDIR)/$(GENCROMFSEXE): $(NXTOOLDIR)/$(GENCROMFSSRC)
 $(FSIMG_SRC): install $(NXTOOLDIR)/$(GENCROMFSEXE)
 	$(Q) $(NXTOOLDIR)/$(GENCROMFSEXE) $(FSIMG_DIR) $@.tmp
 	$(Q) $(call TESTANDREPLACEFILE, $@.tmp, $@)
+
+endif
+
+ifeq ($(CONFIG_EXAMPLES_ELF_FSTYPE),"romfs")
+# Create the romfs.img file from the populated romfs directory
+
+$(ROMFS_IMG): install
+	$(Q) genromfs -f $@.tmp -d $(FSIMG_DIR) -V "ELFTEST"
+	$(Q) $(call TESTANDREPLACEFILE, $@.tmp, $@)
+
+# Create the romfs.c file from the romfs.img file
+
+$(FSIMG_SRC): $(ROMFS_IMG)
 
 endif
 

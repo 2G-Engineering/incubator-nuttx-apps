@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/nxdiag/nxdiag.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,6 +34,9 @@
 #include <nuttx/version.h>
 
 #include "sysinfo.h"
+#ifdef CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL
+#include <fcntl.h>
+#endif
 
 /****************************************************************************
  * Private Data
@@ -224,6 +229,11 @@ static void print_usage(char *prg)
 
 int main(int argc, char *argv[])
 {
+#ifdef CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL
+  int fd;
+  int ret;
+#endif
+
   if (argc == 1 || !are_valid_args(argc, argv))
     {
       print_usage(argv[0]);
@@ -344,7 +354,37 @@ int main(int argc, char *argv[])
       printf("Toolchain version:\n");
       print_array(ESPRESSIF_TOOLCHAIN, ESPRESSIF_TOOLCHAIN_ARRAY_SIZE);
       printf("Esptool version: %s\n\n", ESPRESSIF_ESPTOOL);
-#endif
+      printf("HAL version: %s\n\n", ESPRESSIF_HAL);
+#ifdef CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP
+#ifndef CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL
+      printf("CHIP ID: %s\n\n", ESPRESSIF_CHIP_ID);
+      printf("Flash ID:\n");
+      print_array(ESPRESSIF_FLASH_ID, ESPRESSIF_FLASH_ID_ARRAY_SIZE);
+      printf("Security information:\n");
+      print_array(ESPRESSIF_SECURITY_INFO,
+                  ESPRESSIF_SECURITY_INFO_ARRAY_SIZE);
+      printf("Flash status: %s\n\n", ESPRESSIF_FLASH_STAT);
+      printf("MAC address: %s\n\n", ESPRESSIF_MAC_ADDR);
+#else
+      fd = open("/dev/nxdiag", O_RDONLY);
+      if (fd < 0)
+        {
+          printf("Failed to open device\n");
+          return ERROR;
+        }
+
+      ret = read(fd, ESPRESSIF_INFO, ESPRESSIF_INFO_SIZE);
+      if (ret <= 0)
+        {
+          printf("Failed to read device\n");
+          return ERROR;
+        }
+
+      printf("%s\n\n", ESPRESSIF_INFO);
+
+#endif /* CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP_WO_TOOL */
+#endif /* CONFIG_SYSTEM_NXDIAG_ESPRESSIF_CHIP */
+#endif /* CONFIG_SYSTEM_NXDIAG_ESPRESSIF */
     }
 
   return 0;

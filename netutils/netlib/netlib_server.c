@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_server.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -92,7 +94,8 @@ void netlib_server(uint16_t portno,
       /* Accept the next connection */
 
       addrlen = sizeof(struct sockaddr_in);
-      acceptsd = accept(listensd, (struct sockaddr *)&myaddr, &addrlen);
+      acceptsd = accept4(listensd, (struct sockaddr *)&myaddr, &addrlen,
+                         SOCK_CLOEXEC);
       if (acceptsd < 0)
         {
           nerr("ERROR: accept failure: %d\n", errno);

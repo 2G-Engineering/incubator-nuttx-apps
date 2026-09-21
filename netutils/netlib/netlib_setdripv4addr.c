@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_setdripv4addr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -66,21 +68,19 @@ int netlib_set_dripv4addr(FAR const char *ifname,
   int ret = ERROR;
 
 #ifdef CONFIG_NET_ROUTE
-  FAR struct sockaddr_in *v4_addr;
-  struct sockaddr_storage target;
-  struct sockaddr_storage netmask;
-  struct sockaddr_storage router;
+  struct sockaddr_in target;
+  struct sockaddr_in netmask;
+  struct sockaddr_in router;
 
   memset(&target, 0, sizeof(target));
-  target.ss_family  = AF_INET;
+  target.sin_family  = AF_INET;
 
   memset(&netmask, 0, sizeof(netmask));
-  netmask.ss_family  = AF_INET;
+  netmask.sin_family  = AF_INET;
 
   memset(&router, 0, sizeof(router));
-  v4_addr = (FAR struct sockaddr_in *)&router;
-  v4_addr->sin_family  = AF_INET;
-  v4_addr->sin_addr    = *addr;
+  router.sin_family  = AF_INET;
+  router.sin_addr    = *addr;
 #endif
 
   if (ifname && addr)
@@ -111,11 +111,12 @@ int netlib_set_dripv4addr(FAR const char *ifname,
 
               /* This call fails if no default route exists, but it's OK */
 
-              delroute(sockfd, &target, &netmask);
+              delroute(sockfd, &target, &netmask, sizeof(target));
 
               /* Then add the new default route */
 
-              ret = addroute(sockfd, &target, &netmask, &router);
+              ret = addroute(sockfd, &target, &netmask,
+                             &router, sizeof(router));
             }
 #endif
 

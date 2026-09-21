@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/pwm/pwm_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -523,7 +525,8 @@ int main(int argc, FAR char *argv[])
   for (i = 0; i < CONFIG_PWM_NCHANNELS; i++)
     {
       info.channels[i].channel = g_pwmstate.channels[i];
-      info.channels[i].duty = b16divi(uitoub16(g_pwmstate.duties[i]), 100);
+      info.channels[i].duty = g_pwmstate.duties[i] ? \
+        b16divi(uitoub16(g_pwmstate.duties[i]) - 1, 100) : 0;
       printf(" channel: %d duty: %08" PRIx32,
         info.channels[i].channel, info.channels[i].duty);
     }
@@ -531,7 +534,8 @@ int main(int argc, FAR char *argv[])
   printf("\n");
 
 #else
-  info.duty  = b16divi(uitoub16(g_pwmstate.duty), 100);
+  info.duty = g_pwmstate.duty ? \
+    b16divi(uitoub16(g_pwmstate.duty) - 1, 100) : 0;
 #  ifdef CONFIG_PWM_PULSECOUNT
   info.count = g_pwmstate.count;
 

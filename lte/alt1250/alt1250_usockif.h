@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_usockif.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -57,7 +59,7 @@
           usockif_sendevent((fff), (iii), USRSOCK_EVENT_RECVFROM_AVAIL)
 
 /****************************************************************************
- * Public Data Type
+ * Public Types
  ****************************************************************************/
 
 union usrsock_requests_u

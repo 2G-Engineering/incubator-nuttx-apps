@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_fwupdate.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,7 +37,7 @@
 #define LTE_IMAGE_PERT_SIZE (256)
 
 /****************************************************************************
- * Public Data Type
+ * Public Types
  ****************************************************************************/
 
 struct delta_header_s

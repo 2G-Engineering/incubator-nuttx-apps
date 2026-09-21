@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/dev_null.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,7 +43,7 @@ static FAR char buffer[1024];
  * Public Functions
  ****************************************************************************/
 
-int dev_null(void)
+int dev_null_test(void)
 {
   int nbytes;
   int fd;

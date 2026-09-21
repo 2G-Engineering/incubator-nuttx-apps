@@ -1,6 +1,8 @@
 ###########################################################################
 # apps/sdr/liquid_dsp/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -39,7 +41,7 @@ $(LIQUID_DSP_UNPACK)/.patch: $(LIQUID_DSP_UNPACK)
 	$(Q) touch $(LIQUID_DSP_UNPACK)/.patch
 
 CFLAGS += -std=c99
-CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPDIR)/sdr/liquid_dsp}
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/sdr/liquid_dsp
 CFLAGS += -DM_SQRT1_2=0.7071067811865475244008443621048490
 CFLAGS += -DM_SQRT2=1.4142135623730950488016887242096981
 CFLAGS += -DM_PI=3.1415926535897932384626433832795029

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/taskset/taskset.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -80,7 +82,7 @@ static bool get_cpuset(const char *arg, cpu_set_t *cpu_set)
 
 int main(int argc, FAR char *argv[])
 {
-  char command[CONFIG_NSH_LINELEN];
+  char command[LINE_MAX];
   int exitcode;
   int option;
   int pid = -1;
@@ -138,7 +140,8 @@ int main(int argc, FAR char *argv[])
           goto errout;
         }
 
-      printf("pid %d's current affinity mask: %x\n", pid, cpuset);
+      printf("pid %d's current affinity mask: 0x%" PRIx32 "\n", pid,
+             (uint32_t)cpuset);
     }
   else
     {
@@ -150,7 +153,7 @@ int main(int argc, FAR char *argv[])
             }
 
           /* Construct actual command with args
-           * NOTE: total length does not exceed CONFIG_NSH_LINELEN
+           * NOTE: total length does not exceed LINE_MAX
            */
 
           for (i = 0; i < argc - 2; i++)

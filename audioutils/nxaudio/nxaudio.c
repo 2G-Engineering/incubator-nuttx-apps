@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/audioutils/nxaudio/nxaudio.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -68,7 +70,7 @@ static int configure_audio(int fd, int ch, int fs, int bps, int chmap)
  * name: create_audiomq
  ****************************************************************************/
 
-static mqd_t create_audiomq(int fd, int buf_num)
+static mqd_t create_audiomq(const char *mqname, int fd, int buf_num)
 {
   mqd_t ret;
   struct mq_attr attr;
@@ -78,8 +80,7 @@ static mqd_t create_audiomq(int fd, int buf_num)
   attr.mq_curmsgs = 0;
   attr.mq_flags = 0;
 
-  ret = mq_open(CONFIG_AUDIOUTILS_NXAUDIO_MSGQNAME,
-                O_RDWR | O_CREAT, 0644, &attr);
+  ret = mq_open(mqname, O_RDWR | O_CREAT, 0644, &attr);
   if (ret >= (mqd_t)0)
     {
       int rr;
@@ -147,14 +148,13 @@ static void free_audio_buffers(FAR struct nxaudio_s *nxaudio)
 
 void fin_nxaudio(FAR struct nxaudio_s *nxaudio)
 {
-  free_audio_buffers(nxaudio);
-  ioctl(nxaudio->fd, AUDIOIOC_STOP, 0);
+  ioctl(nxaudio->fd, AUDIOIOC_SHUTDOWN, 0);
   ioctl(nxaudio->fd, AUDIOIOC_UNREGISTERMQ, (unsigned long)nxaudio->mq);
   ioctl(nxaudio->fd, AUDIOIOC_RELEASE, 0);
-  ioctl(nxaudio->fd, AUDIOIOC_SHUTDOWN, 0);
+  free_audio_buffers(nxaudio);
+  close(nxaudio->fd);
   mq_close(nxaudio->mq);
   mq_unlink(CONFIG_AUDIOUTILS_NXAUDIO_MSGQNAME);
-  close(nxaudio->fd);
 }
 
 /****************************************************************************
@@ -164,9 +164,22 @@ void fin_nxaudio(FAR struct nxaudio_s *nxaudio)
 int init_nxaudio(FAR struct nxaudio_s *nxaudio,
                  int fs, int bps, int chnum)
 {
+  return init_nxaudio_devname(nxaudio, fs, bps, chnum,
+                              CONFIG_AUDIOUTILS_NXAUDIO_DEVPATH,
+                              CONFIG_AUDIOUTILS_NXAUDIO_MSGQNAME);
+}
+
+/****************************************************************************
+ * name: init_nxaudio_devname
+ ****************************************************************************/
+
+int init_nxaudio_devname(FAR struct nxaudio_s *nxaudio,
+                 int fs, int bps, int chnum,
+                 const char *devname, const char *mqname)
+{
   struct ap_buffer_info_s buf_info;
 
-  nxaudio->fd = open(CONFIG_AUDIOUTILS_NXAUDIO_DEVPATH, O_RDWR | O_CLOEXEC);
+  nxaudio->fd = open(devname, O_RDWR | O_CLOEXEC);
   if (nxaudio->fd >= 0)
     {
       if (ioctl(nxaudio->fd, AUDIOIOC_RESERVE, 0) < 0)
@@ -186,7 +199,8 @@ int init_nxaudio(FAR struct nxaudio_s *nxaudio,
 
       /* Create message queue to communicate with audio driver */
 
-      nxaudio->mq = create_audiomq(nxaudio->fd, buf_info.nbuffers + 8);
+      nxaudio->mq = create_audiomq(mqname, nxaudio->fd,
+                                   buf_info.nbuffers + 8);
 
       /* Create audio buffers to inject audio sample */
 
@@ -216,6 +230,24 @@ int nxaudio_enqbuffer(FAR struct nxaudio_s *nxaudio,
 
   return ioctl(nxaudio->fd, AUDIOIOC_ENQUEUEBUFFER,
                (unsigned long)(uintptr_t)&desc);
+}
+
+/****************************************************************************
+ * name: nxaudio_pause
+ ****************************************************************************/
+
+int nxaudio_pause(FAR struct nxaudio_s *nxaudio)
+{
+  return ioctl(nxaudio->fd, AUDIOIOC_PAUSE, 0);
+}
+
+/****************************************************************************
+ * name: nxaudio_resume
+ ****************************************************************************/
+
+int nxaudio_resume(FAR struct nxaudio_s *nxaudio)
+{
+  return ioctl(nxaudio->fd, AUDIOIOC_RESUME, 0);
 }
 
 /****************************************************************************
@@ -255,6 +287,8 @@ int nxaudio_stop(FAR struct nxaudio_s *nxaudio)
   term_msg.msg_id = AUDIO_MSG_STOP;
   term_msg.u.data = 0;
   mq_send(nxaudio->mq, (FAR const char *)&term_msg, sizeof(term_msg), 0);
+
+  ioctl(nxaudio->fd, AUDIOIOC_STOP, 0);
 
   return OK;
 }

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/gps/gps_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "minmea/minmea.h"
+#include <minmea/minmea.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -52,13 +54,22 @@ int main(int argc, FAR char *argv[])
   int cnt;
   char ch;
   char line[MINMEA_MAX_LENGTH];
+  char *port = "/dev/ttyS1";
+
+  /* Get the GPS serial port argument. If none specified, default to ttyS1 */
+
+  if (argc > 1)
+    {
+      port = argv[1];
+    }
 
   /* Open the GPS serial port */
 
-  fd = open("/dev/ttyS1", O_RDONLY);
+  fd = open(port, O_RDONLY);
   if (fd < 0)
     {
-      printf("Unable to open file /dev/ttyS1\n");
+      fprintf(stderr, "Unable to open file %s\n", port);
+      return 1;
     }
 
   /* Run forever */
@@ -88,11 +99,14 @@ int main(int argc, FAR char *argv[])
 
               if (minmea_parse_rmc(&frame, line))
                 {
-                  printf("Fixed-point Latitude...........: %d\n",
+                  printf("Fixed-point Latitude...........: %" PRIdLEAST32
+                         "\n",
                          minmea_rescale(&frame.latitude, 1000));
-                  printf("Fixed-point Longitude..........: %d\n",
+                  printf("Fixed-point Longitude..........: %" PRIdLEAST32
+                         "\n",
                          minmea_rescale(&frame.longitude, 1000));
-                  printf("Fixed-point Speed..............: %d\n",
+                  printf("Fixed-point Speed..............: %" PRIdLEAST32
+                         "\n",
                          minmea_rescale(&frame.speed, 1000));
                   printf("Floating point degree latitude.: %2.6f\n",
                          minmea_tocoord(&frame.latitude));
@@ -116,7 +130,8 @@ int main(int argc, FAR char *argv[])
                 {
                   printf("Fix quality....................: %d\n",
                          frame.fix_quality);
-                  printf("Altitude.......................: %d\n",
+                  printf("Altitude.......................: %" PRIdLEAST32
+                         "\n",
                          frame.altitude.value);
                   printf("Tracked satellites.............: %d\n",
                          frame.satellites_tracked);
@@ -128,15 +143,7 @@ int main(int argc, FAR char *argv[])
             }
             break;
 
-          case MINMEA_INVALID:
-          case MINMEA_UNKNOWN:
-          case MINMEA_SENTENCE_GSA:
-          case MINMEA_SENTENCE_GLL:
-          case MINMEA_SENTENCE_GST:
-          case MINMEA_SENTENCE_GSV:
-          case MINMEA_SENTENCE_GBS:
-          case MINMEA_SENTENCE_VTG:
-          case MINMEA_SENTENCE_ZDA:
+          default:
             {
             }
             break;

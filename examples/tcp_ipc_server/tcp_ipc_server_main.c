@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/tcp_ipc_server/tcp_ipc_server_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -243,9 +245,9 @@ int main(int argc, char *argv[])
       /* Wait for a new client socket connection */
 
       addr_size = sizeof server_storage;
-      new_socket_client_fd = accept(socket_server_fd,
-                                    (struct sockaddr *)&server_storage,
-                                    &addr_size);
+      new_socket_client_fd = accept4(socket_server_fd,
+                                     (struct sockaddr *)&server_storage,
+                                     &addr_size, SOCK_CLOEXEC);
 
       if (new_socket_client_fd < 0)
         {

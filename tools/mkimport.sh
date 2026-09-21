@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
+############################################################################
 # apps/tools/mkimport.sh
+#
+# SPDX-License-Identifier: Apache-2.0
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -16,10 +19,26 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 #
-
+############################################################################
 # Get the input parameter list
 
-USAGE="USAGE: $0 [-d] [-z] [-l <ext>] -x <export-path>"
+USAGE="
+
+DESCRIPTION:
+
+  Preparing folder 'import/' using the export package from NuttX kernel
+  build.
+
+USAGE: $0 [-d] [-z] [-l <ext>] -x <export-package>
+
+Where:
+
+  -d enable debugging output
+  -h show this help message
+  -l <ext> extension of library file (default is .a)
+  -x <export-package> export package file name
+  -z expect gzip compressed tar ball
+"
 unset EXPORT
 unset TGZ
 LIBEXT=.a
@@ -41,7 +60,7 @@ while [ ! -z "$1" ]; do
 			TGZ=y
 			;;
 		-h )
-			echo $USAGE
+			echo "$USAGE"
 			exit 0
 			;;
 		* )
@@ -162,7 +181,7 @@ cp -rf ${REGISTERSDIR} ${BUILTINDIR}/. || \
 
 # Move the .config file in place in the import directory
 
-SFILES=".config"
+SFILES=".config System.map"
 for file in ${SFILES}; do
 	if [ -f "${EXPORTDIR}/${file}" ]; then
 		cp -a ${EXPORTDIR}/${file} ${IMPORTDIR}/${file} || \

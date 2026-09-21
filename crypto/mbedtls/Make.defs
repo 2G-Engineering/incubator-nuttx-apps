@@ -1,6 +1,8 @@
 ############################################################################
 # apps/crypto/mbedtls/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -23,10 +25,10 @@ CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
 
 # Allows `<mbedtls/<>.h>` import.
 
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/include
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
 
-CFLAGS += ${DEFINE_PREFIX}MBEDTLS_CONFIG_FILE="<crypto/mbedtls_config.h>"
-CXXFLAGS += ${DEFINE_PREFIX}MBEDTLS_CONFIG_FILE="<crypto/mbedtls_config.h>"
+CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/include
+CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
 
 endif

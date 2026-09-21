@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/capture/cap_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -213,6 +215,7 @@ int main(int argc, FAR char *argv[])
 {
   int8_t dutycycle;
   int32_t frequence;
+  int32_t edges;
   int fd;
   int exitval = EXIT_SUCCESS;
   int ret;
@@ -269,7 +272,7 @@ int main(int argc, FAR char *argv[])
 
       else
         {
-          printf("pwm duty cycle: %d % \n", dutycycle);
+          printf("pwm duty cycle: %d %% \n", dutycycle);
         }
 
       /* Get the frequence data using the ioctl */
@@ -287,7 +290,25 @@ int main(int argc, FAR char *argv[])
 
       else
         {
-          printf("pwm frequence: %d Hz \n", frequence);
+          printf("pwm frequence: %"PRId32" Hz \n", frequence);
+        }
+
+      /* Get the edges data using the ioctl */
+
+      ret = ioctl(fd, CAPIOC_EDGES,
+                  (unsigned long)((uintptr_t)&edges));
+      if (ret < 0)
+        {
+          printf("cap_main: ioctl(CAPIOC_EDGES) failed: %d\n", errno);
+          exitval = EXIT_FAILURE;
+          goto errout_with_dev;
+        }
+
+      /* Print the sample data on successful return */
+
+      else
+        {
+          printf("pwm edges counting: %"PRId32" \n", edges);
         }
 
       /* Delay a little bit */

@@ -1,10 +1,9 @@
 /****************************************************************************
  * apps/modbus/nuttx/porttimer_m.c
  *
- * FreeModbus Library: NuttX Modbus Master Port
- * Original work (c) 2006 Christian Walter <wolti@sil.at>
- * Modified work (c) 2016 Vytautas Lukenskas <lukevyta@gmail.com>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2006 Christian Walter <wolti@sil.at>
+ * SPDX-FileCopyrightText: 2016 Vytautas Lukenskas <lukevyta@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -75,7 +74,7 @@ bool bTimeoutEnable;               /* timeout is active */
  * Private Functions
  ****************************************************************************/
 
-void vMBMasterPortTimersEnable( void )
+void vMBMasterPortTimersEnable(void)
 {
   int res = gettimeofday(&xTimeLast, NULL);
 
@@ -114,33 +113,33 @@ bool xMBMasterPortTimersInit(uint16_t usTimeOut50us)
   return xMBMasterPortSerialSetTimeout(ulTimeOut);
 }
 
-void xMBMasterPortTimersClose()
+void xMBMasterPortTimersClose(void)
 {
   /* Does not use any hardware resources. */
 }
 
-INLINE void vMBMasterPortTimersT35Enable( void )
+INLINE void vMBMasterPortTimersT35Enable(void)
 {
   vMBMasterPortTimersEnable();
   ulTimeOut = ulTimeoutT35;
   vMBMasterSetCurTimerMode(MB_TMODE_T35);
 }
 
-INLINE void vMBMasterPortTimersConvertDelayEnable( void )
+INLINE void vMBMasterPortTimersConvertDelayEnable(void)
 {
   vMBMasterPortTimersEnable();
   ulTimeOut = ulTimeoutConvertDelay;
   vMBMasterSetCurTimerMode(MB_TMODE_CONVERT_DELAY);
 }
 
-INLINE void vMBMasterPortTimersRespondTimeoutEnable( void )
+INLINE void vMBMasterPortTimersRespondTimeoutEnable(void)
 {
   vMBMasterPortTimersEnable();
   ulTimeOut = ulTimeoutResponse;
-  vMBMasterSetCurTimerMode( MB_TMODE_RESPOND_TIMEOUT );
+  vMBMasterSetCurTimerMode(MB_TMODE_RESPOND_TIMEOUT);
 }
 
-void vMBMasterPortTimerPoll( void )
+void vMBMasterPortTimerPoll(void)
 {
   uint32_t       ulDeltaMS;
   struct timeval xTimeCur;
@@ -168,7 +167,7 @@ void vMBMasterPortTimerPoll( void )
     }
 }
 
-void vMBMasterPortTimersDisable()
+void vMBMasterPortTimersDisable(void)
 {
   bTimeoutEnable = false;
 }

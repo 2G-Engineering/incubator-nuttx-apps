@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_builtin.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -69,7 +71,8 @@
  ****************************************************************************/
 
 int nsh_builtin(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
-                FAR char **argv, FAR const char *redirfile, int oflags)
+                FAR char **argv,
+                FAR const struct nsh_param_s *param)
 {
 #if !defined(CONFIG_NSH_DISABLEBG) && defined(CONFIG_SCHED_CHILD_STATUS)
   struct sigaction act;
@@ -101,7 +104,7 @@ int nsh_builtin(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
    * applications.
    */
 
-  ret = exec_builtin(cmd, argv, redirfile, oflags);
+  ret = exec_builtin(cmd, argv, param);
   if (ret >= 0)
     {
       /* The application was successfully started with pre-emption disabled.
@@ -120,6 +123,7 @@ int nsh_builtin(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
        *     foreground
        */
 
+       vtbl->np.np_lastpid = ret;
 #ifdef CONFIG_SCHED_WAITPID
 
       /* CONFIG_SCHED_WAITPID is selected, so we may run the command in
@@ -230,11 +234,17 @@ int nsh_builtin(FAR struct nsh_vtbl_s *vtbl, FAR const char *cmd,
 
           /* Restore the old actions */
 
-          sigaction(SIGCHLD, &old, NULL);
+#  ifndef CONFIG_SCHED_WAITPID
+          if (vtbl->np.np_bg == true)
 #  endif
-          struct sched_param param;
-          sched_getparam(ret, &param);
-          nsh_output(vtbl, "%s [%d:%d]\n", cmd, ret, param.sched_priority);
+            {
+              sigaction(SIGCHLD, &old, NULL);
+            }
+
+#  endif
+          struct sched_param sched;
+          sched_getparam(ret, &sched);
+          nsh_output(vtbl, "%s [%d:%d]\n", cmd, ret, sched.sched_priority);
 
           /* Backgrounded commands always 'succeed' as long as we can start
            * them.

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/hex2bin/hex2mem_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -210,7 +212,7 @@ int main(int argc, FAR char *argv[])
 
   /* And do the deed */
 
-  ret = hex2bin(&stdinstream.public, &memoutstream.public,
+  ret = hex2bin(&stdinstream.common, &memoutstream.common,
                 (uint32_t)baseaddr, (uint32_t)endpaddr,
                 (enum hex2bin_swap_e)swap);
   if (ret < 0)

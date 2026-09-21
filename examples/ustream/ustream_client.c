@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/ustream/ustream_client.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -78,7 +80,7 @@ int main(int argc, FAR char *argv[])
 
   /* Connect the socket to the server */
 
-  addrlen = strlen(CONFIG_EXAMPLES_USTREAM_ADDR) + 1;
+  addrlen = sizeof(CONFIG_EXAMPLES_USTREAM_ADDR);
   if (addrlen > UNIX_PATH_MAX)
     {
       addrlen = UNIX_PATH_MAX;

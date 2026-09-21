@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/sensor/gesture.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,6 +35,14 @@
 
 /* register this as object request broker structure */
 
+ORB_DECLARE(sensor_glance_gesture);
+ORB_DECLARE(sensor_glance_gesture_uncal);
+ORB_DECLARE(sensor_offbody_detector);
+ORB_DECLARE(sensor_offbody_detector_uncal);
+ORB_DECLARE(sensor_pickup_gesture);
+ORB_DECLARE(sensor_pickup_gesture_uncal);
+ORB_DECLARE(sensor_wrist_tilt);
+ORB_DECLARE(sensor_wrist_tilt_uncal);
 ORB_DECLARE(sensor_wake_gesture);
 ORB_DECLARE(sensor_wake_gesture_uncal);
 

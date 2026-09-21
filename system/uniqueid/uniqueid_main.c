@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uniqueid/uniqueid_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -56,8 +58,8 @@ static int parse_positions(FAR char *arg, FAR uint8_t *positions,
   FAR char *range_save;
   FAR char *range_item;
   FAR char *endptr;
-  FAR int pos;
-  FAR int pos2;
+  int pos;
+  int pos2;
 
 #define APPEND_POSITION(pos) \
   do \

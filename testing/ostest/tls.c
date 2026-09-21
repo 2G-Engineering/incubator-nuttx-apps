@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/tls.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 
 #include "ostest.h"
 
-#if CONFIG_TLS_NELEM > 0
+#if defined(CONFIG_TLS_NELEM) && CONFIG_TLS_NELEM > 0
 
 /****************************************************************************
  * Preprocessor Definitions

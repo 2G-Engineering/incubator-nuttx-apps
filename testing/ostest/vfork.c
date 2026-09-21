@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/vfork.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
 
 #include "ostest.h"
 
-#if defined(CONFIG_ARCH_HAVE_VFORK) && defined(CONFIG_SCHED_WAITPID)
+#if defined(CONFIG_ARCH_HAVE_FORK) && defined(CONFIG_SCHED_WAITPID)
 
 /****************************************************************************
  * Private Data
@@ -84,4 +86,4 @@ int vfork_test(void)
   return 0;
 }
 
-#endif /* CONFIG_ARCH_HAVE_VFORK && CONFIG_SCHED_WAITPID */
+#endif /* CONFIG_ARCH_HAVE_FORK && CONFIG_SCHED_WAITPID */

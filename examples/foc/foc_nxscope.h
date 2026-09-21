@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/foc/foc_nxscope.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -51,6 +53,9 @@
 #define FOC_NXSCOPE_SPPOS      (1 << 13)  /* Position setpoint */
 #define FOC_NXSCOPE_DQREF      (1 << 14)  /* DQ reference */
 #define FOC_NXSCOPE_VDQCOMP    (1 << 15)  /* VDQ compensation */
+#define FOC_NXSCOPE_SVM3       (1 << 16)  /* Space-vector modulation sector */
+#define FOC_NXSCOPE_VOBS       (1 << 17)  /* Output from velocity observer */
+#define FOC_NXSCOPE_AOBS       (1 << 18)  /* Output from angle observer */
                                           /* Max 32-bit */
 
 /****************************************************************************

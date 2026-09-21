@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/logging/nxscope/nxscope.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -50,6 +52,14 @@
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
+#ifdef __cplusplus
+#define EXTERN extern "C"
+extern "C"
+{
+#else
+#define EXTERN extern
+#endif
 
 /* Nxscope header ID */
 
@@ -485,5 +495,10 @@ int nxscope_recv(FAR struct nxscope_s *s);
  ****************************************************************************/
 
 int nxscope_stream_start(FAR struct nxscope_s *s, bool start);
+
+#undef EXTERN
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* __APPS_INCLUDE_LOGGING_NXSCOPE_NXSCOPE_H */

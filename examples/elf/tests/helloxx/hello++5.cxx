@@ -1,6 +1,8 @@
 /////////////////////////////////////////////////////////////////////////////
 // apps/examples/elf/tests/helloxx/hello++5.cxx
 //
+// SPDX-License-Identifier: Apache-2.0
+//
 // Licensed to the Apache Software Foundation (ASF) under one or more
 // contributor license agreements.  See the NOTICE file distributed with
 // this work for additional information regarding copyright ownership.  The
@@ -37,7 +39,7 @@
 #include <string>
 
 #ifndef NULL
-# define NULL ((void*)0L)
+#  define NULL ((void*)0L)
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -154,7 +156,7 @@ void CThingSayer::ThrowThing(void)
 void CThingSayer::ThrowMyThing(const char *czSayThis = NULL)
 {
   cout << "CThingSayer::ThrowMyThing: I am now throwing an MyException (with reason)." << endl;
-  throw MyException(tring(czSayThis));
+  throw MyException(string(czSayThis));
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/logging/nxscope/nxscope_intf.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,6 +36,14 @@
 /****************************************************************************
  * Public Types
  ****************************************************************************/
+
+#ifdef __cplusplus
+#define EXTERN extern "C"
+extern "C"
+{
+#else
+#define EXTERN extern
+#endif
 
 /* Forward declaration */
 
@@ -85,7 +95,7 @@ struct nxscope_ser_cfg_s
 {
   FAR char *path;               /* Device path */
   bool      nonblock;           /* Nonblocking operation */
-  speed_t   baud;               /* Baud rate */
+  speed_t   baud;               /* Baud rate. Ignored if set to 0 */
 };
 #endif
 
@@ -121,6 +131,11 @@ int nxscope_ser_init(FAR struct nxscope_intf_s *intf,
  ****************************************************************************/
 
 void nxscope_ser_deinit(FAR struct nxscope_intf_s *intf);
+#endif
+
+#undef EXTERN
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __APPS_INCLUDE_LOGGING_NXSCOPE_NXSCOPE_INTF_H */

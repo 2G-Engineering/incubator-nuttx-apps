@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/wireless/ieee802154/i8sak/i8sak.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -212,6 +214,8 @@ void i8sak_get_cmd         (FAR struct i8sak_s *i8sak,
 void i8sak_poll_cmd        (FAR struct i8sak_s *i8sak,
                             int argc, FAR char *argv[]);
 void i8sak_regdump_cmd     (FAR struct i8sak_s *i8sak,
+                            int argc, FAR char *argv[]);
+void i8sak_tracedump_cmd   (FAR struct i8sak_s *i8sak,
                             int argc, FAR char *argv[]);
 void i8sak_reset_cmd       (FAR struct i8sak_s *i8sak,
                             int argc, FAR char *argv[]);

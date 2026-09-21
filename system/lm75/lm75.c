@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/lm75/lm75.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,12 +43,12 @@
 
 #ifndef CONFIG_SYSTEM_LM75_DEVNAME
 #  warning CONFIG_SYSTEM_LM75_DEVNAME is not defined
-#  define CONFIG_SYSTEM_LM75_DEVNAME "/dev/temp"
+#  define CONFIG_SYSTEM_LM75_DEVNAME "/dev/temp0"
 #endif
 
 #if !defined(CONFIG_SYSTEM_LM75_FAHRENHEIT) && !defined(CONFIG_SYSTEM_LM75_CELSIUS)
 #  warning one of CONFIG_SYSTEM_LM75_FAHRENHEIT or CONFIG_SYSTEM_LM75_CELSIUS must be defined
-#  defeind CONFIG_SYSTEM_LM75_FAHRENHEIT 1
+#  define CONFIG_SYSTEM_LM75_FAHRENHEIT 1
 #endif
 
 #if defined(CONFIG_SYSTEM_LM75_FAHRENHEIT) && defined(CONFIG_SYSTEM_LM75_CELSIUS)

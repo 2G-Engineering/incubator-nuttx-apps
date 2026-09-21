@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/netlink_route/netlink_route_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,7 +50,7 @@
  ****************************************************************************/
 
 #define MAX_DEVICES 16
-#define MAX_ROUTES  64
+#define MAX_ROUTES  4
 
 #ifdef CONFIG_NET_IPv6
 #  define ROUTE_BUFSIZE INET6_ADDRSTRLEN

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/tcpecho/tcpecho_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -244,7 +246,8 @@ static int tcpecho_server(void)
           /* new client connection */
 
           clilen = sizeof(cliaddr);
-          connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
+          connfd = accept4(listenfd, (struct sockaddr *)&cliaddr, &clilen,
+                           SOCK_CLOEXEC);
 
           ninfo("new client: %s\n",
                 inet_ntoa_r(cliaddr.sin_addr, inetaddr, sizeof(inetaddr)));

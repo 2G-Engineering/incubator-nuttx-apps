@@ -1,6 +1,8 @@
 ############################################################################
 # apps/lte/lapi/src/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,6 @@ CSRCS = lapi_evt.c      \
 
 DEPPATH += --dep-path src
 VPATH += :src
-CFLAGS += ${shell $(INCDIR) "$(CC)" $(APPDIR)/lte/lapi/src}
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/lte/lapi/src
 
 endif

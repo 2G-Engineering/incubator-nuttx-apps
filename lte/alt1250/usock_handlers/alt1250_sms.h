@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_sms.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,7 +56,7 @@
 #define SMS_SET_MSG_INDEX(info, x) ((info)->msg_index = (x))
 
 /****************************************************************************
- * Public Data Type
+ * Public Types
  ****************************************************************************/
 
 enum sms_state_e

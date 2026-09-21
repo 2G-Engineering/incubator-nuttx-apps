@@ -1,6 +1,8 @@
 ############################################################################
 # apps/interpreters/luajit/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -161,7 +163,7 @@ HOSTCFLAGS += -DLJ_ABI_SOFTFP=0
 HOSTCFLAGS += -DLJ_ARCH_HASFPU=1
 HOSTCFLAGS += -DLUAJIT_DISABLE_PROFILE
 HOSTCFLAGS += -DLUAJIT_NO_UNWIND
-HOSTCFLAGS += -DLUAJIT_TARGET=LUAJIT_ARCH_arm
+HOSTCFLAGS += -DLUAJIT_TARGET=LUAJIT_ARCH_ARM
 HOSTCFLAGS += -I$(LUAJIT_UNPACK)/src
 HOSTCFLAGS += -I$(LUAJIT_UNPACK)/src/host
 

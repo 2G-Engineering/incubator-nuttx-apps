@@ -1,9 +1,8 @@
 /****************************************************************************
  * apps/modbus/nuttx/port.h
  *
- * FreeModbus Library: NuttX Port
- * Copyright (c) 2006 Christian Walter <wolti@sil.at>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2006 Christian Walter <wolti@sil.at>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -80,8 +79,12 @@ typedef enum
 
 void vMBPortEnterCritical(void);
 void vMBPortExitCritical(void);
+#ifndef CONFIG_MODBUS_DISABLE_LOG
 void vMBPortLog(eMBPortLogLevel eLevel, const char *szModule,
                 const char *szFmt, ...) printf_like(3, 4);
+#else
+#  define vMBPortLog(l, m, c, ...)
+#endif
 void vMBPortTimerPoll(void);
 bool xMBPortSerialPoll(void);
 bool xMBPortSerialSetTimeout(uint32_t dwTimeoutMs);

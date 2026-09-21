@@ -1,6 +1,8 @@
 ############################################################################
 # apps/Application.mk
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -23,12 +25,18 @@
 # has the value "m"
 
 ifneq ($(MAINSRC),)
-  ifeq ($(MODULE),m)
+  ifeq ($(DYNLIB),y)
     BUILD_MODULE = y
-  endif
-
-  ifeq ($(CONFIG_BUILD_KERNEL),y)
-    BUILD_MODULE = y
+    MODAELFFLAGS = $(CMODULELFFLAGS)
+    MODCFLAGS = $(CMODULEFLAGS)
+    MODCXXFLAGS = $(CXXMODULEFLAGS)
+    MODLDFLAGS = $(LDMODULEFLAGS)
+  else ifneq ($(or $(filter y,$(CONFIG_BUILD_KERNEL)), $(filter m,$(MODULE))),)
+      BUILD_MODULE = y
+      MODAELFFLAGS = $(AELFFLAGS)
+      MODCFLAGS = $(CELFFLAGS)
+      MODCXXFLAGS = $(CXXELFFLAGS)
+      MODLDFLAGS = $(LDELFFLAGS)
   endif
 endif
 
@@ -41,6 +49,10 @@ ifeq ($(CONFIG_WINDOWS_NATIVE),y)
 else
   CWD = $(CURDIR)
 endif
+
+SUFFIX ?= $(subst $(DELIM),.,$(CWD))
+
+PROGNAME := $(subst ",,$(PROGNAME))
 
 # Add the static application library to the linked libraries.
 
@@ -61,42 +73,91 @@ ifeq ($(BUILD_MODULE),y)
   LDLIBS += $(COMPILER_RT_LIB)
 endif
 
-SUFFIX = $(subst $(DELIM),.,$(CWD))
+# Apps compilation can achieve out-of-tree intermediate products
+# by specifying "PREFIX" to a directory in its own Makefile.
+# Default value is NULL,
+# Make sure the out-of-tree directory exists and ends with $(DELIM) when setting it.
 
-PROGNAME := $(subst ",,$(PROGNAME))
+PREFIX ?=
 
 # Object files
 
 RASRCS = $(filter %.s,$(ASRCS))
 CASRCS = $(filter %.S,$(ASRCS))
 
-RAOBJS = $(RASRCS:=$(SUFFIX)$(OBJEXT))
-CAOBJS = $(CASRCS:=$(SUFFIX)$(OBJEXT))
-COBJS = $(CSRCS:=$(SUFFIX)$(OBJEXT))
-CXXOBJS = $(CXXSRCS:=$(SUFFIX)$(OBJEXT))
-RUSTOBJS = $(RUSTSRCS:=$(SUFFIX)$(OBJEXT))
-ZIGOBJS = $(ZIGSRCS:=$(SUFFIX)$(OBJEXT))
+RAOBJS = $(RASRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+CAOBJS = $(CASRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+COBJS = $(CSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+CXXOBJS = $(CXXSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+RUSTOBJS = $(RUSTSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+ZIGOBJS = $(ZIGSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+DOBJS = $(DSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+SWIFTOBJS = $(SWIFTSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
 
 MAINCXXSRCS = $(filter %$(CXXEXT),$(MAINSRC))
 MAINCSRCS = $(filter %.c,$(MAINSRC))
 MAINRUSTSRCS = $(filter %$(RUSTEXT),$(MAINSRC))
 MAINZIGSRCS = $(filter %$(ZIGEXT),$(MAINSRC))
-MAINCXXOBJ = $(MAINCXXSRCS:=$(SUFFIX)$(OBJEXT))
-MAINCOBJ = $(MAINCSRCS:=$(SUFFIX)$(OBJEXT))
-MAINRUSTOBJ = $(MAINRUSTSRCS:=$(SUFFIX)$(OBJEXT))
-MAINZIGOBJ = $(MAINZIGSRCS:=$(SUFFIX)$(OBJEXT))
+MAINDSRCS = $(filter %$(DEXT),$(MAINSRC))
+MAINSWIFTSRCS = $(filter %$(SWIFTEXT),$(MAINSRC))
+MAINCXXOBJ = $(MAINCXXSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+MAINCOBJ = $(MAINCSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+MAINRUSTOBJ = $(MAINRUSTSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+MAINZIGOBJ = $(MAINZIGSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+MAINDOBJ = $(MAINDSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
+MAINSWIFTOBJ = $(MAINSWIFTSRCS:%=$(PREFIX)%$(SUFFIX)$(OBJEXT))
 
 SRCS = $(ASRCS) $(CSRCS) $(CXXSRCS) $(MAINSRC)
-OBJS = $(RAOBJS) $(CAOBJS) $(COBJS) $(CXXOBJS) $(RUSTOBJS) $(ZIGOBJS) $(EXTOBJS)
+OBJS = $(RAOBJS) $(CAOBJS) $(COBJS) $(CXXOBJS) $(RUSTOBJS) $(ZIGOBJS) $(DOBJS) $(SWIFTOBJS) $(EXTOBJS)
 
 ifneq ($(BUILD_MODULE),y)
-  OBJS += $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ)
+  OBJS += $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ) $(MAINDOBJ) $(MAINSWIFTOBJ)
+endif
+
+ifneq ($(strip $(PROGNAME)),)
+  PROGOBJ := $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ) $(MAINDOBJ) $(MAINSWIFTOBJ)
+  PROGLIST := $(addprefix $(BINDIR)$(DELIM),$(PROGNAME))
+  REGLIST := $(addprefix $(BUILTIN_REGISTRY)$(DELIM),$(addsuffix .bdat,$(PROGNAME)))
+
+  NLIST := $(shell seq 1 $(words $(PROGNAME)))
+  $(foreach i, $(NLIST), \
+    $(eval PROGNAME_$(word $i,$(PROGOBJ)) := $(word $i,$(PROGNAME))) \
+    $(eval PROGOBJ_$(word $i,$(PROGLIST)) := $(word $i,$(PROGOBJ))) \
+    $(eval PRIORITY_$(word $i,$(REGLIST)) := \
+        $(if $(word $i,$(PRIORITY)),$(word $i,$(PRIORITY)),$(lastword $(PRIORITY)))) \
+    $(eval STACKSIZE_$(word $i,$(REGLIST)) := \
+        $(if $(word $i,$(STACKSIZE)),$(word $i,$(STACKSIZE)),$(lastword $(STACKSIZE)))) \
+    $(eval UID_$(word $i,$(REGLIST)) := \
+        $(if $(word $i,$(UID)),$(word $i,$(UID)),$(lastword $(UID)))) \
+    $(eval GID_$(word $i,$(REGLIST)) := \
+        $(if $(word $i,$(GID)),$(word $i,$(GID)),$(lastword $(GID)))) \
+    $(eval MODE_$(word $i,$(REGLIST)) := \
+        $(if $(word $i,$(MODE)),$(word $i,$(MODE)),$(lastword $(MODE)))) \
+  )
+endif
+
+# Condition flags
+
+DO_REGISTRATION ?= y
+
+ifeq ($(PROGNAME),)
+  DO_REGISTRATION = n
+endif
+
+ifeq ($(WASM_BUILD),y)
+  DO_REGISTRATION = n
+endif
+
+ifeq ($(DYNLIB),y)
+  DO_REGISTRATION = n
 endif
 
 # Compile flags, notice the default flags only suitable for flat build
 
 ZIGELFFLAGS ?= $(ZIGFLAGS)
 RUSTELFFLAGS ?= $(RUSTFLAGS)
+DELFFLAGS ?= $(DFLAGS)
+SWIFTELFFLAGS ?= $(SWIFTFLAGS)
 
 DEPPATH += --dep-path .
 DEPPATH += --obj-path .
@@ -105,25 +166,26 @@ VPATH += :.
 
 # Targets follow
 
-all:: $(OBJS)
+all:: $(PREFIX).built
+	@:
 .PHONY: clean depend distclean
 .PRECIOUS: $(BIN)
 
 define ELFASSEMBLE
 	$(ECHO_BEGIN)"AS: $1 "
-	$(Q) $(CC) -c $(AELFFLAGS) $($(strip $1)_AELFFLAGS) $1 -o $2
+	$(Q) $(MODULECC) -c $(MODAELFFLAGS) $($(strip $1)_AELFFLAGS) $1 -o $2
 	$(ECHO_END)
 endef
 
 define ELFCOMPILE
 	$(ECHO_BEGIN)"CC: $1 "
-	$(Q) $(CC) -c $(CELFFLAGS) $($(strip $1)_CELFFLAGS) $1 -o $2
+	$(Q) $(MODULECC) -c $(MODCFLAGS) $($(strip $1)_CELFFLAGS) $1 -o $2
 	$(ECHO_END)
 endef
 
 define ELFCOMPILEXX
 	$(ECHO_BEGIN)"CXX: $1 "
-	$(Q) $(CXX) -c $(CXXELFFLAGS) $($(strip $1)_CXXELFFLAGS) $1 -o $2
+	$(Q) $(CXX) -c $(MODCXXFLAGS) $($(strip $1)_CXXELFFLAGS) $1 -o $2
 	$(ECHO_END)
 endef
 
@@ -133,143 +195,208 @@ define ELFCOMPILERUST
 	$(ECHO_END)
 endef
 
+# Remove target suffix here since zig compiler add .o automatically
 define ELFCOMPILEZIG
 	$(ECHO_BEGIN)"ZIG: $1 "
-	# Remove target suffix here since zig compiler add .o automatically
 	$(Q) $(ZIG) build-obj $(ZIGELFFLAGS) $($(strip $1)_ZIGELFFLAGS) --name $(basename $2) $1
+	$(ECHO_END)
+endef
+
+define ELFCOMPILED
+	$(ECHO_BEGIN)"DC: $1 "
+	$(Q) $(DC) -c $(DELFFLAGS) $($(strip $1)_DELFFLAGS) $1 -of $2
+	$(ECHO_END)
+endef
+
+define ELFCOMPILESWIFT
+	$(ECHO_BEGIN)"SWIFTC: $1 "
+	$(Q) $(SWIFTC) -c $(SWIFTELFFLAGS) $($(strip $1)_SWIFTELFFLAGS) $1 -o $2
 	$(ECHO_END)
 endef
 
 define ELFLD
 	$(ECHO_BEGIN)"LD: $2 "
-	$(Q) $(LD) $(LDELFFLAGS) $(LDLIBPATH) $(ARCHCRT0OBJ) $1 $(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) -o $2
+	$(Q) $(MODULELD) $(MODLDFLAGS) $(LDMAP) $(LDLIBPATH) $(ARCHCRT0OBJ) $1 $(LDSTARTGROUP) $(LDLIBS) $(LDENDGROUP) -o $2
 	$(ECHO_END)
 endef
 
-$(RAOBJS): %.s$(SUFFIX)$(OBJEXT): %.s
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(AELFFLAGS)), \
+# rename "main()" in $1 to "xxx_main()" and save to $2
+define RENAMEMAIN
+	$(ECHO_BEGIN)"Rename main() in $1 and save to $2"
+	$(Q) ${shell cat $1 | sed -e "s/fn[ ]\+main/fn $(addsuffix _main,$(PROGNAME_$@))/" > $2}
+	$(ECHO_END)
+endef
+
+$(RAOBJS): $(PREFIX)%.s$(SUFFIX)$(OBJEXT): %.s
+	$(if $(and $(CONFIG_MODULES),$(MODAELFFLAGS)), \
 		$(call ELFASSEMBLE, $<, $@), $(call ASSEMBLE, $<, $@))
 
-$(CAOBJS): %.S$(SUFFIX)$(OBJEXT): %.S
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(AELFFLAGS)), \
+$(CAOBJS): $(PREFIX)%.S$(SUFFIX)$(OBJEXT): %.S
+	$(if $(and $(CONFIG_MODULES),$(MODAELFFLAGS)), \
 		$(call ELFASSEMBLE, $<, $@), $(call ASSEMBLE, $<, $@))
 
-$(COBJS): %.c$(SUFFIX)$(OBJEXT): %.c
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
+$(COBJS): $(PREFIX)%.c$(SUFFIX)$(OBJEXT): %.c
+	$(if $(and $(CONFIG_MODULES),$(MODCFLAGS)), \
 		$(call ELFCOMPILE, $<, $@), $(call COMPILE, $<, $@))
 
-$(CXXOBJS): %$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CXXELFFLAGS)), \
+$(CXXOBJS): $(PREFIX)%$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
+	$(if $(and $(CONFIG_MODULES),$(MODCXXFLAGS)), \
 		$(call ELFCOMPILEXX, $<, $@), $(call COMPILEXX, $<, $@))
 
-$(RUSTOBJS): %$(RUSTEXT)$(SUFFIX)$(OBJEXT): %$(RUSTEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
+$(RUSTOBJS): $(PREFIX)%$(RUSTEXT)$(SUFFIX)$(OBJEXT): %$(RUSTEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
 		$(call ELFCOMPILERUST, $<, $@), $(call COMPILERUST, $<, $@))
 
-$(ZIGOBJS): %$(ZIGEXT)$(SUFFIX)$(OBJEXT): %$(ZIGEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE), $(CELFFLAGS)), \
+$(ZIGOBJS): $(PREFIX)%$(ZIGEXT)$(SUFFIX)$(OBJEXT): %$(ZIGEXT)
+	$(if $(and $(CONFIG_MODULES), $(CELFFLAGS)), \
 		$(call ELFCOMPILEZIG, $<, $@), $(call COMPILEZIG, $<, $@))
 
-archive:
-	$(call ARCHIVE_ADD, $(call CONVERT_PATH,$(BIN)), $(OBJS))
+$(DOBJS): $(PREFIX)%$(DEXT)$(SUFFIX)$(OBJEXT): %$(DEXT)
+	$(if $(and $(CONFIG_MODULES), $(CELFFLAGS)), \
+		$(call ELFCOMPILED, $<, $@), $(call COMPILED, $<, $@))
+
+$(SWIFTOBJS): $(PREFIX)%$(SWIFTEXT)$(SUFFIX)$(OBJEXT): %$(SWIFTEXT)
+	$(if $(and $(CONFIG_MODULES), $(CELFFLAGS)), \
+		$(call ELFCOMPILESWIFT, $<, $@), $(call COMPILESWIFT, $<, $@))
+
+AROBJS :=
+ifneq ($(OBJS),)
+SORTOBJS := $(sort $(OBJS))
+$(eval $(call SPLITVARIABLE,OBJS_SPILT,$(SORTOBJS),100))
+$(foreach BATCH, $(OBJS_SPILT_TOTAL), \
+	$(foreach obj, $(OBJS_SPILT_$(BATCH)), \
+		$(eval substitute := $(patsubst %$(OBJEXT),%_$(BATCH)$(OBJEXT),$(obj))) \
+		$(eval AROBJS += $(substitute)) \
+		$(eval $(call AROBJSRULES, $(substitute),$(obj))) \
+	) \
+)
+endif
+
+$(PREFIX).built: $(AROBJS)
+	$(call SPLITVARIABLE,ALL_OBJS,$(AROBJS),100)
+	$(foreach BATCH, $(ALL_OBJS_TOTAL), \
+		$(if $(strip $(ALL_OBJS_$(BATCH))), \
+			$(shell $(call ARLOCK, $(call CONVERT_PATH,$(BIN)), $(ALL_OBJS_$(BATCH)))) \
+		) \
+	)
+	$(Q) touch $@
 
 ifeq ($(BUILD_MODULE),y)
 
-$(MAINCXXOBJ): %$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CXXELFFLAGS)), \
+$(MAINCXXOBJ): $(PREFIX)%$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
+	$(if $(and $(CONFIG_MODULES),$(MODCXXFLAGS)), \
 		$(call ELFCOMPILEXX, $<, $@), $(call COMPILEXX, $<, $@))
 
-$(MAINCOBJ): %.c$(SUFFIX)$(OBJEXT): %.c
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
+$(MAINCOBJ): $(PREFIX)%.c$(SUFFIX)$(OBJEXT): %.c
+	$(if $(and $(CONFIG_MODULES),$(MODCFLAGS)), \
 		$(call ELFCOMPILE, $<, $@), $(call COMPILE, $<, $@))
 
-PROGLIST := $(wordlist 1,$(words $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ)),$(PROGNAME))
-PROGLIST := $(addprefix $(BINDIR)$(DELIM),$(PROGLIST))
-PROGOBJ := $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ)
+$(MAINZIGOBJ): $(PREFIX)%$(ZIGEXT)$(SUFFIX)$(OBJEXT): %$(ZIGEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+		$(call ELFCOMPILEZIG, $<, $@), $(call COMPILEZIG, $<, $@))
 
-$(PROGLIST): $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ)
+$(MAINDOBJ): $(PREFIX)%$(DEXT)$(SUFFIX)$(OBJEXT): %$(DEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+		$(call ELFCOMPILED, $<, $@), $(call COMPILED, $<, $@))
+
+$(MAINSWIFTOBJ): $(PREFIX)%$(SWIFTEXT)$(SUFFIX)$(OBJEXT): %$(SWIFTEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+		$(call ELFCOMPILESWIFT, $<, $@), $(call COMPILESWIFT, $<, $@))
+
+$(PROGLIST): $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ) $(MAINDOBJ) $(MAINSWIFTOBJ)
 	$(Q) mkdir -p $(BINDIR)
-	$(call ELFLD,$(firstword $(PROGOBJ)),$(call CONVERT_PATH,$(firstword $(PROGLIST))))
-	$(Q) chmod +x $(firstword $(PROGLIST))
-ifneq ($(CONFIG_DEBUG_SYMBOLS),y)
-	$(Q) $(STRIP) $(firstword $(PROGLIST))
+	$(call ELFLD, $(PROGOBJ_$@), $(call CONVERT_PATH,$@))
+	$(Q) chmod +x $@
+ifneq ($(CONFIG_DEBUG_SYMBOLS),)
+	$(Q) mkdir -p $(BINDIR_DEBUG)
+	$(Q) cp $@ $(BINDIR_DEBUG)
+	$(Q) $(MODULESTRIP) $@
 endif
-	$(eval PROGLIST=$(filter-out $(firstword $(PROGLIST)),$(PROGLIST)))
-	$(eval PROGOBJ=$(filter-out $(firstword $(PROGOBJ)),$(PROGOBJ)))
 
 install:: $(PROGLIST)
+	@:
 
 else
 
-MAINNAME := $(addsuffix _main,$(PROGNAME))
-
-$(MAINCXXOBJ): %$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
-	$(eval MAIN=$(word $(call GETINDEX,$<,$(MAINCXXSRCS)),$(MAINNAME)))
-	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(MAIN)})
-	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(MAIN)})
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CXXELFFLAGS)), \
+$(MAINCXXOBJ): $(PREFIX)%$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
+	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGNAME_$@))})
+	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGNAME_$@))})
+	$(if $(and $(CONFIG_MODULES),$(MODCXXFLAGS)), \
 		$(call ELFCOMPILEXX, $<, $@), $(call COMPILEXX, $<, $@))
 
-$(MAINCOBJ): %.c$(SUFFIX)$(OBJEXT): %.c
-	$(eval MAIN=$(word $(call GETINDEX,$<,$(MAINCSRCS)),$(MAINNAME)))
-	$(eval $<_CFLAGS += ${DEFINE_PREFIX}main=$(MAIN))
-	$(eval $<_CELFFLAGS += ${DEFINE_PREFIX}main=$(MAIN))
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
+$(MAINCOBJ): $(PREFIX)%.c$(SUFFIX)$(OBJEXT): %.c
+	$(eval $<_CFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGNAME_$@)))
+	$(eval $<_CELFFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGNAME_$@)))
+	$(if $(and $(CONFIG_MODULES),$(MODCFLAGS)), \
 		$(call ELFCOMPILE, $<, $@), $(call COMPILE, $<, $@))
 
-$(MAINRUSTOBJ): %$(RUSTEXT)$(SUFFIX)$(OBJEXT): %$(RUSTEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
+$(MAINRUSTOBJ): $(PREFIX)%$(RUSTEXT)$(SUFFIX)$(OBJEXT): %$(RUSTEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
 		$(call ELFCOMPILERUST, $<, $@), $(call COMPILERUST, $<, $@))
 
-$(MAINZIGOBJ): %$(ZIGEXT)$(SUFFIX)$(OBJEXT): %$(ZIGEXT)
-	$(if $(and $(CONFIG_BUILD_LOADABLE),$(CELFFLAGS)), \
-		$(call ELFCOMPILEZIG, $<, $@), $(call COMPILEZIG, $<, $@))
+$(MAINZIGOBJ): $(PREFIX)%$(ZIGEXT)$(SUFFIX)$(OBJEXT): %$(ZIGEXT)
+	$(Q) $(call RENAMEMAIN, $<, $(basename $<)_tmp.zig)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+			$(call ELFCOMPILEZIG, $(basename $<)_tmp.zig, $@), $(call COMPILEZIG, $(basename $<)_tmp.zig, $@))
+	$(Q) rm -f $(basename $<)_tmp.zig
+
+$(MAINDOBJ): $(PREFIX)%$(DEXT)$(SUFFIX)$(OBJEXT): %$(DEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+		$(call ELFCOMPILED, $<, $@), $(call COMPILED, $<, $@))
+
+$(MAINSWIFTOBJ): $(PREFIX)%$(SWIFTEXT)$(SUFFIX)$(OBJEXT): %$(SWIFTEXT)
+	$(if $(and $(CONFIG_MODULES),$(CELFFLAGS)), \
+		$(call ELFCOMPILESWIFT, $<, $@), $(call COMPILESWIFT, $<, $@))
 
 install::
+	@:
 
 endif # BUILD_MODULE
 
+postinstall::
+	@:
+
 context::
 
-ifneq ($(PROGNAME),)
-
-REGLIST := $(addprefix $(BUILTIN_REGISTRY)$(DELIM),$(addsuffix .bdat,$(PROGNAME)))
-APPLIST := $(PROGNAME)
+ifeq ($(DO_REGISTRATION),y)
 
 $(REGLIST): $(DEPCONFIG) Makefile
-	$(call REGISTER,$(firstword $(APPLIST)),$(firstword $(PRIORITY)),$(firstword $(STACKSIZE)),$(if $(BUILD_MODULE),,$(firstword $(APPLIST))_main))
-	$(eval APPLIST=$(filter-out $(firstword $(APPLIST)),$(APPLIST)))
-	$(if $(filter-out $(firstword $(PRIORITY)),$(PRIORITY)),$(eval PRIORITY=$(filter-out $(firstword $(PRIORITY)),$(PRIORITY))))
-	$(if $(filter-out $(firstword $(STACKSIZE)),$(STACKSIZE)),$(eval STACKSIZE=$(filter-out $(firstword $(STACKSIZE)),$(STACKSIZE))))
-
-register:: $(REGLIST)
+	$(eval PROGNAME_$@ := $(basename $(notdir $@)))
+ifeq ($(CONFIG_SCHED_USER_IDENTITY),y)
+	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGNAME_$@)_main),$(UID_$@),$(GID_$@),$(MODE_$@))
 else
-register::
+	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGNAME_$@)_main))
 endif
 
-.depend: Makefile $(wildcard $(foreach SRC, $(SRCS), $(addsuffix /$(SRC), $(subst :, ,$(VPATH))))) $(DEPCONFIG)
-	$(Q) $(MKDEP) $(DEPPATH) --obj-suffix .c$(SUFFIX)$(OBJEXT) "$(CC)" -- $(CFLAGS) -- $(filter %.c,$^) >Make.dep
-	$(Q) $(MKDEP) $(DEPPATH) --obj-suffix .S$(SUFFIX)$(OBJEXT) "$(CC)" -- $(CFLAGS) -- $(filter %.S,$^) >>Make.dep
-	$(Q) $(MKDEP) $(DEPPATH) --obj-suffix $(CXXEXT)$(SUFFIX)$(OBJEXT) "$(CXX)" -- $(CXXFLAGS) -- $(filter %$(CXXEXT),$^) >>Make.dep
+register:: $(REGLIST)
+	@:
+else
+register::
+	@:
+endif
+
+$(PREFIX).depend: Makefile $(wildcard $(foreach SRC, $(SRCS), $(addsuffix /$(SRC), $(subst :, ,$(VPATH))))) $(DEPCONFIG)
+	$(shell echo "# Gen Make.dep automatically" >$(PREFIX)Make.dep)
+	$(call SPLITVARIABLE,ALL_DEP_OBJS,$^,100)
+	$(foreach BATCH, $(ALL_DEP_OBJS_TOTAL), \
+	  $(shell $(MKDEP) $(DEPPATH) --obj-suffix .c$(SUFFIX)$(OBJEXT) "$(CC)" -- $(CFLAGS) -- $(filter %.c,$(ALL_DEP_OBJS_$(BATCH))) >>$(PREFIX)Make.dep) \
+	  $(shell $(MKDEP) $(DEPPATH) --obj-suffix .S$(SUFFIX)$(OBJEXT) "$(CC)" -- $(CFLAGS) -- $(filter %.S,$(ALL_DEP_OBJS_$(BATCH))) >>$(PREFIX)Make.dep) \
+	  $(shell $(MKDEP) $(DEPPATH) --obj-suffix $(CXXEXT)$(SUFFIX)$(OBJEXT) "$(CXX)" -- $(CXXFLAGS) -- $(filter %$(CXXEXT),$(ALL_DEP_OBJS_$(BATCH))) >>$(PREFIX)Make.dep) \
+	)
 	$(Q) touch $@
 
-depend:: .depend
+depend:: $(PREFIX).depend
+	@:
 
 clean::
+	$(call DELFILE, .built)
+	$(call CLEANAROBJS)
 	$(call CLEAN)
-
 distclean:: clean
 	$(call DELFILE, Make.dep)
 	$(call DELFILE, .depend)
 
--include Make.dep
+-include $(PREFIX)Make.dep
 
-# Default values for WASM_BUILD from Application.mk
-
-WASM_BUILD ?= n
-
-ifeq ($(WASM_BUILD),y)
-	ifneq ($(CONFIG_INTERPRETERS_WAMR)$(CONFIG_INTERPRETERS_WASM)$(CONFIG_INTERPRETERS_TOYWASM),)
-		include $(APPDIR)/tools/Wasm.mk
-	endif
-endif
+# Include Wasm specific definitions
+include $(APPDIR)/tools/Wasm.mk

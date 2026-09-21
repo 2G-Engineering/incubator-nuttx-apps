@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/watcher/watcher_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -206,9 +208,9 @@ static int watcher_daemon(int argc, FAR char *argv[])
       goto errout;
     }
 
-  fprintf(fp, "%d %d %d %d %d\n", (int)watcher_pid,
-          (int)CONFIG_EXAMPLES_WATCHER_SIGNAL, (int)SUBSCRIBE_CMD,
-          (int)FEED_CMD, (int)UNSUBSCRIBE_CMD);
+  fprintf(fp, "%d %d %d %d %d\n", watcher_pid,
+          CONFIG_EXAMPLES_WATCHER_SIGNAL, SUBSCRIBE_CMD,
+          FEED_CMD, UNSUBSCRIBE_CMD);
   fclose(fp);
 
   /* Suspends the calling thread until delivery of a non-blocked signal. */

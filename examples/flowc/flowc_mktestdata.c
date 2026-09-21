@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/flowc/flowc_mktestdata.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,7 +37,7 @@ int main(int argc, char **envp)
 
   for (i = 0; i < 100; i++)
     {
-      for (ch = 0x20; ch < 0x7F; ch++)
+      for (ch = 0x20; ch < 0x7f; ch++)
         {
           putchar(ch);
         }

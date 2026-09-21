@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/usock_handlers/alt1250_closehdlr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -63,7 +65,7 @@ static int send_close_command(FAR struct alt1250_s *dev,
   set_container_response(container, USOCKET_REP_RESPONSE(usock), idx);
   set_container_postproc(container, postproc_sockcommon, 0);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -92,7 +94,7 @@ int postproc_sockcommon(FAR struct alt1250_s *dev,
    */
 
   *usock_xid = USOCKET_XID(usock);
-  *usock_result = COMBINE_ERRCODE(*(int *)resp[0], *(int *)resp[1]);
+  *usock_result = COMBINE_ERRCODE(*(FAR int *)resp[0], *(FAR int *)resp[1]);
 
   switch (USOCKET_REQID(usock))
     {
@@ -141,7 +143,7 @@ int usockreq_close(FAR struct alt1250_s *dev,
   if (usock == NULL)
     {
       dbg_alt1250("Failed to get socket context: %u\n",
-                     request->usockid);
+                  request->usockid);
       *usock_result = -EBADFD;
       return REP_SEND_ACK_WOFREE;
     }

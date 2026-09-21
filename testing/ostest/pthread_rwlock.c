@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/pthread_rwlock.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -88,6 +90,7 @@ static FAR void *race_cond_thread1(FAR void *data)
       ASSERT(false);
     }
 
+  sem_wait(rc->sem1);
   status = pthread_rwlock_rdlock(rc->rw_lock);
   if (status != 0)
     {
@@ -197,6 +200,7 @@ static FAR void *race_cond_thread2(FAR void *data)
       ASSERT(false);
     }
 
+  sem_post(rc->sem1);
   if (g_race_cond_thread_pos++ != 3)
     {
       printf("pthread_rwlock: Thread order unexpected. Expected 3, got %d",

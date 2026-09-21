@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/timedmqueue.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -49,7 +51,7 @@
 #else
 /* Message length is the size of the message plus the null terminator */
 
-#  define TEST_MSGLEN         (strlen(TEST_MESSAGE)+1)
+#  define TEST_MSGLEN         sizeof(TEST_MESSAGE)
 #endif
 
 #define TEST_SEND_NMSGS     (10)

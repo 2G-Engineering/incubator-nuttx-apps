@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/fsutils/passwd/passwd_append.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -64,11 +66,11 @@ int passwd_append(FAR const char *username, FAR const char *password)
 
   stream = fopen(CONFIG_FSUTILS_PASSWD_PATH, "a");
   if (stream == NULL)
-   {
+    {
       int errcode = errno;
       DEBUGASSERT(errcode > 0);
       return errcode;
-   }
+    }
 
   /* The format of the password file is:
    *

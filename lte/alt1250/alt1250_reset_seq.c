@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_reset_seq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,6 +28,7 @@
 #include <nuttx/net/usrsock.h>
 
 #include <sys/poll.h>
+#include <sys/param.h>
 #include <assert.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -42,7 +45,7 @@
 #include "alt1250_evt.h"
 
 /****************************************************************************
- * Private Data Type
+ * Private Types
  ****************************************************************************/
 
 struct reset_arg_s
@@ -61,7 +64,7 @@ static postproc_hdlr_t ponreset_seq[] =
 {
   postproc_fwgetversion,
 };
-#define PONRESET_SEQ_NUM  (sizeof(ponreset_seq) / sizeof(ponreset_seq[0]))
+#define PONRESET_SEQ_NUM  nitems(ponreset_seq)
 
 /****************************************************************************
  * Private Functions
@@ -72,12 +75,15 @@ static postproc_hdlr_t ponreset_seq[] =
  ****************************************************************************/
 
 static int postproc_ponresetseq(FAR struct alt1250_s *dev,
-  FAR struct alt_container_s *reply, FAR struct usock_s *usock,
-  FAR int32_t *usock_result, FAR uint32_t *usock_xid,
-  FAR struct usock_ackinfo_s *ackinfo, unsigned long arg)
+                                FAR struct alt_container_s *reply,
+                                FAR struct usock_s *usock,
+                                FAR int32_t *usock_result,
+                                FAR uint32_t *usock_xid,
+                                FAR struct usock_ackinfo_s *ackinfo,
+                                unsigned long arg)
 {
   int ret = REP_NO_ACK_WOFREE;
-  struct reset_arg_s *rarg = (struct reset_arg_s *)arg;
+  FAR struct reset_arg_s *rarg = (FAR struct reset_arg_s *)arg;
   ASSERT(rarg->seq_no < PONRESET_SEQ_NUM);
 
   ponreset_seq[rarg->seq_no](dev, reply, usock, usock_result, usock_xid,
@@ -112,7 +118,7 @@ static int send_getversion_onreset(FAR struct alt1250_s *dev,
   set_container_postproc(container, postproc_ponresetseq,
                          (unsigned long)&reset_arg);
 
-  return altdevice_send_command(dev->altfd, container, usock_result);
+  return altdevice_send_command(dev, dev->altfd, container, usock_result);
 }
 
 /****************************************************************************
@@ -135,7 +141,7 @@ static void str_toupper_case(FAR char *data, int len)
 
 static int recv_atreply_onreset(atreply_parser_t parse,
                                 FAR struct alt1250_s *dev,
-                                void *arg)
+                                FAR void *arg)
 {
   int ret;
   uint64_t bitmap;
@@ -172,7 +178,7 @@ static int recv_atreply_onreset(atreply_parser_t parse,
       ASSERT(rlist == NULL);
 
       reply = (FAR char *)container->outparam[0];
-      rlen = *(int *)container->outparam[2];
+      rlen = *(FAR int *)container->outparam[2];
 
       str_toupper_case(reply, rlen);
       ret = parse(reply, rlen, arg);
@@ -186,6 +192,37 @@ static int recv_atreply_onreset(atreply_parser_t parse,
     }
 
   return ret;
+}
+
+/****************************************************************************
+ * name: alt1250_disable_scanplan
+ ****************************************************************************/
+
+static int alt1250_disable_scanplan(FAR struct alt1250_s *dev,
+                                    FAR struct alt_container_s *container)
+{
+  int recv_ret;
+  struct atreply_truefalse_s t_or_f;
+
+  t_or_f.target_str = "0";
+  ltesp_send_getscanplan(dev, container);
+  recv_ret = recv_atreply_onreset(check_atreply_truefalse, dev, &t_or_f);
+  if (recv_ret == REP_MODEM_RESET)
+    {
+      return recv_ret;
+    }
+
+  if (!t_or_f.result)
+    {
+      ltesp_send_setscanplan(dev, container, false);
+      recv_ret = recv_atreply_onreset(check_atreply_ok, dev, NULL);
+      if (recv_ret == REP_MODEM_RESET)
+        {
+          return recv_ret;
+        }
+    }
+
+  return recv_ret;
 }
 
 /****************************************************************************
@@ -315,6 +352,14 @@ static int alt1250_lwm2m_ponreset(FAR struct alt1250_s *dev,
       ret = REP_SEND_ACK;
     }
 
+  /* Make sure SCAN_PALAN_EN is 0 */
+
+  recv_ret = alt1250_disable_scanplan(dev, container);
+  if (recv_ret == REP_MODEM_RESET)
+    {
+      return recv_ret;
+    }
+
   if (ret == REP_SEND_ACK)
     {
       /* Force Reset is needed. */
@@ -339,11 +384,10 @@ int handle_poweron_reset_stage2(FAR struct alt1250_s *dev)
 {
   int ret;
   int32_t unused;
-
   FAR struct alt_container_s *container;
 
   container = container_alloc();
-  ASSERT(container != 0);
+  ASSERT(container != NULL);
 
   ret = send_getversion_onreset(dev, container, &unused);
 
@@ -373,7 +417,7 @@ int handle_poweron_reset(FAR struct alt1250_s *dev)
   FAR struct alt_container_s *container;
 
   container = container_alloc();
-  ASSERT(container);
+  ASSERT(container != NULL);
 
   while (ret == REP_MODEM_RESET)
     {

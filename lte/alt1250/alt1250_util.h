@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_util.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,15 +27,13 @@
  * Included Files
  ****************************************************************************/
 
+#include <sys/param.h>
+
 #include "alt1250_daemon.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef MIN
-#  define MIN(a,b)  (((a) < (b)) ? (a) : (b))
-#endif
 
 /****************************************************************************
  * Public Function Prototypes

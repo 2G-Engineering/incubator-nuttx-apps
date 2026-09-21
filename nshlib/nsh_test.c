@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_test.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -181,7 +183,7 @@ static inline int unaryexpression(FAR struct nsh_vtbl_s *vtbl,
 {
   struct stat buf;
   FAR char *fullpath;
-  int ret;
+  int ret = TEST_ERROR;
 
   /* -n STRING */
 
@@ -206,21 +208,18 @@ static inline int unaryexpression(FAR struct nsh_vtbl_s *vtbl,
    */
 
   fullpath = nsh_getfullpath(vtbl, argv[1]);
-  if (!fullpath)
+  if (fullpath)
     {
-      return TEST_FALSE;
+      ret = stat(fullpath, &buf);
+      nsh_freefullpath(fullpath);
     }
-
-  ret = stat(fullpath, &buf);
-  nsh_freefullpath(fullpath);
 
   if (ret != 0)
     {
-      /* The file does not exist (or another error occurred) -- return
-       * FALSE.
+      /* The file does not exist (or another error occurred)
        */
 
-      return TEST_FALSE;
+      memset(&buf, 0, sizeof(struct stat));
     }
 
   /* -b FILE */
@@ -256,7 +255,7 @@ static inline int unaryexpression(FAR struct nsh_vtbl_s *vtbl,
     {
       /* Return true if the file exists */
 
-      return TEST_TRUE;
+      return ret == 0 ? TEST_TRUE : TEST_FALSE;
     }
 
   /* -f FILE */
@@ -333,14 +332,20 @@ static int expression(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           goto errout_syntax;
         }
 
-      i += 2;
       value = unaryexpression(vtbl, argv);
+      if (value == TEST_ERROR)
+        {
+          goto do_binary;
+        }
+
+      i += 2;
     }
 
   /* Check for binary operations on simple, typed arguments */
 
   else
     {
+do_binary:
       if (argc < 3)
         {
           goto errout_syntax;

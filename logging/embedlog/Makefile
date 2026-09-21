@@ -1,6 +1,8 @@
 ############################################################################
 # apps/logging/embedlog/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -26,8 +28,8 @@ PACKEXT = .tar.gz
 NXTOOLSDIR = $(APPDIR)/tools
 
 EMBEDLOG_URL = https://distfiles.bofc.pl/embedlog
-EMBEDLOG_VERSION = 0.6.0
-EMBEDLOG_SRC_SHA256 = f5f15dd124d113c7c8cc286f17fc633e1ade90acb6633dc98277968ab2a149d5
+EMBEDLOG_VERSION = 0.7.2
+EMBEDLOG_SRC_SHA256 = 561021ab825584ac7cdf88adb639950ab9fddb474fd52fc8950bc4c70d8d9960
 EMBEDLOG_EXT = tar.gz
 EMBEDLOG_SOURCES = embedlog-$(EMBEDLOG_VERSION)
 EMBEDLOG_TARBALL = $(EMBEDLOG_SOURCES).$(EMBEDLOG_EXT)

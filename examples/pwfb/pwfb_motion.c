@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/pwfb/pwfb_motion.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -177,7 +179,7 @@ static inline bool pwfb_move_cursor(FAR struct pwfb_state_s *st)
 #ifdef CONFIG_EXAMPLES_PWFB_VERBOSE
   printf("pwfb_move_cursor: State: %u countdown: %u blinktime: %u\n",
          (unsigned int)st->cursor.state, (unsigned int)st->cursor.countdown,
-         (unsigned int)st->cursor.blinktime;
+         (unsigned int)st->cursor.blinktime);
   printf("pwfb_move_cursor: Velocity: (%lx.%04lx,%lx.%04lx)\n",
          (unsigned long)st->cursor.deltax >> 16,
          (unsigned long)st->cursor.deltax & 0xffff,
@@ -186,12 +188,13 @@ static inline bool pwfb_move_cursor(FAR struct pwfb_state_s *st)
 #endif
 
   /* Handle the update based on cursor state */
+
   /* If the state is not PFWB_CURSOR_STATIONARY, then update the cursor
    * position.
    */
 
- if (st->cursor.state != PFWB_CURSOR_STATIONARY)
-   {
+  if (st->cursor.state != PFWB_CURSOR_STATIONARY)
+    {
       /* Update X position */
 
       newx                  = st->cursor.xpos + st->cursor.deltax;
@@ -258,7 +261,7 @@ static inline bool pwfb_move_cursor(FAR struct pwfb_state_s *st)
 
           return false;
         }
-   }
+    }
 
   /* Check for state changes */
 

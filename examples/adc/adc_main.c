@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/adc/adc_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -308,7 +310,7 @@ int main(int argc, FAR char *argv[])
           if (nsamples * sizeof(struct adc_msg_s) != nbytes)
             {
               printf("adc_main: read size=%ld is not a multiple of "
-                     "sample size=%d, Ignoring\n",
+                     "sample size=%zu, Ignoring\n",
                      (long)nbytes, sizeof(struct adc_msg_s));
             }
           else

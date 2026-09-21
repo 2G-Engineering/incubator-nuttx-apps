@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/include/audioutils/mml_parser.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -99,4 +101,4 @@ int parse_mml(FAR struct music_macro_lang_s *mml,
 }
 #endif
 
-#endif	/* __APPS_INCLUDE_AUDIOUTILS_MML_PARSER_MML_PARSER_H */
+#endif /* __APPS_INCLUDE_AUDIOUTILS_MML_PARSER_MML_PARSER_H */

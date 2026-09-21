@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/nshlib/nsh_consolemain.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -65,6 +67,10 @@ int nsh_consolemain(int argc, FAR char *argv[])
   int ret;
 
   DEBUGASSERT(pstate != NULL);
+  if (pstate == NULL)
+    {
+      return -ENOMEM;
+    }
 
   /* Execute the session */
 

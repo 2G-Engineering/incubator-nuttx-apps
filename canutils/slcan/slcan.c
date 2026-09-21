@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/canutils/slcan/slcan.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -44,10 +46,8 @@
 #include <sys/socket.h>
 #include <syslog.h>
 #include <sys/uio.h>
-#include <net/if.h>
 #include <termios.h>
 #include <nuttx/can.h>
-#include <netpacket/can.h>
 
 #include "slcan.h"
 
@@ -137,8 +137,7 @@ static int caninit(char *candev, int *s, struct sockaddr_can *addr,
       syslog(LOG_ERR, "Error opening CAN socket\n");
       return -1;
     }
-  strncpy(ifr.ifr_name, candev, 4);
-  ifr.ifr_name[4] = '\0';
+  strlcpy(ifr.ifr_name, candev, IFNAMSIZ);
   ifr.ifr_ifindex = if_nametoindex(ifr.ifr_name);
   if (!ifr.ifr_ifindex)
     {
@@ -317,9 +316,22 @@ int main(int argc, char *argv[])
                         {
                           /* open CAN interface */
 
-                          mode = 1;
-                          debug_print("Open interface\n");
-                          ok_return(fd);
+                          struct ifreq ifr;
+
+                          strlcpy(ifr.ifr_name, argv[1], IFNAMSIZ);
+
+                          ifr.ifr_flags = IFF_UP;
+                          if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
+                            {
+                              syslog(LOG_ERR, "Open interface failed\n");
+                              fail_return(fd);
+                            }
+                          else
+                            {
+                              mode = 1;
+                              debug_print("Open interface\n");
+                              ok_return(fd);
+                            }
                         }
                       else if (buf[0] == 'S')
                         {
@@ -363,9 +375,7 @@ int main(int argc, char *argv[])
                           /* set the device name */
 
                           strlcpy(ifr.ifr_name, argv[1], IFNAMSIZ);
-
-                          ifr.ifr_ifru.ifru_can_data.arbi_bitrate =
-                            canspeed / 1000; /* Convert bit/s to kbit/s */
+                          ifr.ifr_ifru.ifru_can_data.arbi_bitrate = canspeed;
                           ifr.ifr_ifru.ifru_can_data.arbi_samplep = 80;
 
                           if (ioctl(s, SIOCSCANBITRATE, &ifr) < 0)
@@ -395,9 +405,22 @@ int main(int argc, char *argv[])
                         {
                           /* close interface */
 
-                          mode = 0;
-                          debug_print("Close interface\n");
-                          ok_return(fd);
+                          struct ifreq ifr;
+
+                          strlcpy(ifr.ifr_name, argv[1], IFNAMSIZ);
+
+                          ifr.ifr_flags = 0;
+                          if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
+                            {
+                              syslog(LOG_ERR, "Close interface failed\n");
+                              fail_return(fd);
+                            }
+                          else
+                            {
+                              mode = 0;
+                              debug_print("Close interface\n");
+                              ok_return(fd);
+                            }
                         }
                       else if (buf[0] == 'T')
                         {

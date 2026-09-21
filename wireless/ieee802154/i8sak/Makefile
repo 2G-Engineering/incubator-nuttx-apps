@@ -1,6 +1,8 @@
 ############################################################################
 # apps/wireless/ieee802154/i8sak/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -31,7 +33,7 @@ MODULE = $(CONFIG_IEEE802154_I8SAK)
 
 CSRCS = i8sak_acceptassoc.c i8sak_assoc.c i8sak_scan.c i8sak_blaster.c i8sak_poll.c
 CSRCS += i8sak_sniffer.c i8sak_startpan.c i8sak_tx.c i8sak_get.c i8sak_set.c
-CSRCS += i8sak_reset.c i8sak_regdump.c i8sak_events.c
+CSRCS += i8sak_reset.c i8sak_regdump.c i8sak_events.c i8sak_tracedump.c
 MAINSRC = i8sak_main.c
 
 include $(APPDIR)/Application.mk

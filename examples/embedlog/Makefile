@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/embedlog/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -26,6 +28,10 @@ PROGNAME = $(CONFIG_EXAMPLES_EMBEDLOG_PROGNAME)
 PRIORITY = $(CONFIG_EXAMPLES_EMBEDLOG_PRIORITY)
 STACKSIZE = $(CONFIG_EXAMPLES_EMBEDLOG_STACKSIZE)
 MODULE = $(CONFIG_EXAMPLES_EMBEDLOG)
+
+ifeq ($(CONFIG_EXAMPLES_EMBEDLOG_STRIP_ALL_STRINGS),y)
+  CFLAGS += -DDISABLE_ALL_EMBEDLOG
+endif
 
 # embedlog Example
 

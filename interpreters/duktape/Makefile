@@ -1,6 +1,8 @@
 ############################################################################
 # apps/interpreters/duktape/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -47,6 +49,7 @@ CFLAGS += -I$(DUKTAPE_UNPACK)/extras/console
 CFLAGS += -I$(DUKTAPE_UNPACK)/extras/print-alert
 CFLAGS += -DDUK_CMDLINE_CONSOLE_SUPPORT
 CFLAGS += -DDUK_CMDLINE_PRINTALERT_SUPPORT
+CFLAGS += -Wno-unused-but-set-variable
 
 $(DUKTAPE_TARBALL):
 	$(Q) echo "Downloading $(DUKTAPE_TARBALL)"

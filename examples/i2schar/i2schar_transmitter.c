@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/i2schar/i2schar_transmitter.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -100,7 +102,7 @@ pthread_addr_t i2schar_transmitter(pthread_addr_t arg)
 
   /* Loop for the requested number of times */
 
-  for (i = 0, crap = 0; i < CONFIG_EXAMPLES_I2SCHAR_TXBUFFERS; i++)
+  for (i = 0, crap = 0; i < g_i2schar.txcount; i++)
     {
       /* Allocate an audio buffer of the configured size */
 

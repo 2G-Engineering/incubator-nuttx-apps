@@ -1,6 +1,8 @@
 #############################################################################
 # apps/netutils/thttpd/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -37,7 +39,7 @@ ifeq ($(CONFIG_THTTPD_NXFLAT),y)
 endif
 
 ifeq ($(CONFIG_THTTPD_BINFS),y)
-  CSRCS +=  phf.c redirect.c ssi.c
+  MAINSRC +=  phf.c redirect.c ssi.c
   CFLAGS += ${INCDIR_PREFIX}"$(APPDIR)$(DELIM)netutils$(DELIM)thttpd"
   DEPPATHS += --dep-path cgi-src
   VPATH += :cgi-src

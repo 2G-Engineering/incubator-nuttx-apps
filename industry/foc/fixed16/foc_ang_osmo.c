@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/industry/foc/fixed16/foc_ang_osmo.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -267,6 +269,15 @@ static int foc_angle_osmo_run_b16(FAR foc_angle_b16_t *h,
 
   DEBUGASSERT(h->data);
   ob = h->data;
+
+  if (in->vel == 0)
+    {
+      /* Do nothing if motor stopped */
+
+      out->type  = FOC_ANGLE_TYPE_ELE;
+      out->angle = 0;
+      return OK;
+    }
 
   /* Update observer */
 

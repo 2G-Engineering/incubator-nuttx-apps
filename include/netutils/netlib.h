@@ -1,17 +1,11 @@
 /****************************************************************************
  * apps/include/netutils/netlib.h
- * Various non-standard APIs to support netutils.  All non-standard and
- * intended only for internal use.
  *
- *   Copyright (C) 2007, 2009, 2011, 2015, 2017 Gregory Nutt. All rights
- *   reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Some of these APIs derive from uIP.  uIP also has a BSD style license:
- *
- *   Author: Adam Dunkels <adam@sics.se>
- *   Copyright (c) 2002, Adam Dunkels.
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2007, 2009, 2011, 2015, 2017 Gregory Nutt.
+ * SPDX-FileCopyrightText: 2002 Adam Dunkels.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-FileContributor: Adam Dunkels <adam@sics.se>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,6 +52,7 @@
 
 #include <net/if.h>
 #include <netinet/in.h>
+#include <nuttx/net/netdev.h>
 #include <nuttx/net/netconfig.h>
 
 /****************************************************************************
@@ -122,6 +117,60 @@ struct netlib_device_s
   char ifname[IFNAMSIZ];          /* Interface name */
 };
 #endif /* CONFIG_NETLINK_ROUTE*/
+
+#ifdef CONFIG_NETLINK_NETFILTER
+/* Describes one connection returned by netlib_get_conntrack() */
+
+union netlib_conntrack_addr_u
+{
+#ifdef CONFIG_NET_IPv4
+  struct in_addr ipv4;
+#endif
+#ifdef CONFIG_NET_IPv6
+  struct in6_addr ipv6;
+#endif
+};
+
+struct netlib_conntrack_tuple_s
+{
+  union netlib_conntrack_addr_u src;
+  union netlib_conntrack_addr_u dst;
+
+  union
+  {
+    struct
+    {
+      uint16_t sport;
+      uint16_t dport;
+    } tcp; /* and udp */
+
+    struct
+    {
+      uint16_t id;
+      uint8_t  type;
+      uint8_t  code;
+    } icmp; /* and icmp6 */
+  } l4;
+
+  uint8_t l4proto;
+};
+
+struct netlib_conntrack_s
+{
+  struct netlib_conntrack_tuple_s orig;
+  struct netlib_conntrack_tuple_s reply;
+
+  sa_family_t family; /* AF_INET or AF_INET6 */
+  uint8_t     type;   /* IPCTNL_MSG_CT_* */
+};
+
+/* There might be many conntrack entries, so we don't use array of data, but
+ * use callback instead.
+ */
+
+typedef CODE int (*netlib_conntrack_cb_t)(FAR struct netlib_conntrack_s *ct);
+
+#endif /* CONFIG_NETLINK_NETFILTER */
 
 #ifdef CONFIG_NETUTILS_NETLIB_GENERICURLPARSER
 struct url_s
@@ -239,7 +288,21 @@ int netlib_get_ipv4netmask(FAR const char *ifname, FAR struct in_addr *addr);
 int netlib_ipv4adaptor(in_addr_t destipaddr, FAR in_addr_t *srcipaddr);
 #endif
 
+/* We support multiple IPv6 addresses on a single interface.
+ * Recommend to use netlib_add/del_ipv6addr to manage them, by which you
+ * don't need to care about the slot it stored.
+ *
+ * Previous interfaces can still work, the ifname can be <eth>:<num>,
+ * e.g. eth0:0 stands for managing the secondary address on eth0
+ */
+
 #ifdef CONFIG_NET_IPv6
+#  ifdef CONFIG_NETDEV_MULTIPLE_IPv6
+int netlib_add_ipv6addr(FAR const char *ifname,
+                        FAR const struct in6_addr *addr, uint8_t preflen);
+int netlib_del_ipv6addr(FAR const char *ifname,
+                        FAR const struct in6_addr *addr, uint8_t preflen);
+#  endif
 int netlib_get_ipv6addr(FAR const char *ifname, FAR struct in6_addr *addr);
 int netlib_set_ipv6addr(FAR const char *ifname,
                         FAR const struct in6_addr *addr);
@@ -307,10 +370,20 @@ ssize_t netlib_get_route(FAR struct rtentry *rtelist,
                          unsigned int nentries, sa_family_t family);
 #endif
 
+#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NETUTILS_DHCPC)
+/* DHCP */
+
+int netlib_obtain_ipv4addr(FAR const char *ifname);
+#endif
+
 #ifdef CONFIG_NET_ICMPv6_AUTOCONF
 /* ICMPv6 Autoconfiguration */
 
 int netlib_icmpv6_autoconfiguration(FAR const char *ifname);
+
+/* DHCPv6 */
+
+int netlib_obtain_ipv6addr(FAR const char *ifname);
 #endif
 
 #ifdef CONFIG_NET_IPTABLES
@@ -318,11 +391,16 @@ int netlib_icmpv6_autoconfiguration(FAR const char *ifname);
 
 struct ipt_replace;  /* Forward reference */
 struct ipt_entry;    /* Forward reference */
+struct ip6t_replace; /* Forward reference */
+struct ip6t_entry;   /* Forward reference */
 enum nf_inet_hooks;  /* Forward reference */
 
+#  ifdef CONFIG_NET_IPv4
 FAR struct ipt_replace *netlib_ipt_prepare(FAR const char *table);
 int netlib_ipt_commit(FAR const struct ipt_replace *repl);
 int netlib_ipt_flush(FAR const char *table, enum nf_inet_hooks hook);
+int netlib_ipt_policy(FAR const char *table, enum nf_inet_hooks hook,
+                      int verdict);
 int netlib_ipt_append(FAR struct ipt_replace **repl,
                       FAR const struct ipt_entry *entry,
                       enum nf_inet_hooks hook);
@@ -332,9 +410,52 @@ int netlib_ipt_insert(FAR struct ipt_replace **repl,
 int netlib_ipt_delete(FAR struct ipt_replace *repl,
                       FAR const struct ipt_entry *entry,
                       enum nf_inet_hooks hook, int rulenum);
-#  ifdef CONFIG_NET_NAT
+int netlib_ipt_fillifname(FAR struct ipt_entry *entry,
+                          FAR const char *inifname,
+                          FAR const char *outifname);
+#    ifdef CONFIG_NET_NAT
 FAR struct ipt_entry *netlib_ipt_masquerade_entry(FAR const char *ifname);
-#  endif
+#    endif
+#    ifdef CONFIG_NET_IPFILTER
+FAR struct ipt_entry *netlib_ipt_filter_entry(FAR const char *target,
+                                              int verdict,
+                                              uint8_t match_proto);
+#    endif
+#  endif /* CONFIG_NET_IPv4 */
+#  ifdef CONFIG_NET_IPv6
+FAR struct ip6t_replace *netlib_ip6t_prepare(FAR const char *table);
+int netlib_ip6t_commit(FAR const struct ip6t_replace *repl);
+int netlib_ip6t_flush(FAR const char *table, enum nf_inet_hooks hook);
+int netlib_ip6t_policy(FAR const char *table, enum nf_inet_hooks hook,
+                       int verdict);
+int netlib_ip6t_append(FAR struct ip6t_replace **repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook);
+int netlib_ip6t_insert(FAR struct ip6t_replace **repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook, int rulenum);
+int netlib_ip6t_delete(FAR struct ip6t_replace *repl,
+                       FAR const struct ip6t_entry *entry,
+                       enum nf_inet_hooks hook, int rulenum);
+int netlib_ip6t_fillifname(FAR struct ip6t_entry *entry,
+                           FAR const char *inifname,
+                           FAR const char *outifname);
+#    ifdef CONFIG_NET_IPFILTER
+FAR struct ip6t_entry *netlib_ip6t_filter_entry(FAR const char *target,
+                                                int verdict,
+                                                uint8_t match_proto);
+#    endif
+#  endif /* CONFIG_NET_IPv6 */
+#endif /* CONFIG_NET_IPTABLES */
+
+#ifdef CONFIG_NETLINK_NETFILTER
+/* Netfilter connection tracking support */
+
+struct nlmsghdr;  /* Forward reference */
+
+int netlib_parse_conntrack(FAR const struct nlmsghdr *nlh, size_t len,
+                           FAR struct netlib_conntrack_s *ct);
+int netlib_get_conntrack(sa_family_t family, netlib_conntrack_cb_t cb);
 #endif
 
 /* HTTP support */
@@ -368,6 +489,11 @@ int netlib_set_ipv6dnsaddr(FAR const struct in6_addr *inaddr);
 #endif
 
 int netlib_set_mtu(FAR const char *ifname, int mtu);
+
+#if defined(CONFIG_NETDEV_STATISTICS)
+int netlib_getifstatistics(FAR const char *ifname,
+                           FAR struct netdev_statistics_s *stat);
+#endif
 
 #undef EXTERN
 #ifdef __cplusplus

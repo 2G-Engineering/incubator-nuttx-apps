@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/nxplayer/nxplayer_mp3.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <unistd.h>
 
 #include <nuttx/audio/audio.h>
@@ -42,7 +45,7 @@
 #define ID3V2_BIT_MASK 0x7F
 
 /****************************************************************************
- * Private Type Declarations
+ * Private Types
  ****************************************************************************/
 
 const static uint16_t g_mpa_freq_tab[3] =
@@ -157,8 +160,7 @@ static int nxplayer_parse_mpeg(uint32_t header, FAR uint32_t *samplerate,
   padding = (header >> 9) & 1;
   mode    = (header >> 6) & 3;
 
-  if (sr_idx >= sizeof(g_mpa_freq_tab) / sizeof(g_mpa_freq_tab[0]) ||
-      br_idx >= 0xf)
+  if (sr_idx >= nitems(g_mpa_freq_tab) || br_idx >= 0xf)
     {
       return -EINVAL;
     }

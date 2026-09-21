@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/netutils/netlib/netlib_setipv4addr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -63,7 +65,7 @@ int netlib_set_ipv4addr(FAR const char *ifname,
 
   if (ifname && addr)
     {
-      int sockfd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
+      int sockfd = socket(AF_INET, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
       if (sockfd >= 0)
         {
           FAR struct sockaddr_in *inaddr;

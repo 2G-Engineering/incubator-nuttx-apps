@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -53,10 +55,13 @@
 #define ALTFDNO (0)
 #define USOCKFDNO (1)
 
-#define SET_POLLIN(fds, fid) { \
-  (fds).fd = (fid);  \
-  (fds).events = POLLIN; \
-}
+#define SET_POLLIN(fds, fid) \
+  do \
+    { \
+      (fds).fd = (fid);  \
+      (fds).events = POLLIN; \
+    } \
+  while (0)
 
 #define IS_POLLIN(fds) ((fds).revents & POLLIN)
 
@@ -259,7 +264,7 @@ int main(int argc, FAR char *argv[])
 {
   int ret;
   FAR char *endptr;
-  sem_t *syncsem = NULL;
+  FAR sem_t *syncsem = NULL;
 
   if (argc > 1)
     {

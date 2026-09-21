@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/uorb/sensor/hall.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,21 +31,12 @@
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_UORB
-static void print_sensor_hall_message(FAR const struct orb_metadata *meta,
-                                      FAR const void *buffer)
-{
-  FAR const struct sensor_hall *message = buffer;
-  const orb_abstime now = orb_absolute_time();
-
-  uorbinfo_raw("%s:\ttimestamp: %" PRIu64 " (%" PRIu64 " us ago) "
-               "hall: %" PRIi32 "",
-               meta->o_name, message->timestamp, now - message->timestamp,
-               message->hall);
-}
+static const char sensor_hall_format[] =
+  "timestamp:%" PRIu64 ",hall:%" PRIi32 "";
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
 
-ORB_DEFINE(sensor_hall, struct sensor_hall, print_sensor_hall_message);
+ORB_DEFINE(sensor_hall, struct sensor_hall, sensor_hall_format);

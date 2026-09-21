@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/telnetd/telnetd.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,9 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
 /* Configuration ************************************************************/
+
 /* CONFIG_EXAMPLES_TELNETD_DAEMONPRIO - Priority of the Telnet daemon.
  *   Default: SCHED_PRIORITY_DEFAULT
  * CONFIG_EXAMPLES_TELNETD_DAEMONSTACKSIZE - Stack size allocated for the
@@ -35,10 +39,12 @@
  *   Telnet client. Default: 2048
  * CONFIG_EXAMPLES_TELNETD_NOMAC - If the hardware has no MAC address of its
  *   own, define this =y to provide a bogus address for testing.
- * CONFIG_EXAMPLES_TELNETD_IPADDR - The target IP address.  Default 10.0.0.2
- * CONFIG_EXAMPLES_TELNETD_DRIPADDR - The default router address. Default
- *   10.0.0.1
- * CONFIG_EXAMPLES_TELNETD_NETMASK - The network mask.  Default: 255.255.255.0
+ * CONFIG_EXAMPLES_TELNETD_IPADDR - The target IP address.
+ *   Default 10.0.0.2
+ * CONFIG_EXAMPLES_TELNETD_DRIPADDR - The default router address.
+ *   Default 10.0.0.1
+ * CONFIG_EXAMPLES_TELNETD_NETMASK - The network mask.
+ *   Default: 255.255.255.0
  */
 
 #ifndef CONFIG_EXAMPLES_TELNETD_DAEMONPRIO
@@ -69,7 +75,7 @@
 
 /* Other definitions ********************************************************/
 
-#define SHELL_PROMPT "uIP 1.0> "
+#define SHELL_PROMPT "cfg> "
 
 /****************************************************************************
  * Public Function Prototypes

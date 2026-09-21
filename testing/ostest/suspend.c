@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/suspend.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,6 +38,12 @@
 #include <unistd.h>
 
 #include "ostest.h"
+
+/* REVISIT: This could be implemented for CONFIG_BUILD_KERNEL as well, by
+ * starting a new process instead of using task_create()
+ */
+
+#ifndef CONFIG_BUILD_KERNEL
 
 /****************************************************************************
  * Public Functions
@@ -136,3 +144,4 @@ void suspend_test(void)
   printf("suspend_test: done\n");
   FFLUSH();
 }
+#endif /* !CONFIG_BUILD_KERNEL */

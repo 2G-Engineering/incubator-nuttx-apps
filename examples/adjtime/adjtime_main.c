@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/adjtime/adjtime_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -148,7 +150,7 @@ int main(int argc, FAR char *argv[])
   parse_args(&delta, argc, argv);
 
   printf("Delta time is %ld seconds and %ld micro seconds.\n",
-         delta.tv_sec, delta.tv_usec);
+         (long)delta.tv_sec, delta.tv_usec);
 
   /* Call adjtime function. */
 
@@ -160,7 +162,7 @@ int main(int argc, FAR char *argv[])
   else
     {
       printf("Returned olddelta is %ld seconds and %ld micro seconds.\n",
-             olddelta.tv_sec, olddelta.tv_usec);
+             (long)olddelta.tv_sec, olddelta.tv_usec);
     }
 
   return ret;

@@ -1,6 +1,8 @@
 ############################################################################
 # apps/examples/hello_nim/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -30,8 +32,8 @@ MODULE    = $(CONFIG_EXAMPLES_HELLO_NIM)
 # Hello, World! Example
 
 NIMPATH = $(shell choosenim show path)
-CFLAGS += -I $(NIMPATH)/lib -I ./.nimcache
-CSRCS += $(wildcard .nimcache/*.c)
+CFLAGS += -I $(NIMPATH)/lib -I ../../.nimcache
+CSRCS += $(wildcard ../../.nimcache/*.c)
 
 MAINSRC = hello_nim_main.c
 

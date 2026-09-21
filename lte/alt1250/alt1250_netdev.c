@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/lte/alt1250/alt1250_netdev.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,8 @@
 
 #include "alt1250_netdev.h"
 
+#define ALT1250_SUBNET_MASK 0xFFFFFF00 /* 255.255.255.0 this is dummy */
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -58,9 +62,11 @@ void alt1250_netdev_unregister(FAR struct alt1250_s *dev)
 
 void alt1250_netdev_ifdown(FAR struct alt1250_s *dev)
 {
-  dev->net_dev.d_flags = IFF_DOWN;
+  dev->net_dev.d_flags = ~IFF_UP;
 #ifdef CONFIG_NET_IPv4
   memset(&dev->net_dev.d_ipaddr, 0, sizeof(dev->net_dev.d_ipaddr));
+  memset(&dev->net_dev.d_draddr, 0, sizeof(dev->net_dev.d_draddr));
+  memset(&dev->net_dev.d_netmask, 0, sizeof(dev->net_dev.d_netmask));
 #endif
 #ifdef CONFIG_NET_IPv6
   memset(&dev->net_dev.d_ipv6addr, 0, sizeof(dev->net_dev.d_ipv6addr));
@@ -85,6 +91,17 @@ void alt1250_netdev_ifup(FAR struct alt1250_s *dev, FAR lte_pdn_t *pdn)
           inet_pton(AF_INET,
                     (FAR const char *)pdn->address[i].address,
                     (FAR void *)&dev->net_dev.d_ipaddr);
+          inet_pton(AF_INET,
+                    (FAR const char *)pdn->address[i].address,
+                    (FAR void *)&dev->net_dev.d_draddr);
+
+          /* The following parameters are dummy values because
+           * they cannot be obtained from alt1250.
+           */
+
+          dev->net_dev.d_draddr = htonl((ntohl(dev->net_dev.d_draddr) &
+                                         ALT1250_SUBNET_MASK) | 1);
+          dev->net_dev.d_netmask = htonl(ALT1250_SUBNET_MASK);
         }
 #endif
 

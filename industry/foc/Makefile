@@ -1,6 +1,8 @@
 ############################################################################
 # apps/industry/foc/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -75,6 +77,9 @@ endif
 ifeq ($(CONFIG_INDUSTRY_FOC_VELOCITY_OPLL),y)
 CSRCS += float/foc_vel_opll.c
 endif
+ifeq ($(CONFIG_INDUSTRY_FOC_FEEDFORWARD),y)
+CSRCS += float/foc_feedforward.c
+endif
 
 endif
 
@@ -128,6 +133,9 @@ CSRCS += fixed16/foc_vel_odiv.c
 endif
 ifeq ($(CONFIG_INDUSTRY_FOC_VELOCITY_OPLL),y)
 CSRCS += fixed16/foc_vel_opll.c
+endif
+ifeq ($(CONFIG_INDUSTRY_FOC_FEEDFORWARD),y)
+CSRCS += fixed16/foc_feedforward.c
 endif
 
 endif

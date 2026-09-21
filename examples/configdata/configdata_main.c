@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/configdata/configdata_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -399,11 +401,9 @@ static int configdata_verifyconfig(void)
   int ret;
   int errcode = OK;
   int i;
-  static int iteration = 0;
 
   /* Create a file for each unused file structure */
 
-  iteration++;
   for (i = 0; i < CONFIG_EXAMPLES_CONFIGDATA_MAXENTRIES; i++)
     {
       entry = &g_entries[i];

@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/testing/ostest/restart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,8 @@
 #include <unistd.h>
 
 #include "ostest.h"
+
+#ifndef CONFIG_BUILD_KERNEL
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -225,3 +229,5 @@ void restart_test(void)
 
   printf("restart_main: Exiting\n");
 }
+
+#endif /* !CONFIG_BUILD_KERNEL */

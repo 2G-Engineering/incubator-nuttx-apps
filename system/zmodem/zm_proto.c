@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/zmodem/zm_proto.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -189,7 +191,7 @@ int zm_senddata(FAR struct zm_state_s *pzm, FAR const uint8_t *buffer,
     {
       if (zbin == ZBIN)
         {
-          crc = (uint32_t)crc16part(buffer, 1, (uint16_t)crc);
+          crc = (uint32_t)crc16xmodempart(buffer, 1, (uint16_t)crc);
         }
       else /* zbin = ZBIN32 */
         {
@@ -207,7 +209,7 @@ int zm_senddata(FAR struct zm_state_s *pzm, FAR const uint8_t *buffer,
 
   if (zbin == ZBIN)
     {
-      crc = crc16part((FAR const uint8_t *)&term, 1, crc);
+      crc = crc16xmodempart((FAR const uint8_t *)&term, 1, crc);
     }
   else
     {
@@ -281,12 +283,12 @@ int zm_sendhexhdr(FAR struct zm_state_s *pzm, int type,
 
   /* type */
 
-  crc = crc16part((FAR const uint8_t *)&type, 1, 0);
+  crc = crc16xmodempart((FAR const uint8_t *)&type, 1, 0);
   ptr = zm_puthex8(ptr, type);
 
   /* f3/p0 f2/p1 f1/p2 f0/p3 */
 
-  crc = crc16part(buffer, 4, crc);
+  crc = crc16xmodempart(buffer, 4, crc);
   for (i = 0; i < 4; i++)
     {
       ptr = zm_puthex8(ptr, *buffer++);
@@ -357,12 +359,12 @@ int zm_sendbin16hdr(FAR struct zm_state_s *pzm, int type,
 
   /* type */
 
-  crc = crc16part((FAR const uint8_t *)&type, 1, 0);
+  crc = crc16xmodempart((FAR const uint8_t *)&type, 1, 0);
   ptr = zm_putzdle(pzm, ptr, type);
 
   /* f3/p0 f2/p1 f1/p2 f0/p3 */
 
-  crc = crc16part(buffer, 4, crc);
+  crc = crc16xmodempart(buffer, 4, crc);
   for (i = 0; i < 4; i++)
     {
       ptr = zm_putzdle(pzm, ptr, *buffer++);

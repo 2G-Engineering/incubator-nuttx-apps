@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/ina226/ina226_main.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -70,7 +73,8 @@ int main(int argc, FAR char *argv[])
           break;
         }
 
-      printf("U=%12u uV I=%12d uA\n", sample.voltage, sample.current);
+      printf("U=%12"PRIu32 "uV I=%12"PRIi32 "uA\n", sample.voltage,
+             sample.current);
 
       usleep(500000);
     }

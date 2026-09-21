@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/examples/rfid_readuid/rfid_readuid.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,14 +37,9 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#ifndef CONFIG_CL_MFRC522
-#  error "CONFIG_CL_MFRC522 is not defined in the configuration"
-#endif
-
 #ifndef CONFIG_EXAMPLES_RFID_READUID_DEVNAME
 #  define CONFIG_EXAMPLES_RFID_READUID_DEVNAME "/dev/rfid0"
 #endif
-
 
 /****************************************************************************
  * Public Functions

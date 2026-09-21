@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/builtin/exec_builtin.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -43,13 +45,9 @@
  *   New application is run in a separate task context (and thread).
  *
  * Input Parameter:
- *   filename  - Name of the linked-in binary to be started.
- *   argv      - Argument list
- *   redirfile - If output is redirected, this parameter will be non-NULL
- *               and will provide the full path to the file.
- *   oflags    - If output is redirected, this parameter will provide the
- *               open flags to use.  This will support file replacement
- *               of appending to an existing file.
+ *   filename      - Name of the linked-in binary to be started.
+ *   argv          - Argument list
+ *   param         - Parameters for execute.
  *
  * Returned Value:
  *   This is an end-user function, so it follows the normal convention:
@@ -59,12 +57,12 @@
  ****************************************************************************/
 
 int exec_builtin(FAR const char *appname, FAR char * const *argv,
-                 FAR const char *redirfile, int oflags)
+                 FAR const struct nsh_param_s *param)
 {
   FAR const struct builtin_s *builtin;
   posix_spawnattr_t attr;
   posix_spawn_file_actions_t file_actions;
-  struct sched_param param;
+  struct sched_param sched;
   pid_t pid;
   int index;
   int ret;
@@ -103,8 +101,8 @@ int exec_builtin(FAR const char *appname, FAR char * const *argv,
 
   /* Set the correct task size and priority */
 
-  param.sched_priority = builtin->priority;
-  ret = posix_spawnattr_setschedparam(&attr, &param);
+  sched.sched_priority = builtin->priority;
+  ret = posix_spawnattr_setschedparam(&attr, &sched);
   if (ret != 0)
     {
       goto errout_with_actions;
@@ -144,19 +142,67 @@ int exec_builtin(FAR const char *appname, FAR char * const *argv,
 
 #endif
 
-  /* Is output being redirected? */
-
-  if (redirfile)
+  if (param)
     {
-      /* Set up to close open redirfile and set to stdout (1) */
+      /* Is input being redirected? */
 
-      ret = posix_spawn_file_actions_addopen(&file_actions, 1,
-                                             redirfile, oflags, 0644);
-      if (ret != 0)
+      if (param->file_in)
         {
-          serr("ERROR: posix_spawn_file_actions_addopen failed: %d\n", ret);
-          goto errout_with_actions;
+          /* Set up to close open redirfile and set to stdin (0) */
+
+          ret = posix_spawn_file_actions_addopen(&file_actions, 0,
+                                                 param->file_in,
+                                                 param->oflags_in, 0);
+          if (ret != 0)
+            {
+              serr("ERROR: posix_spawn_file_actions_addopen failed: %d\n",
+                   ret);
+              goto errout_with_actions;
+            }
         }
+#ifdef CONFIG_NSH_PIPELINE
+      else if (param->fd_in != -1)
+        {
+          ret = posix_spawn_file_actions_adddup2(&file_actions,
+                                                 param->fd_in, 0);
+          if (ret != 0)
+            {
+              serr("ERROR: posix_spawn_file_actions_adddup2 failed: %d\n",
+                   ret);
+              goto errout_with_actions;
+            }
+        }
+#endif
+
+      /* Is output being redirected? */
+
+      if (param->file_out)
+        {
+          /* Set up to close open redirfile and set to stdout (1) */
+
+          ret = posix_spawn_file_actions_addopen(&file_actions, 1,
+                                                 param->file_out,
+                                                 param->oflags_out, 0644);
+          if (ret != 0)
+            {
+              serr("ERROR: posix_spawn_file_actions_addopen failed: %d\n",
+                   ret);
+              goto errout_with_actions;
+            }
+        }
+#ifdef CONFIG_NSH_PIPELINE
+      else if (param->fd_out != -1)
+        {
+          ret = posix_spawn_file_actions_adddup2(&file_actions,
+                                                 param->fd_out, 1);
+          if (ret != 0)
+            {
+              serr("ERROR: posix_spawn_file_actions_adddup2 failed: %d\n",
+                   ret);
+              goto errout_with_actions;
+            }
+        }
+#endif
     }
 
 #ifdef CONFIG_LIBC_EXECFUNCS

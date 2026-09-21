@@ -1,6 +1,8 @@
 /****************************************************************************
  * apps/system/zmodem/zm_state.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,7 +43,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <ctype.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -200,7 +201,7 @@ static int zm_hdrevent(FAR struct zm_state_s *pzm)
        * The header type, 4 data bytes, plus 2 CRC bytes
        */
 
-      crc = crc16part(pzm->hdrdata, 7, 0);
+      crc = crc16xmodempart(pzm->hdrdata, 7, 0);
       if (crc != 0)
         {
           zmdbg("ERROR: ZBIN/ZHEX CRC16 failure: %04x vs 0000\n", crc);
@@ -257,7 +258,7 @@ static int zm_dataevent(FAR struct zm_state_s *pzm)
     {
       uint16_t crc;
 
-      crc = crc16part(pzm->pktbuf, pzm->pktlen, 0);
+      crc = crc16xmodempart(pzm->pktbuf, pzm->pktlen, 0);
       if (crc != 0)
         {
           zmdbg("ERROR: ZBIN/ZHEX CRC16 failure: %04x vs 0000\n", crc);

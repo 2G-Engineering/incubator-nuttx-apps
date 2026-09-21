@@ -1,9 +1,8 @@
 /****************************************************************************
  * apps/modbus/nuttx/porttimer.c
  *
- * FreeModbus Library: NuttX Port
- * Copyright (c) 2006 Christian Walter <wolti@sil.at>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2006 Christian Walter <wolti@sil.at>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,12 +67,12 @@ bool xMBPortTimersInit(uint16_t usTim1Timerout50us)
   return xMBPortSerialSetTimeout(ulTimeOut);
 }
 
-void xMBPortTimersClose()
+void xMBPortTimersClose(void)
 {
   /* Does not use any hardware resources. */
 }
 
-void vMBPortTimerPoll()
+void vMBPortTimerPoll(void)
 {
   uint32_t       ulDeltaMS;
   struct timeval xTimeCur;
@@ -101,7 +100,7 @@ void vMBPortTimerPoll()
     }
 }
 
-void vMBPortTimersEnable()
+void vMBPortTimersEnable(void)
 {
   int res = gettimeofday(&xTimeLast, NULL);
 
@@ -109,7 +108,7 @@ void vMBPortTimersEnable()
   bTimeoutEnable = true;
 }
 
-void vMBPortTimersDisable()
+void vMBPortTimersDisable(void)
 {
   bTimeoutEnable = false;
 }
