@@ -48,8 +48,14 @@ if(CONFIG_NIMBLE)
       mynewt-nimble/porting/nimble/src/mem.c
       mynewt-nimble/porting/nimble/src/nimble_port.c
       mynewt-nimble/porting/nimble/src/os_mbuf.c
-      mynewt-nimble/porting/nimble/src/os_mempool.c
-      mynewt-nimble/porting/nimble/src/os_msys_init.c)
+      mynewt-nimble/porting/nimble/src/os_mempool.c)
+
+  # os_msys_init.c is obsolete
+  if(EXISTS mynewt-nimble/porting/nimble/src/os_msys_init.c)
+    list(APPEND SRCS_PORTING mynewt-nimble/porting/nimble/src/os_msys_init.c)
+  else()
+    list(APPEND SRCS_PORTING mynewt-nimble/porting/nimble/src/os_msys.c)
+  endif()
 
   set(SRCS_NPL
       mynewt-nimble/porting/npl/nuttx/src/os_atomic.c
@@ -187,7 +193,8 @@ if(CONFIG_NIMBLE)
 
   target_include_directories(nimble PUBLIC include ${INCLUDES})
 
-  target_compile_options(nimble PUBLIC -Wno-pointer-to-int-cast -Wno-undef
-                                       -Wno-format -Wno-unused-but-set-variable)
+  target_compile_options(nimble PUBLIC -Wno-undef -Wno-format
+                                       -Wno-unused-but-set-variable)
+
   target_sources(nimble PRIVATE ${SRCS})
 endif()

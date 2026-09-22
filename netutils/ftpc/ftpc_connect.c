@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <arpa/inet.h>
 
@@ -108,6 +108,11 @@ SESSION ftpc_connect(FAR union ftpc_sockaddr_u *server)
    */
 
   session->homeldir = strdup(ftpc_lpwd());
+  if (session->homeldir == NULL)
+    {
+      nerr("ERROR: Failed to allocate local home directory\n");
+      goto errout_with_alloc;
+    }
 
   /* And (Re-)connect to the server */
 

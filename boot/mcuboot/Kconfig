@@ -22,11 +22,11 @@ config MCUBOOT_REPOSITORY
 
 config MCUBOOT_VERSION
 	string "MCUboot version"
-	default "fefc398cc13ebbc527e297fe9df78cd98a359d75"
+	default "e36d3c8d6ca5e0ed1f510f2a7d110f405a7c396b"
 	---help---
 		Defines MCUboot version to be downloaded. Either release tag
 		or commit hash should be specified. Using newer MCUboot version
-		may cause compatability issues.
+		may cause compatibility issues.
 
 config MCUBOOT_ENABLE_LOGGING
 	bool "Enable MCUboot logging"

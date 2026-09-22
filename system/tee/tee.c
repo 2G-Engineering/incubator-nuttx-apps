@@ -50,7 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -103,8 +103,9 @@ static void show_usage(FAR const char *progrname, int exitcode)
   fprintf(stderr, "-a:\n");
   fprintf(stderr, "\tAppend to the file (vs. truncating)\n");
   fprintf(stderr, "file:\n");
-  fprintf(stderr, "\tArbitrary number of options output files.  Output\n");
-  fprintf(stderr, "\twill go to stdout in addition to each of these files.\n");
+  fprintf(stderr, "\tArbitrary number of options output files. Output\n");
+  fprintf(stderr, "\twill go to stdout in addition to each of these\n");
+  fprintf(stderr, "\tfiles.\n");
   fprintf(stderr, "-h:\n");
   fprintf(stderr, "\tShows this message and exits\n");
   exit(exitcode);

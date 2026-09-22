@@ -30,11 +30,6 @@
 #include <openssl/x509_local.h>
 #include <openssl/x509_vfy.h>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -61,6 +56,24 @@ struct ssl_ctx_st
   int read_ahead;
   int read_buffer_len;
   X509_VERIFY_PARAM param;
+
+  /* Default password callback. */
+
+  pem_password_cb *default_passwd_callback;
+
+  /* Default password callback user data. */
+
+  void *default_passwd_callback_userdata;
+  uint32_t mode;
+
+  /* optional informational callback */
+
+  void (*info_callback)(const SSL *ssl, int type, int val);
+
+  /* callback that allows applications to peek at protocol messages */
+
+  ossl_msg_cb msg_callback;
+  SSL_psk_client_cb_func psk_client_callback;
 };
 
 struct ssl_method_func_st
@@ -97,16 +110,22 @@ struct ssl_session_st
   long timeout;
   long time;
   X509 *peer;
+  const SSL_CIPHER *cipher;
+  int references;
+  struct
+    {
+      char hostname[TLSEXT_MAXLEN_host_name];
+    } ext;
 };
 
 struct ssl_st
 {
-/* protocol version(one of SSL3.0, TLS1.0, etc.) */
+  /* protocol version(one of SSL3.0, TLS1.0, etc.) */
 
   int version;
   unsigned long options;
 
-/* shut things down(0x01 : sent, 0x02 : received) */
+  /* shut things down(0x01 : sent, 0x02 : received) */
 
   int shutdown;
   CERT *cert;
@@ -116,7 +135,7 @@ struct ssl_st
   const char **alpn_protos;
   RECORD_LAYER rlayer;
 
-/* where we are */
+  /* where we are */
 
   OSSL_STATEM statem;
   SSL_SESSION *session;
@@ -129,10 +148,21 @@ struct ssl_st
   int err;
   void (*info_callback) (const SSL *ssl, int type, int val);
 
-/* SSL low-level system arch point */
+  /* SSL low-level system arch point */
 
   void *ssl_pm;
+  SSL_CIPHER *cipher_list;
 };
+
+struct ssl_cipher_st
+{
+  const char *name;           /* text name */
+};
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 /****************************************************************************
  * Public Function Prototypes

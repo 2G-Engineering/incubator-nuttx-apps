@@ -53,9 +53,7 @@ int main(int argc, FAR char *argv[])
   short s        = 2;
   int i          = 3;
   long l         = 4;
-#ifdef CONFIG_HAVE_LONG_LONG
   long long ll   = 5;
-#endif
   intmax_t im    = 6;
   size_t sz      = 7;
   ptrdiff_t ptr  = 8;
@@ -78,9 +76,7 @@ int main(int argc, FAR char *argv[])
       sched_note_printf(NOTE_TAG_ALWAYS, "%hd", s);
       sched_note_printf(NOTE_TAG_ALWAYS, "%d", i);
       sched_note_printf(NOTE_TAG_ALWAYS, "%ld", l);
-#ifdef CONFIG_HAVE_LONG_LONG
       sched_note_printf(NOTE_TAG_ALWAYS, "%lld", ll);
-#endif
       sched_note_printf(NOTE_TAG_ALWAYS, "%jd", im);
       sched_note_printf(NOTE_TAG_ALWAYS, "%zd", sz);
       sched_note_printf(NOTE_TAG_ALWAYS, "%td", ptr);

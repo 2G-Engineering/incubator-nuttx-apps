@@ -393,7 +393,7 @@ int main(int argc, FAR char *argv[])
 
       setrel.id      = alarmid;
       setrel.pid     = g_alarm_daemon_pid;
-      setrel.reltime = (time_t)seconds;
+      setrel.reltime = seconds;
 
       setrel.event.sigev_notify = SIGEV_SIGNAL;
       setrel.event.sigev_signo  = CONFIG_EXAMPLES_ALARM_SIGNO;

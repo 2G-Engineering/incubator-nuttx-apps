@@ -27,7 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -52,6 +52,10 @@
 
 #ifdef CONFIG_LIBYUV
 #  include <libyuv.h>
+
+#  define CONVERT_TO_ARGB    ConvertToARGB
+#  define CONVERT_FROM_I420  ConvertFromI420
+#  define CONVERT_TO_I420    ConvertToI420
 #endif
 
 /****************************************************************************
@@ -91,38 +95,38 @@ static int show_image(FAR struct nxcamera_s *pcam, FAR v4l2_buffer_t *buf)
 #ifdef CONFIG_LIBYUV
   if (pcam->display_vinfo.fmt == FB_FMT_RGB32)
     {
-      return ConvertToARGB(pcam->bufs[buf->index],
-                           pcam->buf_sizes[buf->index],
-                           pcam->display_pinfo.fbmem,
-                           pcam->display_pinfo.stride,
-                           0,
-                           0,
-                           pcam->fmt.fmt.pix.width,
-                           pcam->fmt.fmt.pix.height,
-                           pcam->fmt.fmt.pix.width,
-                           pcam->fmt.fmt.pix.height,
-                           0,
-                           pcam->fmt.fmt.pix.pixelformat);
+      return CONVERT_TO_ARGB(pcam->bufs[buf->index],
+                             pcam->buf_sizes[buf->index],
+                             pcam->display_pinfo.fbmem,
+                             pcam->display_pinfo.stride,
+                             0,
+                             0,
+                             pcam->fmt.fmt.pix.width,
+                             pcam->fmt.fmt.pix.height,
+                             pcam->fmt.fmt.pix.width,
+                             pcam->fmt.fmt.pix.height,
+                             0,
+                             pcam->fmt.fmt.pix.pixelformat);
     }
   else if (pcam->display_vinfo.fmt == FB_FMT_RGB16_565)
     {
       if (pcam->fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUV420)
         {
-          return ConvertFromI420(pcam->bufs[buf->index],
-                                 pcam->fmt.fmt.pix.width,
-                                 &pcam->bufs[buf->index][
-                                            pcam->fmt.fmt.pix.width *
-                                            pcam->fmt.fmt.pix.height],
-                                 pcam->fmt.fmt.pix.width / 2,
-                                 &pcam->bufs[buf->index][
-                                      pcam->fmt.fmt.pix.width *
-                                      pcam->fmt.fmt.pix.height * 5 / 4],
-                                 pcam->fmt.fmt.pix.width / 2,
-                                 pcam->display_pinfo.fbmem,
-                                 pcam->display_pinfo.stride,
-                                 pcam->fmt.fmt.pix.width,
-                                 pcam->fmt.fmt.pix.height,
-                                 V4L2_PIX_FMT_RGB565);
+          return CONVERT_FROM_I420(pcam->bufs[buf->index],
+                                   pcam->fmt.fmt.pix.width,
+                                   &pcam->bufs[buf->index][
+                                              pcam->fmt.fmt.pix.width *
+                                              pcam->fmt.fmt.pix.height],
+                                   pcam->fmt.fmt.pix.width / 2,
+                                   &pcam->bufs[buf->index][
+                                        pcam->fmt.fmt.pix.width *
+                                        pcam->fmt.fmt.pix.height * 5 / 4],
+                                   pcam->fmt.fmt.pix.width / 2,
+                                   pcam->display_pinfo.fbmem,
+                                   pcam->display_pinfo.stride,
+                                   pcam->fmt.fmt.pix.width,
+                                   pcam->fmt.fmt.pix.height,
+                                   V4L2_PIX_FMT_RGB565);
         }
       else
         {
@@ -134,42 +138,42 @@ static int show_image(FAR struct nxcamera_s *pcam, FAR v4l2_buffer_t *buf)
               return -ENOMEM;
             }
 
-          ret = ConvertToI420(pcam->bufs[buf->index],
-                              pcam->buf_sizes[buf->index],
-                              dst,
-                              pcam->fmt.fmt.pix.width,
-                              &dst[pcam->fmt.fmt.pix.width *
-                                        pcam->fmt.fmt.pix.height],
-                              pcam->fmt.fmt.pix.width / 2,
-                              &dst[pcam->fmt.fmt.pix.width *
-                                        pcam->fmt.fmt.pix.height * 5 / 4],
-                              pcam->fmt.fmt.pix.width / 2,
-                              0,
-                              0,
-                              pcam->fmt.fmt.pix.width,
-                              pcam->fmt.fmt.pix.height,
-                              pcam->fmt.fmt.pix.width,
-                              pcam->fmt.fmt.pix.height,
-                              0,
-                              pcam->fmt.fmt.pix.pixelformat);
+          ret = CONVERT_TO_I420(pcam->bufs[buf->index],
+                                pcam->buf_sizes[buf->index],
+                                dst,
+                                pcam->fmt.fmt.pix.width,
+                                &dst[pcam->fmt.fmt.pix.width *
+                                          pcam->fmt.fmt.pix.height],
+                                pcam->fmt.fmt.pix.width / 2,
+                                &dst[pcam->fmt.fmt.pix.width *
+                                          pcam->fmt.fmt.pix.height * 5 / 4],
+                                pcam->fmt.fmt.pix.width / 2,
+                                0,
+                                0,
+                                pcam->fmt.fmt.pix.width,
+                                pcam->fmt.fmt.pix.height,
+                                pcam->fmt.fmt.pix.width,
+                                pcam->fmt.fmt.pix.height,
+                                0,
+                                pcam->fmt.fmt.pix.pixelformat);
           if (ret < 0)
             {
               goto err;
             }
 
-          ret = ConvertFromI420(dst,
-                                pcam->fmt.fmt.pix.width,
-                                &dst[pcam->fmt.fmt.pix.width *
-                                            pcam->fmt.fmt.pix.height],
-                                pcam->fmt.fmt.pix.width / 2,
-                                &dst[pcam->fmt.fmt.pix.width *
-                                     pcam->fmt.fmt.pix.height * 5 / 4],
-                                pcam->fmt.fmt.pix.width / 2,
-                                pcam->display_pinfo.fbmem,
-                                pcam->display_pinfo.stride,
-                                pcam->fmt.fmt.pix.width,
-                                pcam->fmt.fmt.pix.height,
-                                V4L2_PIX_FMT_RGB565);
+          ret = CONVERT_FROM_I420(dst,
+                                  pcam->fmt.fmt.pix.width,
+                                  &dst[pcam->fmt.fmt.pix.width *
+                                              pcam->fmt.fmt.pix.height],
+                                  pcam->fmt.fmt.pix.width / 2,
+                                  &dst[pcam->fmt.fmt.pix.width *
+                                       pcam->fmt.fmt.pix.height * 5 / 4],
+                                  pcam->fmt.fmt.pix.width / 2,
+                                  pcam->display_pinfo.fbmem,
+                                  pcam->display_pinfo.stride,
+                                  pcam->fmt.fmt.pix.width,
+                                  pcam->fmt.fmt.pix.height,
+                                  V4L2_PIX_FMT_RGB565);
           if (ret < 0)
             {
               goto err;
@@ -571,7 +575,7 @@ int nxcamera_setfile(FAR struct nxcamera_s *pcam, FAR const char *pfile,
 
   /* Try to open the file */
 
-  temp_fd = open(pfile, O_CREAT | O_RDWR);
+  temp_fd = open(pfile, O_CREAT | O_RDWR, 0666);
   if (temp_fd == -1)
     {
       /* Error opening the file */
@@ -672,7 +676,7 @@ int nxcamera_stream(FAR struct nxcamera_s *pcam,
   int                        i;
   struct v4l2_buffer         buf;
   struct v4l2_requestbuffers req;
-  struct v4l2_streamparm     parm;
+  struct v4l2_streamparm     param;
 
   DEBUGASSERT(pcam != NULL);
 
@@ -716,11 +720,11 @@ int nxcamera_stream(FAR struct nxcamera_s *pcam,
       return ret;
     }
 
-  memset(&parm, 0, sizeof(parm));
-  parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  parm.parm.capture.timeperframe.denominator = framerate;
-  parm.parm.capture.timeperframe.numerator = 1;
-  ret = ioctl(pcam->capture_fd, VIDIOC_S_PARM, (uintptr_t)&parm);
+  memset(&param, 0, sizeof(param));
+  param.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  param.parm.capture.timeperframe.denominator = framerate;
+  param.parm.capture.timeperframe.numerator = 1;
+  ret = ioctl(pcam->capture_fd, VIDIOC_S_PARM, (uintptr_t)&param);
   if (ret < 0)
     {
       ret = -errno;

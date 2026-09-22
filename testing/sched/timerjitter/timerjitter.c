@@ -25,6 +25,7 @@
  ****************************************************************************/
 
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -35,8 +36,8 @@
  ****************************************************************************/
 
 #define DEFAULT_CLOCKID   CLOCK_REALTIME
-#define DEFAULT_INTERVAL  1000
-#define DEFAULT_ITERATION 1000
+#define DEFAULT_INTERVAL  (1000 * USEC_PER_TICK)
+#define DEFAULT_ITERATION (USEC_PER_SEC / DEFAULT_INTERVAL)
 
 /* Fix compilation error for Non-NuttX OS */
 #ifndef FAR
@@ -137,12 +138,15 @@ static FAR void *timerjitter(FAR void *arg)
   struct timespec   next;
   struct timespec   intv;
   struct itimerspec tspec;
-  struct sigevent   sigev;
   sigset_t          sigset;
   timer_t           timer;
   int64_t           diff;
   int               sigs;
   int               ret;
+  struct sigevent   sigev =
+  {
+    0
+  };
 
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGALRM);
@@ -154,8 +158,20 @@ static FAR void *timerjitter(FAR void *arg)
   sigev.sigev_notify = SIGEV_SIGNAL;
   sigev.sigev_signo  = SIGALRM;
 
-  timer_create(param->clockid, &sigev, &timer);
-  clock_gettime(param->clockid, &now);
+  ret = timer_create(param->clockid, &sigev, &timer);
+
+  if (ret != 0)
+    {
+      printf("timer_create failed %d\n", ret);
+      return NULL;
+    }
+
+  ret = clock_gettime(param->clockid, &now);
+
+  if (ret)
+    {
+      printf("clock_gettime failed %d\n", ret);
+    }
 
   next = now;
   calc_next(&next, &intv);
@@ -167,7 +183,13 @@ static FAR void *timerjitter(FAR void *arg)
   /* Using TIMER_ABSTIME */
 
   tspec.it_value = next;
-  timer_settime(timer, TIMER_ABSTIME, &tspec, NULL);
+  ret = timer_settime(timer, TIMER_ABSTIME, &tspec, NULL);
+
+  if (ret)
+    {
+      printf("timer_settime failed %d\n", ret);
+      return NULL;
+    }
 
   param->avg = 0;
   param->max = 0;
@@ -192,7 +214,8 @@ static FAR void *timerjitter(FAR void *arg)
       diff = calc_diff(&now, &next);
       if (param->print)
         {
-          printf("diff %lu, now %lu.%lu\n", diff, now.tv_sec, now.tv_nsec);
+          printf("diff %"PRId64", now %jd.%09ld\n", diff,
+                  (intmax_t)now.tv_sec, now.tv_nsec);
         }
 
       if (diff > param->max)
@@ -220,6 +243,7 @@ static FAR void *timerjitter(FAR void *arg)
         }
     }
 
+  timer_delete(timer);
   param->avg = param->avg / param->cur_cnt;
   return NULL;
 }

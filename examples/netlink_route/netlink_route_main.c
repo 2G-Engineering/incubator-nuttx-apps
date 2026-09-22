@@ -168,11 +168,7 @@ static void dump_neighbor(void)
           printf("  ");
         }
 
-#ifdef CONFIG_SYSTEM_TIME64
       printf("Time 0x%" PRIx64 "\n", nb->ne_time);
-#else
-      printf("Time 0x%" PRIx32 "\n", nb->ne_time);
-#endif
     }
 
   free(nbtab);

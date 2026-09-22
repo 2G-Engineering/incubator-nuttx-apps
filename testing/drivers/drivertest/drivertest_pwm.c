@@ -34,7 +34,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <string.h>
 #include <inttypes.h>
 
@@ -107,7 +107,7 @@ static void pwm_help(FAR const char *progname,
          progname);
   printf("\nArguments are \"sticky\".  "
          "For example, once the PWM frequency is\n");
-  printf("specified, that frequency will be re-used until it is changed.\n");
+  printf("specified, that frequency will be reused until it is changed.\n");
   printf("\n\"sticky\" OPTIONS include:\n");
   printf("  [-p devpath] selects the PWM device.  "
          "Default: %s Current: %s\n", PWM_DEFAULT_DEVPATH,
@@ -164,11 +164,11 @@ static void parse_commandline(FAR struct pwm_state_s *pwm_state, int argc,
             OPTARG_TO_VALUE(converted, uint32_t, 10);
             if (converted < 0)
               {
-                printf("Count must be non-negative: %ld\n", converted);
+                printf("Count must be non-negative: %d\n", converted);
                 pwm_help(argv[0], pwm_state, EXIT_FAILURE);
               }
 
-            pwm_state->count = (uint32_t)value;
+            pwm_state->count = (uint32_t)converted;
             break;
 #endif
           case 'f':
@@ -223,9 +223,7 @@ static void drivertest_pwm(FAR void **state)
 {
   int fd;
   int ret;
-#ifdef CONFIG_PWM_MULTICHAN
   int i;
-#endif
   struct pwm_info_s info;
   FAR struct pwm_state_s *pwm_state;
   pwm_state = (FAR struct pwm_state_s *)*state;
@@ -241,18 +239,14 @@ static void drivertest_pwm(FAR void **state)
 
   info.frequency = pwm_state->freq;
 
-#ifdef CONFIG_PWM_MULTICHAN
   for (i = 0; i < CONFIG_PWM_NCHANNELS; i++)
     {
       info.channels[i].channel = i + 1;
       info.channels[i].duty = b16divi(uitoub16(pwm_state->duty), 100);
     }
-#else
-  info.duty = b16divi(uitoub16(pwm_state->duty), 100);
-#endif
 
 #ifdef CONFIG_PWM_PULSECOUNT
-  info.count = pwm_state.count;
+  info.channels[0].count = pwm_state->count;
 #endif
 
   ret = ioctl(fd, PWMIOC_SETCHARACTERISTICS,
@@ -271,7 +265,7 @@ static void drivertest_pwm(FAR void **state)
    */
 
 #ifdef CONFIG_PWM_PULSECOUNT
-  if (info.count == 0)
+  if (info.channels[0].count == 0)
 #endif
     {
       /* Wait for the specified duration */

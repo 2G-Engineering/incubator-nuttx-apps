@@ -22,7 +22,7 @@
 
 /****************************************************************************
  *
- * This file was taken from Mini Basic, versino 1.0 developed by Malcolm
+ * This file was taken from Mini Basic, version 1.0 developed by Malcolm
  * McLean, Leeds University.  Mini Basic version 1.0 was released the
  * Creative Commons Attribution license which, from my reading, appears to
  * be compatible with the NuttX BSD-style license:
@@ -45,7 +45,7 @@
  * Private Data
  ****************************************************************************/
 
-#ifdef CONFIG_INTERPRETER_MINIBASIC_TESTSCRIPT
+#ifdef CONFIG_INTERPRETERS_MINIBASIC_TESTSCRIPT
 /* Here is a simple script to play with */
 
 static FAR char *script =
@@ -147,7 +147,7 @@ int main(int argc, FAR char *argv[])
 
   if (argc == 1)
     {
-#ifdef CONFIG_INTERPRETER_MINIBASIC_TESTSCRIPT
+#ifdef CONFIG_INTERPRETERS_MINIBASIC_TESTSCRIPT
       basic(script, stdin, stdout, stderr);
 #else
       fprintf(stderr, "ERROR: Missing argument.\n");

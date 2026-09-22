@@ -192,13 +192,13 @@ static void parsearg(int argc, FAR char *argv[],
           case 'q':
             switch (strtol(optarg, NULL, 10))
               {
-                case '0':
+                case 0L:
                   cfg->qos = MQTT_PUBLISH_QOS_0;
                   break;
-                case '1':
+                case 1L:
                   cfg->qos = MQTT_PUBLISH_QOS_1;
                   break;
-                case '2':
+                case 2L:
                   cfg->qos = MQTT_PUBLISH_QOS_2;
                   break;
                 }
@@ -528,7 +528,7 @@ int main(int argc, FAR char *argv[])
                       NULL);
   if (mqtterr != MQTT_OK)
     {
-      printf("ERRPR! mqtt_init() failed.\n");
+      printf("ERROR! mqtt_init() failed.\n");
       goto err_with_conn;
     }
 

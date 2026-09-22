@@ -29,7 +29,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <string.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <errno.h>
 
 #include "fsutils/mkfatfs.h"
@@ -121,13 +121,8 @@ static inline uint32_t
 mkfatfs_nfatsect12(FAR struct fat_format_s *fmt, FAR struct fat_var_s *var,
                    uint32_t navailsects)
 {
-#ifdef CONFIG_HAVE_LONG_LONG
   uint64_t denom;
   uint64_t number;
-#else
-  uint32_t denom;
-  uint32_t number;
-#endif
 
   /* For FAT12, the cluster number is held in a 12-bit number or 1.5 bytes
    * per cluster reference.  So each FAT sector will hold sectorsize/1.5
@@ -156,25 +151,12 @@ mkfatfs_nfatsect12(FAR struct fat_format_s *fmt, FAR struct fat_var_s *var,
    *   navailsects > 0x55555555 - 2 * clustersize
    */
 
-#ifndef CONFIG_HAVE_LONG_LONG
-  if (navailsects <= (0x55555555 - (1 << (fmt->ff_clustshift + 1))))
-    {
-#endif
-
-      denom = (fmt->ff_nfats << 1) + fmt->ff_nfats
-            + (var->fv_sectorsize << (fmt->ff_clustshift + 1));
-      number = (navailsects << 1) + navailsects
-            + (1 << (fmt->ff_clustshift + 2))
-            + (1 << (fmt->ff_clustshift + 1));
-      return (uint32_t)((number + denom - 1) / denom);
-
-#ifndef CONFIG_HAVE_LONG_LONG
-    }
-  else
-    {
-      return 0;
-    }
-#endif
+  denom = (fmt->ff_nfats << 1) + fmt->ff_nfats
+        + (var->fv_sectorsize << (fmt->ff_clustshift + 1));
+  number = (navailsects << 1) + navailsects
+        + (1 << (fmt->ff_clustshift + 2))
+        + (1 << (fmt->ff_clustshift + 1));
+  return (uint32_t)((number + denom - 1) / denom);
 }
 
 /****************************************************************************
@@ -201,13 +183,8 @@ static inline uint32_t
 mkfatfs_nfatsect16(FAR struct fat_format_s *fmt, FAR struct fat_var_s *var,
                    uint32_t navailsects)
 {
-#ifdef CONFIG_HAVE_LONG_LONG
   uint64_t denom;
   uint64_t number;
-#else
-  uint32_t denom;
-  uint32_t number;
-#endif
 
   /* For FAT16, the cluster number is held in a 16-bit number or 2 bytes per
    * cluster reference.  So each FAT sector will hold sectorsize/2 cluster
@@ -270,13 +247,8 @@ static inline uint32_t
 mkfatfs_nfatsect32(FAR struct fat_format_s *fmt, FAR struct fat_var_s *var,
                    uint32_t navailsects)
 {
-#ifdef CONFIG_HAVE_LONG_LONG
   uint64_t denom;
   uint64_t number;
-#else
-  uint32_t denom;
-  uint32_t number;
-#endif
 
   /* For FAT32, the cluster number is held in a 32-bit number or 4 bytes per
    * cluster reference.  So each FAT sector will hold sectorsize/4 cluster

@@ -108,7 +108,7 @@ static FAR const char *const g_resetcause[] =
   "cpu_rtc_watchdog",
   "pin",
   "lowpower",
-  "unkown"
+  "unknown"
 };
 #endif
 
@@ -510,7 +510,7 @@ int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 
   if (cause.cause != BOARDIOC_RESETCAUSE_CPU_SOFT)
     {
-      nsh_output(vtbl, "%s(%lu)\n",
+      nsh_output(vtbl, "%s(%" PRIu32 ")\n",
              g_resetcause[cause.cause], cause.flag);
     }
   else
@@ -592,6 +592,12 @@ static int cmd_rpmsg_once(FAR struct nsh_vtbl_s *vtbl,
       val = (unsigned long)&ping;
     }
 #endif
+#ifdef CONFIG_RPMSG_TEST
+  else if (strcmp(argv[1], "test") == 0)
+    {
+      cmd = RPMSGIOC_TEST;
+    }
+#endif
   else if (rpmsg_cb && rpmsg_cb(&cmd, &val, argv) == OK)
     {
       /* Nothing */
@@ -642,13 +648,13 @@ static int cmd_rpmsg_recursive(FAR struct nsh_vtbl_s *vtbl,
 static int cmd_rpmsg_help(FAR struct nsh_vtbl_s *vtbl, int argc,
                           FAR char **argv)
 {
-  nsh_output(vtbl, "%s <panic|dump> <path>\n", argv[0]);
+  nsh_output(vtbl, "%s <panic|dump|test> <path>\n", argv[0]);
 #ifdef CONFIG_RPMSG_PING
   nsh_output(vtbl, "%s ping <path> <times> <length> <cmd> "
              "<period(ms)>\n\n", argv[0]);
   nsh_output(vtbl, "<times>      Number of ping operations.\n");
   nsh_output(vtbl, "<length>     The length of each ping packet.\n");
-  nsh_output(vtbl, "<cmd>        Whether the peer acknowlege or "
+  nsh_output(vtbl, "<cmd>        Whether the peer acknowledge or "
              "check data.\n");
   nsh_output(vtbl, "             Bit0 - Request need ack or not.\n");
   nsh_output(vtbl, "             Bit1 - Check the data or not.\n");

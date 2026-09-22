@@ -28,7 +28,7 @@
 
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include "netutils/ftpc.h"
 
@@ -172,6 +172,10 @@ int ftpc_relogin(FAR struct ftpc_session_s *session)
   if (session->homerdir != NULL)
     {
       session->currdir = strdup(session->homerdir);
+      if (session->currdir == NULL)
+        {
+          return -ENOMEM;
+        }
     }
 
   /* If the user has requested a special start up directory, then change to

@@ -219,7 +219,6 @@
 
 /* GCC supports both types double and long long */
 
-#  define CONFIG_HAVE_LONG_LONG 1
 #  define CONFIG_HAVE_FLOAT 1
 #  define CONFIG_HAVE_DOUBLE 1
 #  define CONFIG_HAVE_LONG_DOUBLE 1
@@ -323,7 +322,6 @@
 
 /* SDCC does not support type long long or type double */
 
-# undef  CONFIG_HAVE_LONG_LONG
 #  define CONFIG_HAVE_FLOAT 1
 # undef  CONFIG_HAVE_DOUBLE
 # undef  CONFIG_HAVE_LONG_DOUBLE
@@ -431,7 +429,6 @@
  * and simply do not support long long or double.
  */
 
-# undef  CONFIG_HAVE_LONG_LONG
 #  define CONFIG_HAVE_FLOAT 1
 # undef  CONFIG_HAVE_DOUBLE
 # undef  CONFIG_HAVE_LONG_DOUBLE
@@ -507,7 +504,6 @@
 # undef  CONFIG_SMALL_MEMORY
 # undef  CONFIG_LONG_IS_NOT_INT
 # undef  CONFIG_PTR_IS_NOT_INT
-# undef  CONFIG_HAVE_LONG_LONG
 #  define CONFIG_HAVE_FLOAT 1
 # undef  CONFIG_HAVE_DOUBLE
 # undef  CONFIG_HAVE_LONG_DOUBLE

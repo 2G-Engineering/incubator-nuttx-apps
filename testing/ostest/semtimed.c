@@ -29,6 +29,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
@@ -79,11 +80,7 @@ static void ostest_gettime(struct timespec *tp)
       printf("ostest_gettime: ERROR: clock_gettime failed\n");
       ASSERT(false);
     }
-#ifdef CONFIG_SYSTEM_TIME64
   else if (tp->tv_sec < 0 || tp->tv_nsec < 0 ||
-#else
-  else if (tp->tv_nsec < 0 ||
-#endif
            tp->tv_nsec >= 1000 * 1000 * 1000)
     {
       printf("ostest_gettime: ERROR: clock_gettime returned bogus time\n");
@@ -154,10 +151,10 @@ void semtimed_test(void)
         }
     }
 
-  printf("BEFORE: (%lu sec, %lu nsec)\n",
-          (unsigned long)before.tv_sec, (unsigned long)before.tv_nsec);
-  printf("AFTER:  (%lu sec, %lu nsec)\n",
-          (unsigned long)after.tv_sec, (unsigned long)after.tv_nsec);
+  printf("BEFORE: (%jd sec, %ld nsec)\n",
+          (intmax_t)before.tv_sec, before.tv_nsec);
+  printf("AFTER:  (%jd sec, %ld nsec)\n",
+          (intmax_t)after.tv_sec, after.tv_nsec);
 
   /* Now make sure that the time wait returns successfully if the semaphore
    * is posted
@@ -250,10 +247,10 @@ void semtimed_test(void)
       printf("semtimed_test: PASS: sem_timedwait succeeded\n");
     }
 
-  printf("BEFORE: (%lu sec, %lu nsec)\n",
-          (unsigned long)before.tv_sec, (unsigned long)before.tv_nsec);
-  printf("AFTER:  (%lu sec, %lu nsec)\n",
-          (unsigned long)after.tv_sec, (unsigned long)after.tv_nsec);
+  printf("BEFORE: (%jd sec, %ld nsec)\n",
+          (intmax_t)before.tv_sec, before.tv_nsec);
+  printf("AFTER:  (%jd sec, %ld nsec)\n",
+          (intmax_t)after.tv_sec, after.tv_nsec);
 
   /* Clean up detritus left by the pthread */
 

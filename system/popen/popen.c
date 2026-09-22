@@ -35,7 +35,7 @@
 #include <sched.h>
 #include <spawn.h>
 #include <assert.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <fcntl.h>
 #include <errno.h>
 
@@ -312,7 +312,7 @@ FILE *popen(FAR const char *command, FAR const char *mode)
 
   close(newfd[0]);
 
-  if (rw)
+  if (rw && newfd[0] != newfd[1])
     {
       close(newfd[1]);
     }

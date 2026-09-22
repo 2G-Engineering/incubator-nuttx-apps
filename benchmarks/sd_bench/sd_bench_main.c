@@ -130,8 +130,8 @@ static uint64_t get_time_delta_us(const struct timespec *start,
                                   const struct timespec *end)
 {
   uint64_t elapsed;
-  elapsed = (((uint64_t)end->tv_sec * NSEC_PER_SEC) + end->tv_nsec);
-  elapsed -= (((uint64_t)start->tv_sec * NSEC_PER_SEC) + start->tv_nsec);
+  elapsed = (end->tv_sec * NSEC_PER_SEC) + end->tv_nsec;
+  elapsed -= (start->tv_sec * NSEC_PER_SEC) + start->tv_nsec;
   return elapsed / 1000.;
 }
 
@@ -451,7 +451,7 @@ int main(int argc, char *argv[])
 
   cfg.run_duration *= 1000;
   bench_fd = open(BENCHMARK_FILE,
-                  O_CREAT | (verify ? O_RDWR : O_WRONLY) | O_TRUNC);
+                  O_CREAT | (verify ? O_RDWR : O_WRONLY) | O_TRUNC, 0666);
 
   if (bench_fd < 0)
     {

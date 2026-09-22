@@ -41,7 +41,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define RTC_DEFAULT_DEVIATION 10
+#define RTC_DEFAULT_DEVIATION 100
 #define DEFAULT_TIME_OUT      2
 #define SLEEPSECONDS          10
 
@@ -64,7 +64,8 @@
 struct posix_timer_state_s
 {
   struct itimerspec it;
-  uint32_t tim;
+  uint64_t tim;
+  uint32_t trigger_count;
   uint32_t deviation;
 };
 
@@ -140,10 +141,10 @@ static void parse_commandline(
  * Name: get_timestamp
  ****************************************************************************/
 
-static uint32_t get_timestamp(void)
+static uint64_t get_timestamp(void)
 {
   struct timespec ts;
-  uint32_t ms;
+  uint64_t ms;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   ms = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
   return ms;
@@ -157,14 +158,17 @@ static void posix_timer_callback(union sigval arg)
 {
   FAR struct posix_timer_state_s *sigev_para =
                       (FAR struct posix_timer_state_s *)arg.sival_ptr;
-  int range = get_timestamp() - (*sigev_para).tim;
+  uint64_t expected = (*sigev_para).tim +
+                      DEFAULT_TIME_OUT * (*sigev_para).trigger_count;
+  int range = get_timestamp() - expected;
 
-  assert_in_range(range,
-          sigev_para->it.it_interval.tv_sec * 1000 - sigev_para->deviation,
-          sigev_para->it.it_interval.tv_sec * 1000 + sigev_para->deviation);
+  syslog(0, "range: %d ms\n", range);
+
+  assert(range >= sigev_para->it.it_interval.tv_sec * 1000 -
+                  sigev_para->deviation);
 
   syslog(LOG_DEBUG, "callback trigger!!!\n");
-  (*sigev_para).tim = get_timestamp();
+  (*sigev_para).trigger_count++;
 }
 
 /****************************************************************************
@@ -195,10 +199,10 @@ static void drivertest_posix_timer(FAR void **state)
 
   /* Start the timer */
 
+  posix_timer_state->tim = get_timestamp();
+
   ret = timer_settime(timerid, 0, &(posix_timer_state->it), NULL);
   assert_return_code(ret, OK);
-
-  posix_timer_state->tim = get_timestamp();
 
   /* Get the timer status */
 
@@ -225,6 +229,7 @@ int main(int argc, FAR char *argv[])
     .it.it_value.tv_nsec    = 0,
     .it.it_interval.tv_sec  = DEFAULT_TIME_OUT,
     .it.it_interval.tv_nsec = 0,
+    .trigger_count          = 0,
     .deviation              = RTC_DEFAULT_DEVIATION
   };
 

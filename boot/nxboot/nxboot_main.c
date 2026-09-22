@@ -124,7 +124,7 @@ static const char *progress_msgs[] =
  ****************************************************************************/
 
 #ifdef CONFIG_NXBOOT_PROGRESS
-void nxboot_progress(enum progress_type_e type, ...)
+void nxboot_progress(int type, ...)
 {
 #ifdef CONFIG_NXBOOT_PRINTF_PROGRESS
   va_list arg;
@@ -264,16 +264,10 @@ int main(int argc, FAR char *argv[])
   FAR struct boardioc_reset_cause_s cause;
 #endif
 
-#if defined(CONFIG_BOARDCTL) && !defined(CONFIG_NSH_ARCHINIT)
-  /* Perform architecture-specific initialization (if configured) */
-
-  boardctl(BOARDIOC_INIT, 0);
-
 #ifdef CONFIG_BOARDCTL_FINALINIT
   /* Perform architecture-specific final-initialization (if configured) */
 
   boardctl(BOARDIOC_FINALINIT, 0);
-#endif
 #endif
 
   syslog(LOG_INFO, "*** nxboot ***\n");

@@ -37,7 +37,7 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 
 #include <nuttx/sensors/qencoder.h>
 
@@ -307,27 +307,34 @@ int main(int argc, FAR char *argv[])
 
       if (g_qeexample.use_qeindex)
         {
-          ret = ioctl(fd, QEIOC_GETINDEX, (unsigned long)((uintptr_t)&index));
+          ret = ioctl(fd, QEIOC_GETINDEX,
+                      (unsigned long)((uintptr_t)&index));
           if (ret < 0)
             {
-              printf("qe_main: ioctl(QEIOC_GETINDEX) failed: %d\n", errno);
-              printf("Your MCU probably does not support this ioctl call.\n");
+              printf("qe_main: ioctl(QEIOC_GETINDEX) failed: %d\n",
+                     errno);
+              printf("Your MCU probably does not support this ioctl "
+                     "call.\n");
               printf("Consider using this example without the -i option.\n");
               exitval = EXIT_FAILURE;
               goto errout_with_dev;
             }
 
-          /* GETINDEX succesful */
+          /* GETINDEX successful */
 
           else
             {
-              printf("qe_main: %3d. pos: %" PRIi32 ", last index: %" PRIi32 ", hit indexes: %" \
-                     PRIi16 "\n", nloops + 1, index.qenc_pos, index.indx_pos, index.indx_cnt);
+              printf("qe_main: %3d. pos: %" PRIi32 ", "
+                     "last index: %" PRIi32 ", "
+                     "hit indexes: %" PRIi16 "\n",
+                     nloops + 1, index.qenc_pos, index.indx_pos,
+                     index.indx_cnt);
             }
         }
       else
         {
-          ret = ioctl(fd, QEIOC_POSITION, (unsigned long)((uintptr_t)&position));
+          ret = ioctl(fd, QEIOC_POSITION,
+                      (unsigned long)((uintptr_t)&position));
           if (ret < 0)
             {
               printf("qe_main: ioctl(QEIOC_POSITION) failed: %d\n", errno);

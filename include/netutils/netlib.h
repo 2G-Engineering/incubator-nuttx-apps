@@ -52,8 +52,14 @@
 
 #include <net/if.h>
 #include <netinet/in.h>
+#include <nuttx/mm/iob.h>
 #include <nuttx/net/netdev.h>
 #include <nuttx/net/netconfig.h>
+
+#ifdef CONFIG_NET_IPTABLES
+#  include <nuttx/net/netfilter/ip_tables.h>
+#  include <nuttx/net/netfilter/ip6_tables.h>
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -197,6 +203,11 @@ struct url_s
 };
 #endif
 
+#ifdef CONFIG_NETUTILS_DHCPC
+typedef CODE void (*netlib_dhcp_ntp_callback_t)
+  (FAR const char *ntp_server_list, FAR void *arg);
+#endif
+
 /****************************************************************************
  * Public Data
  ****************************************************************************/
@@ -240,6 +251,44 @@ ssize_t netlib_get_devices(FAR struct netlib_device_s *devlist,
 
 bool netlib_ipv4addrconv(FAR const char *addrstr, FAR uint8_t *addr);
 bool netlib_ethaddrconv(FAR const char *hwstr, FAR uint8_t *hw);
+
+#ifdef CONFIG_NETUTILS_DHCPC
+/****************************************************************************
+ * Name: netlib_set_ntp_servers_from_dhcp
+ *
+ * Description:
+ *   Update the currently active DHCP option 42 NTP server list. The list
+ *   contains semicolon-separated hostnames or addresses. Passing NULL or
+ *   an empty string clears the DHCP-provided list.
+ *
+ ****************************************************************************/
+
+int netlib_set_ntp_servers_from_dhcp(FAR const char *ntp_server_list);
+
+/****************************************************************************
+ * Name: netlib_register_dhcp_ntp_callback
+ *
+ * Description:
+ *   Register a callback to receive DHCP option 42 NTP server list updates.
+ *   The current list, if any, is replayed immediately after registration.
+ *   Only one callback may be registered at a time.
+ *
+ ****************************************************************************/
+
+int netlib_register_dhcp_ntp_callback(netlib_dhcp_ntp_callback_t callback,
+                                      FAR void *arg);
+
+/****************************************************************************
+ * Name: netlib_unregister_dhcp_ntp_callback
+ *
+ * Description:
+ *   Unregister a previously registered DHCP option 42 NTP update callback.
+ *
+ ****************************************************************************/
+
+int netlib_unregister_dhcp_ntp_callback(netlib_dhcp_ntp_callback_t callback,
+                                        FAR void *arg);
+#endif
 
 #ifdef CONFIG_NET_ETHERNET
 /* Get and set IP/MAC addresses (Ethernet L2 only) */
@@ -326,6 +375,11 @@ ssize_t netlib_get_nbtable(FAR struct neighbor_entry_s *nbtab,
 #ifdef CONFIG_NETDEV_WIRELESS_IOCTL
 int netlib_getessid(FAR const char *ifname, FAR char *essid, size_t idlen);
 int netlib_setessid(FAR const char *ifname, FAR const char *essid);
+#endif
+
+#ifdef CONFIG_NET_VLAN
+int netlib_add_vlan(FAR const char *ifname, int vlanid, int prio);
+int netlib_del_vlan(FAR const char *vlanif);
 #endif
 
 #ifdef CONFIG_NET_ARP
@@ -477,15 +531,21 @@ void netlib_server(uint16_t portno, pthread_startroutine_t handler,
 int netlib_getifstatus(FAR const char *ifname, FAR uint8_t *flags);
 int netlib_ifup(FAR const char *ifname);
 int netlib_ifdown(FAR const char *ifname);
+int netlib_ifarp(const char *ifname);
+int netlib_ifnoarp(const char *ifname);
 
 /* DNS server addressing */
 
 #if defined(CONFIG_NET_IPv4) && defined(CONFIG_NETDB_DNSCLIENT)
 int netlib_set_ipv4dnsaddr(FAR const struct in_addr *inaddr);
+int netlib_del_ipv4dnsaddr(FAR const struct in_addr *inaddr);
+int netlib_del_ipv4dnsaddr_by_index(int index);
 #endif
 
 #if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDB_DNSCLIENT)
 int netlib_set_ipv6dnsaddr(FAR const struct in6_addr *inaddr);
+int netlib_del_ipv6dnsaddr(FAR const struct in6_addr *inaddr);
+int netlib_del_ipv6dnsaddr_by_index(int index);
 #endif
 
 int netlib_set_mtu(FAR const char *ifname, int mtu);
@@ -494,6 +554,66 @@ int netlib_set_mtu(FAR const char *ifname, int mtu);
 int netlib_getifstatistics(FAR const char *ifname,
                            FAR struct netdev_statistics_s *stat);
 #endif
+
+/* Network check support */
+
+#ifdef CONFIG_NET_ARP_ACD
+int netlib_check_ifconflict(FAR const char *ifname);
+#endif
+
+/****************************************************************************
+ * Name: netlib_check_ipconnectivity
+ *
+ * Description:
+ *   Check network connectivity by pinging a remote IP address.
+ *   If ip is NULL, ping the gateway of each network interface,
+ *   and optionally the routers from the routing table. If ping
+ *   is disabled, just check the status of the IP network card.
+ *
+ * Parameters:
+ *   ip       The ipv4 address to check, or NULL to ping gateways
+ *   timeout  The max timeout of each ping
+ *   retry    The retry times of ping
+ *
+ * Return:
+ *   nums of remote reply of ping; a negative or ZERO on failure
+ *
+ ****************************************************************************/
+
+int netlib_check_ipconnectivity(FAR const char *ip, int timeout, int retry);
+
+#ifdef CONFIG_NETUTILS_PING
+
+/****************************************************************************
+ * Name: netlib_check_ifconnectivity
+ *
+ * Description:
+ *   Check network connectivity by pinging the default gateway
+ *   of the specified network interface.
+ *
+ * Parameters:
+ *   ifname   The name of the interface to use
+ *   timeout  The timeout of ping
+ *   retry    The retry times of ping
+ *
+ * Return:
+ *   nums of gateway reply of ping; a negative on failure.
+ *
+ ****************************************************************************/
+
+int netlib_check_ifconnectivity(FAR const char *ifname,
+                                int timeout, int retry);
+#else
+#define netlib_check_ifconnectivity(i, t, r) 1
+#endif
+
+#ifdef CONFIG_MM_IOB
+int netlib_get_iobinfo(FAR struct iob_stats_s *iob);
+#endif
+
+int netlib_check_httpconnectivity(FAR const char *host,
+                                  FAR const char *getmsg,
+                                  int port, int expect_code);
 
 #undef EXTERN
 #ifdef __cplusplus

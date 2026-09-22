@@ -26,8 +26,11 @@
 
 #include <nuttx/config.h>
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include "netutils/ptpd.h"
 
@@ -35,19 +38,16 @@
  * Private Functions
  ****************************************************************************/
 
-static int do_ptpd_start(FAR const char *interface)
+static int do_ptpd_start(FAR const struct ptpd_config_s *config)
 {
-  int pid;
+  int ret;
 
-  pid = ptpd_start(interface);
-  if (pid < 0)
-    {
-      fprintf(stderr, "ERROR: ptpd_start() failed\n");
-      return EXIT_FAILURE;
-    }
+  ret = ptpd_start(config);
 
-  printf("Started the PTP daemon as PID=%d\n", pid);
-  return EXIT_SUCCESS;
+  /* Should never happen */
+
+  fprintf(stderr, "ERROR: ptpd_start() failed:%d\n", ret);
+  return EXIT_FAILURE;
 }
 
 static int do_ptpd_status(int pid)
@@ -98,7 +98,7 @@ static int do_ptpd_status(int pid)
   gmtime_r(&status.last_clock_update.tv_sec, &time_tm);
   strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &time_tm);
   printf("- last_clock_update: %s.%09ld\n",
-    buf, (long)status.last_clock_update.tv_nsec);
+    buf, status.last_clock_update.tv_nsec);
 
   printf("- last_delta_ns: %lld\n", (long long)status.last_delta_ns);
   printf("- last_adjtime_ns: %lld\n", (long long)status.last_adjtime_ns);
@@ -107,20 +107,20 @@ static int do_ptpd_status(int pid)
 
   clock_gettime(CLOCK_MONOTONIC, &time_now);
 
-  printf("- last_received_multicast: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_received_multicast.tv_sec));
-  printf("- last_received_announce: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_received_announce.tv_sec));
-  printf("- last_received_sync: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_received_sync.tv_sec));
-  printf("- last_transmitted_sync: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_transmitted_sync.tv_sec));
-  printf("- last_transmitted_announce: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_transmitted_announce.tv_sec));
-  printf("- last_transmitted_delayresp: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_transmitted_delayresp.tv_sec));
-  printf("- last_transmitted_delayreq: %d s ago\n",
-    (int)(time_now.tv_sec - status.last_transmitted_delayreq.tv_sec));
+  printf("- last_received_multicast: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_received_multicast.tv_sec));
+  printf("- last_received_announce: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_received_announce.tv_sec));
+  printf("- last_received_sync: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_received_sync.tv_sec));
+  printf("- last_transmitted_sync: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_transmitted_sync.tv_sec));
+  printf("- last_transmitted_announce: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_transmitted_announce.tv_sec));
+  printf("- last_transmitted_delayresp: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_transmitted_delayresp.tv_sec));
+  printf("- last_transmitted_delayreq: %jd s ago\n",
+    (intmax_t)(time_now.tv_sec - status.last_transmitted_delayreq.tv_sec));
 
   return EXIT_SUCCESS;
 }
@@ -143,6 +143,27 @@ int do_ptpd_stop(int pid)
     }
 }
 
+static void usage(FAR const char *progname)
+{
+  fprintf(stderr, "Usage: %s [options]: run this daemon in background.\n"
+                  " -s       client only synchronization mode\n"
+                  " Network Transport:\n"
+                  " -2       IEEE 802.3\n"
+                  " -4       UDP IPV4 (default)\n"
+                  " -6       UDP IPV6\n"
+                  " Time Stamping:\n"
+                  " -H       HARDWARE (default) depends on NET_TIMESTAMP\n"
+                  " -S       SOFTWARE\n"
+                  " -B       The best master clock algorithm is used\n"
+                  " -r       synchronize system (realtime) clock\n"
+                  " -E       E2E, support client delay request-response\n"
+                  " -i [dev] interface device to use, for example 'eth0'\n"
+                  " -p [dev] clock device to use\n"
+                  " -t [pid] look the status of ptp daemon\n"
+                  " -d [pid] stop ptp daemon\n",
+                  progname);
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -153,24 +174,71 @@ int do_ptpd_stop(int pid)
 
 int main(int argc, FAR char *argv[])
 {
-  if (argc == 3 && strcmp(argv[1], "start") == 0)
+  struct ptpd_config_s config;
+  int option;
+
+  /* Default config for ptp daemon */
+
+  config.interface = "eth0";
+  config.clock = "realtime";
+  config.client_only = false;
+  config.delay_e2e = false;
+#ifdef CONFIG_NET_TIMESTAMP
+  config.hardware_ts = true;
+#else
+  config.hardware_ts = false;
+#endif
+  config.bmca = false;
+  config.af = AF_INET;
+
+  while ((option = getopt(argc, argv, "p:i:t:d:rs246BEHS")) != ERROR)
     {
-      return do_ptpd_start(argv[2]);
+      switch (option)
+        {
+          case 's':
+            config.client_only = true;
+            break;
+          case 't':
+            return do_ptpd_status(atoi(optarg));
+          case 'd':
+            return do_ptpd_stop(atoi(optarg));
+          case '2':
+            config.af = AF_PACKET;
+            break;
+          case '4':
+            config.af = AF_INET;
+            break;
+          case '6':
+            config.af = AF_INET6;
+            break;
+          case 'B':
+            config.bmca = true;
+            break;
+          case 'E':
+            config.delay_e2e = true;
+            break;
+#ifdef CONFIG_NET_TIMESTAMP
+          case 'H':
+            config.hardware_ts = true;
+            break;
+#endif
+          case 'S':
+            config.hardware_ts = false;
+            break;
+          case 'i':
+            config.interface = optarg;
+            break;
+          case 'p':
+            config.clock = optarg;
+            break;
+          case 'r':
+            config.clock = "realtime";
+            break;
+          default:
+            usage(argv[0]);
+            return 0;
+        }
     }
-  else if (argc == 3 && strcmp(argv[1], "status") == 0)
-    {
-      return do_ptpd_status(atoi(argv[2]));
-    }
-  else if (argc == 3 && strcmp(argv[1], "stop") == 0)
-    {
-      return do_ptpd_stop(atoi(argv[2]));
-    }
-  else
-    {
-      fprintf(stderr, "Usage: \n"
-                      "ptpd start <interface>\n"
-                      "ptpd status <pid>\n"
-                      "ptpd stop <pid>\n");
-      return EXIT_FAILURE;
-    }
+
+  return do_ptpd_start(&config);
 }

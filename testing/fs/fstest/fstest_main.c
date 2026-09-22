@@ -218,7 +218,7 @@ static inline void fstest_randname(FAR struct fstest_ctx_s *ctx,
 
   dirlen   = strlen(ctx->mountdir);
 
-  /* Force the max filename lengh and also the min name len = 4 */
+  /* Force the max filename length and also the min name len = 4 */
 
   maxname  = CONFIG_TESTING_FSTEST_MAXNAME - dirlen - 3;
   namelen  = (rand() % maxname) + 4;
@@ -668,7 +668,6 @@ static inline int fstest_rdfile(FAR struct fstest_ctx_s *ctx,
  * Name: fstest_filesize
  ****************************************************************************/
 
-#ifdef CONFIG_HAVE_LONG_LONG
 static unsigned long long fstest_filesize(FAR struct fstest_ctx_s *ctx)
 {
   unsigned long long bytes_used;
@@ -688,27 +687,6 @@ static unsigned long long fstest_filesize(FAR struct fstest_ctx_s *ctx)
 
   return bytes_used;
 }
-#else
-static unsigned long fstest_filesize(FAR struct fstest_ctx_s *ctx)
-{
-  unsigned long bytes_used;
-  FAR struct fstest_filedesc_s *file;
-  int i;
-
-  bytes_used = 0;
-
-  for (i = 0; i < ctx->max_open; i++)
-    {
-      file = &ctx->files[i];
-      if (file->name != NULL && !file->deleted)
-        {
-          bytes_used += file->len;
-        }
-    }
-
-  return bytes_used;
-}
-#endif
 
 /****************************************************************************
  * Name: fstest_verifyfs
@@ -983,7 +961,7 @@ int main(int argc, FAR char *argv[])
   ctx = malloc(sizeof(struct fstest_ctx_s));
   if (ctx == NULL)
     {
-      printf("malloc ctx feild,exit!\n");
+      printf("malloc ctx field,exit!\n");
       exit(1);
     }
 
@@ -1081,11 +1059,7 @@ int main(int argc, FAR char *argv[])
       /* Directory listing */
 
       fstest_directory(ctx);
-#ifdef CONFIG_HAVE_LONG_LONG
       printf("Total file size: %llu\n", fstest_filesize(ctx));
-#else
-      printf("Total file size: %lu\n", fstest_filesize(ctx));
-#endif
 
       /* Verify all files written to FLASH */
 
@@ -1131,11 +1105,7 @@ int main(int argc, FAR char *argv[])
       /* Directory listing */
 
       fstest_directory(ctx);
-#ifdef CONFIG_HAVE_LONG_LONG
       printf("Total file size: %llu\n", fstest_filesize(ctx));
-#else
-      printf("Total file size: %lu\n", fstest_filesize(ctx));
-#endif
 
       /* Verify all files written to FLASH */
 

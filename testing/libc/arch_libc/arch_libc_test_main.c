@@ -32,7 +32,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <assert.h>
 
 /****************************************************************************
@@ -133,7 +133,7 @@ int arch_libc_test_strcpy_offset(int dst_offset, int src_offset)
         }
     }
 
-  /* strcpy shouln't change arch_libc_test_strcpy's local variable */
+  /* strcpy shouldn't change arch_libc_test_strcpy's local variable */
 
   if (dest != (g_test_dst_str + dst_offset) ||
       src != (g_test_src_str + src_offset))
@@ -224,8 +224,8 @@ int arch_libc_strcpy_speed(void)
         }
     }
 
-  printf("strcpy total(run 25 times) cpu cycles %" PRIu32 "\n", cycles);
-  printf("strcpy average cpu cycles %" PRIu32 "\n", cycles / 25);
+  printf("strcpy total(run 25 times) cpu cycles %"PRIu64"\n", cycles);
+  printf("strcpy average cpu cycles %"PRIu64"\n", cycles / 25);
 
   return 0;
 }

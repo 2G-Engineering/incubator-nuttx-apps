@@ -28,7 +28,7 @@ include $(APPDIR)/Make.defs
 
 WD := ${shell echo $(CURDIR) | sed -e 's/ /\\ /g'}
 
-CONFIG_NETUTILS_CJSON_URL ?= "https://github.com/DaveGamble/cJSON/archive"
+CONFIG_NETUTILS_CJSON_URL ?= "https://github.com/DaveGamble/cJSON/archive/refs/tags"
 CONFIG_NETUTILS_CJSON_VERSION ?= "1.7.10"
 CJSON_VERSION = $(patsubst "%",%,$(strip $(CONFIG_NETUTILS_CJSON_VERSION)))
 

@@ -35,7 +35,8 @@ CFLAGS += \
 	-DLWS_LIBRARY_VERSION_MINOR=$(call word-dot,$(LIBWEBSOCKETS_VERSION),2) \
 	-DLWS_LIBRARY_VERSION_PATCH=$(call word-dot,$(LIBWEBSOCKETS_VERSION),3) \
 	-DLWS_LIBRARY_VERSION_PATCH_ELABORATED=$(call word-dot,$(LIBWEBSOCKETS_VERSION),3)-unknown \
-	-DLWS_LIBRARY_VERSION=\"$(LIBWEBSOCKETS_VERSION)-unknown\"
+	-DLWS_LIBRARY_VERSION=\"$(LIBWEBSOCKETS_VERSION)-unknown\" \
+	-Wno-shadow -Wno-format
 
 CFLAGS += \
 	-I. \
@@ -118,6 +119,16 @@ CSRCS += \
 	$(LIBWEBSOCKETS_UNPACK)/lib/roles/http/client/client-http.c \
 	$(LIBWEBSOCKETS_UNPACK)/lib/event-libs/poll/poll.c
 
+ifneq ($(CONFIG_NETUTILS_LIBWEBSOCKETS_SERVER),)
+CSRCS += \
+	$(LIBWEBSOCKETS_UNPACK)/lib/roles/ws/server-ws.c \
+	$(LIBWEBSOCKETS_UNPACK)/lib/roles/http/server/server.c \
+	$(LIBWEBSOCKETS_UNPACK)/lib/roles/listen/ops-listen.c
+
+CFLAGS += -I$(LIBWEBSOCKETS_UNPACK)/lib/roles/http/server
+endif
+
+ifneq ($(CONFIG_NETUTILS_LIBWEBSOCKETS_TLS),)
 CSRCS += \
 	$(LIBWEBSOCKETS_UNPACK)/lib/tls/tls.c \
 	$(LIBWEBSOCKETS_UNPACK)/lib/tls/tls-network.c \
@@ -128,7 +139,8 @@ CSRCS += \
 	$(LIBWEBSOCKETS_UNPACK)/lib/tls/mbedtls/mbedtls-x509.c \
 	$(LIBWEBSOCKETS_UNPACK)/lib/tls/mbedtls/mbedtls-ssl.c \
 	$(LIBWEBSOCKETS_UNPACK)/lib/tls/mbedtls/mbedtls-session.c \
-	$(LIBWEBSOCKETS_UNPACK)/lib/tls/mbedtls/mbedtls-client.c \
+	$(LIBWEBSOCKETS_UNPACK)/lib/tls/mbedtls/mbedtls-client.c
+endif
 
 ifneq ($(CONFIG_NETUTILS_MQTTC),)
 	CFLAGS += -I$(LIBWEBSOCKETS_UNPACK)/lib/roles/mqtt

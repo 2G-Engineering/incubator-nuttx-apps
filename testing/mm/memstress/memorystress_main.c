@@ -26,8 +26,10 @@
 
 #include <nuttx/config.h>
 #include <stdlib.h>
-#include <debug.h>
+#include <nuttx/debug.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
@@ -120,7 +122,7 @@ static void show_usage(FAR const char *progname)
 {
   printf("\nUsage: %s -m [max allocsize Default:8192] "
          "-n [node length Default:1024] -t [sleep us Default:100]"
-         " -x [nthreads Default:1] -d [debuger mode]\n",
+         " -x [nthreads Default:1] -d [debugger mode]\n",
         progname);
   printf("\nWhere:\n");
   printf("  -m [max-allocsize] max alloc size.\n");
@@ -215,7 +217,7 @@ static void checknode(FAR struct memorystress_thread_context_s *context,
           context->error.rwerror = rwerror;
 
           error_result(context->error);
-          lib_dumpbuffer("debuger", node->buf, size);
+          lib_dumpbuffer("debugger", node->buf, size);
 
           /* Trigger the ASSET once it occurs, retaining the error site */
 

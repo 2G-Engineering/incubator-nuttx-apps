@@ -117,17 +117,19 @@ void test_nuttx_syscall_fsync02(FAR void **state)
 
       /* EBADF - fd is closed */
 
+#  ifndef CONFIG_FDCHECK
         {
           &pipe_fd[0], EBADF
         },
+#  endif
 
       /* EBADF - fd is invalid (-1) */
 
-  #ifndef CONFIG_FDSAN
+#  ifndef CONFIG_FDSAN
         {
           &bad_fd, EBADF
         },
-  #endif
+#  endif
 
       /* EINVAL - fsync() on fifo should not succeed. */
 
@@ -236,7 +238,7 @@ void test_nuttx_syscall_fsync03(FAR void **state)
   ret = fsync(fd);
 
   time_end = time(0);
-  assert_true(time_end != (time_t)-1);
+  assert_true(time_end != -1);
   assert_int_not_equal(ret, -1);
   assert_int_equal(ret, 0);
   assert_false(time_end < time_start);

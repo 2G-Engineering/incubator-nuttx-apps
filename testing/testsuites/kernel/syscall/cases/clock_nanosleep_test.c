@@ -55,7 +55,7 @@ void test_nuttx_syscall_clocknanosleep01(FAR void **state)
   ret = clock_nanosleep(type, 0, &t, NULL);
   assert_int_equal(ret, 0);
   end_time = clock();
-  assert_int_equal((time_t)(end_time - start_time) / CLOCKS_PER_SEC,
+  assert_int_equal((end_time - start_time) / CLOCKS_PER_SEC,
                    t.tv_sec);
 }
 

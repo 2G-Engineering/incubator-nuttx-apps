@@ -100,7 +100,7 @@ struct nsh_taskstatus_s
   FAR const char *td_sigmask;      /* Signal mask */
 #endif
   FAR char       *td_cmdline;      /* Command line */
-  int             td_pid;          /* Task ID */
+  int             td_tid;          /* Task ID */
   int             td_ppid;         /* Parent task ID */
 #ifdef NSH_HAVE_CPULOAD
   FAR const char *td_cpuload;      /* CPU load */
@@ -379,7 +379,7 @@ static int ps_record(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
   status->td_sigmask = "";
 #endif
   status->td_cmdline = "";
-  status->td_pid = atoi(entryp->d_name);
+  status->td_tid = atoi(entryp->d_name);
   status->td_ppid = INVALID_PROCESS_ID;
 #ifdef NSH_HAVE_CPULOAD
   status->td_cpuload = "";
@@ -633,7 +633,7 @@ static void ps_title(FAR struct nsh_vtbl_s *vtbl, bool heap)
               "%6s "
 #endif
               "%s\n"
-              , "PID", "PPID", "GROUP"
+              , "TID", "PID", "PPID"
 #ifdef CONFIG_SMP
               , "CPU"
 #endif
@@ -679,7 +679,7 @@ static void ps_output(FAR struct nsh_vtbl_s *vtbl, bool heap,
 #endif
 
   nsh_output(vtbl,
-             "%5d %5d %5s "
+             "%5d %5s %5d "
 #ifdef CONFIG_SMP
              "%3s "
 #endif
@@ -700,7 +700,7 @@ static void ps_output(FAR struct nsh_vtbl_s *vtbl, bool heap,
              "%5s "
 #endif
              "%s\n"
-           , status->td_pid, status->td_ppid, status->td_groupid
+           , status->td_tid, status->td_groupid, status->td_ppid
 #ifdef CONFIG_SMP
            , status->td_cpu
 #endif
@@ -873,6 +873,7 @@ static int top_cmpcpuload(FAR const void *item1, FAR const void *item2)
     }
 }
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
 /****************************************************************************
  * Name: top_exit
  ****************************************************************************/
@@ -881,6 +882,7 @@ static void top_exit(int signo, FAR siginfo_t *siginfo, FAR void *context)
 {
   *(FAR bool *)siginfo->si_user = true;
 }
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
 
 #endif
 
@@ -993,7 +995,8 @@ int cmd_pidof(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
  * Name: cmd_kill
  ****************************************************************************/
 
-#ifndef CONFIG_NSH_DISABLE_KILL
+#if !defined(CONFIG_NSH_DISABLE_KILL) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_kill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR char *ptr;
@@ -1096,7 +1099,8 @@ invalid_arg:
  * Name: cmd_pkill
  ****************************************************************************/
 
-#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PKILL)
+#if defined(CONFIG_FS_PROCFS) && !defined(CONFIG_NSH_DISABLE_PKILL) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_pkill(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR const char *name;
@@ -1197,7 +1201,8 @@ invalid_arg:
  * Name: cmd_sleep
  ****************************************************************************/
 
-#ifndef CONFIG_NSH_DISABLE_SLEEP
+#if !defined(CONFIG_NSH_DISABLE_SLEEP) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(argc);
@@ -1220,8 +1225,8 @@ int cmd_sleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 /****************************************************************************
  * Name: cmd_usleep
  ****************************************************************************/
-
-#ifndef CONFIG_NSH_DISABLE_USLEEP
+#if !defined(CONFIG_NSH_DISABLE_USLEEP) && \
+    !defined(CONFIG_DISABLE_ALL_SIGNALS)
 int cmd_usleep(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(argc);
@@ -1357,7 +1362,9 @@ int cmd_top(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   FAR char *pidlist = NULL;
   size_t num = SIZE_MAX;
   size_t i;
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   struct sigaction act;
+#endif
   bool quit = false;
   int delay = 3;
   int ret = 0;
@@ -1393,6 +1400,7 @@ int cmd_top(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         }
     }
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   act.sa_user = &quit;
   act.sa_sigaction = top_exit;
   sigemptyset(&act.sa_mask);
@@ -1402,6 +1410,7 @@ int cmd_top(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       nsh_error(vtbl, g_fmtcmdfailed, "top", "sigaction", NSH_ERRNO);
       return ERROR;
     }
+#endif
 
   if (vtbl->isctty)
     {
