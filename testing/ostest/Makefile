@@ -31,7 +31,7 @@ MODULE = $(CONFIG_TESTING_OSTEST)
 
 # NuttX OS Test
 
-CSRCS  = getopt.c libc_memmem.c restart.c sighelper.c
+CSRCS  = getopt.c libc_memmem.c libc_strto.c restart.c sighelper.c
 
 ifeq ($(CONFIG_ENABLE_ALL_SIGNALS),y)
 CSRCS += sighand.c signest.c
@@ -83,6 +83,14 @@ ifeq ($(CONFIG_SCHED_WAITPID),y)
 CSRCS += waitpid.c
 endif
 
+ifeq ($(CONFIG_FS_CHROOT),y)
+ifeq ($(CONFIG_SCHED_WAITPID),y)
+ifneq ($(CONFIG_BUILD_KERNEL),y)
+CSRCS += chroot.c
+endif
+endif
+endif
+
 ifneq ($(CONFIG_DISABLE_PTHREAD),y)
 CSRCS += cancel.c cond.c mutex.c timedmutex.c sem.c semtimed.c barrier.c
 CSRCS += timedwait.c pthread_rwlock.c pthread_rwlock_cancel.c schedlock.c
@@ -119,14 +127,14 @@ ifeq ($(CONFIG_SCHED_SPORADIC),y)
 CSRCS += sporadic.c sporadic2.c
 endif
 
-ifeq ($(CONFIG_SCHED_WORKQUEUE),y)
-CSRCS += wqueue.c
-endif
-
 ifeq ($(CONFIG_PRIORITY_INHERITANCE),y)
 CSRCS += prioinherit.c
 endif
 endif # CONFIG_DISABLE_PTHREAD
+
+ifeq ($(CONFIG_TESTING_OSTEST_WQUEUE),y)
+CSRCS += wqueue.c
+endif
 
 ifneq ($(CONFIG_DISABLE_MQUEUE),y)
 ifneq ($(CONFIG_DISABLE_PTHREAD),y)

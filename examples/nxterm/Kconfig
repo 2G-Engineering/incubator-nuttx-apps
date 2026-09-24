@@ -57,6 +57,50 @@ config EXAMPLES_NXTERM_WCOLOR
 	hex "Window color"
 	default 0xcf1f
 
+config EXAMPLES_NXTERM_FULLSCREEN
+	bool "Full-screen window"
+	default n
+	---help---
+		Size the NXTerm window to cover the complete display instead of
+		centering it at three quarters of the display size.
+
+config EXAMPLES_NXTERM_PTYCONSOLE
+	bool "PTY-backed keyboard console"
+	default n
+	depends on PSEUDOTERM && INPUT_KEYBOARD
+	depends on !INPUT_KEYBOARD_BYTESTREAM
+	depends on !NSH_ALTCONDEV && !NSH_USBKBD
+	---help---
+		Route NSH through a pseudo-terminal and bridge an event-mode keyboard
+		to the terminal master.  This gives NXTerm a real TTY, translates
+		NuttX keyboard special-key codes to VT100 input, and permits terminal
+		generated signals such as Ctrl-C and Ctrl-Z.
+
+config EXAMPLES_NXTERM_NSH_FALLBACK
+	bool "Fall back to serial NSH"
+	default n
+	depends on NSH_CONSOLE
+	---help---
+		Run NSH on the original system console if NX or NXTerm initialization
+		fails.  This is useful on framebuffer systems where display startup
+		failures would otherwise leave no interactive console.
+
+config EXAMPLES_NXTERM_STARTUP_TIMEOUT
+	int "NX startup timeout"
+	default 5
+	range 1 60
+	depends on EXAMPLES_NXTERM_NSH_FALLBACK
+	---help---
+		Number of seconds to wait for the NX server to accept the client
+		connection before falling back to NSH on the system console.
+
+config EXAMPLES_NXTERM_KBDDEV
+	string "Keyboard device"
+	default "/dev/kbda"
+	depends on EXAMPLES_NXTERM_PTYCONSOLE
+	---help---
+		Path of the keyboard event device bridged to the pseudo-terminal.
+
 config EXAMPLES_NXTERM_TOOLBAR_HEIGHT
 	int "Toolbar height"
 	default 16

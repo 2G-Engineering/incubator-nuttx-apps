@@ -40,6 +40,7 @@ config SYSTEM_NXINIT_RC_FILE_PATH
 config SYSTEM_NXINIT_RC_LINE_MAX
 	int "Max line length of RC file"
 	default 128
+	range 64 4096
 	---help---
 		Maximum line length of RC file.
 		More details: https://android.googlesource.com/platform/system/core/+/master/init/README.md
@@ -69,7 +70,7 @@ config SYSTEM_NXINIT_ACTION_WARN_SLOW
 
 config SYSTEM_NXINIT_ACTION_EVENTS_MAX
 	int "Max number of events"
-	default 1
+	default 2
 	range 1 64
 	---help---
 		Maximum number of event and action events.
@@ -94,7 +95,7 @@ comment "NXInit Service"
 
 config SYSTEM_NXINIT_SERVICE_ARGS_MAX
 	int "Max number of service arguments"
-	default 8
+	default 16
 	range 3 64
 	---help---
 		Maximum number of service arguments,
@@ -109,6 +110,59 @@ config SYSTEM_NXINIT_SERVICE_ARGS_MAX
 config SYSTEM_NXINIT_SERVICE_RESTART_PERIOD
 	int "Service restart period in ms"
 	default 5000
+
+config SYSTEM_NXINIT_CONSOLE_DEV
+	string "Default console device of a service"
+	default "/dev/console"
+	---help---
+		The device used as stdin/stdout/stderr of a service declared with the
+		option "console" and no explicit device, i.e. "console" rather than
+		"console <device>".
+
+		This is needed by services which expect a controlling terminal but do
+		not open one themselves (e.g. plain "sh"), and is the only way to get
+		a console when the console device is not available at the time the
+		file descriptors of the idle task are set up, as is the case for a USB
+		gadget console.
+
+comment "NXInit Testing"
+
+config SYSTEM_NXINIT_TEST
+	bool "NxInit unit tests"
+	default n
+	depends on TESTING_CMOCKA
+	---help---
+		Enable cmocka-based unit tests covering NxInit's argument/config
+		parser, action event matching, and service conflict detection.
+		Builds a separate "nxinit_unit_test" program. Under the CMake
+		build the test sources compile into a dedicated target and the
+		"init" program is unaffected; under the Make build the test
+		sources are appended to the shared CSRCS list, so they are also
+		linked into "init", enlarging it and pulling in the cmocka
+		dependency. Keep this disabled for production Make builds.
+
+if SYSTEM_NXINIT_TEST
+
+config SYSTEM_NXINIT_TEST_PRIORITY
+	int "Test task priority"
+	default 100
+
+config SYSTEM_NXINIT_TEST_STACKSIZE
+	int "Test task stack size"
+	default 8192
+	---help---
+		Several of the parser test cases build multi-hundred-byte
+		buffers on the stack (e.g. lines several times
+		CONFIG_SYSTEM_NXINIT_RC_LINE_MAX long) on top of cmocka's own
+		framework overhead. On at least one real embedded target this
+		overflowed the default DEFAULT_TASK_STACKSIZE (2048) silently
+		(no crash dump, no watchdog reset, the test task just stopped
+		producing output), which is far harder to diagnose than an
+		outright test failure. 8192 has been verified to run all test
+		cases cleanly on that target; lower it back down only if you
+		have confirmed your target's stack usage stays within bounds.
+
+endif # SYSTEM_NXINIT_TEST
 
 comment "NXInit Log level"
 
@@ -127,5 +181,13 @@ config SYSTEM_NXINIT_INFO
 config SYSTEM_NXINIT_DEBUG
 	bool "Enable debug log"
 	depends on SYSTEM_NXINIT_INFO
+
+config SYSTEM_NXINIT_STDOUT
+	bool "Output log to stdout (printf)"
+	default n
+	---help---
+		Debug option: redirect all init logs to stdout via printf
+		instead of syslog. Useful when syslog is not available or
+		serial console has no output during early boot.
 
 endif

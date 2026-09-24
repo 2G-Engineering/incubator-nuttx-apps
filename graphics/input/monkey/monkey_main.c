@@ -220,6 +220,7 @@ static int monkey_get_screen_resolution(FAR int *hor_res, FAR int *ver_res)
   int fd;
   int ret;
   FAR const char *dev_path = MONKEY_SCREEN_DEV;
+
   *hor_res = MONKEY_SCREEN_HOR_RES_DEFAULT;
   *ver_res = MONKEY_SCREEN_VER_RES_DEFAULT;
   fd = open(dev_path, 0);
@@ -360,6 +361,7 @@ static void parse_long_commandline(int argc, FAR char **argv,
                                    FAR struct monkey_param_s *param)
 {
   int event_index;
+
   switch (longindex)
     {
       case 0:
@@ -516,12 +518,14 @@ static enum monkey_wait_res_e monkey_wait(uint32_t ms)
 
   sigemptyset(&set);
   sigaddset(&set, SIGTSTP);
+  sigaddset(&set, SIGTERM);
 
   ret = sigtimedwait(&set, NULL, &timeout);
 
   if (ret < 0)
     {
       int errcode = errno;
+
       if (errcode == EINTR)
         {
           res = MONKEY_WAIT_RES_STOP;
@@ -539,8 +543,22 @@ static enum monkey_wait_res_e monkey_wait(uint32_t ms)
     {
       res = MONKEY_WAIT_RES_PAUSE;
     }
+  else if (ret == SIGTERM)
+    {
+      MONKEY_LOG_WARN("Recv sig: SIGTERM");
+      res = MONKEY_WAIT_RES_STOP;
+    }
 
   return res;
+}
+
+/****************************************************************************
+ * Name: signal_handler
+ ****************************************************************************/
+
+static void signal_handler(int sig)
+{
+  MONKEY_LOG_WARN("Recv sig: %d", sig);
 }
 
 /****************************************************************************
@@ -565,7 +583,25 @@ int main(int argc, FAR char *argv[])
   struct monkey_param_s param;
   FAR struct monkey_s *monkey;
   uint32_t start_tick;
+  sigset_t mask;
+
   parse_commandline(argc, argv, &param);
+
+  /* Block SIGTERM and let sigtimedwait() consume it: the signal mask
+   * and pending queue are per task, so sibling monkey instances stop
+   * independently, and a signal arriving outside the wait window stays
+   * pending instead of being swallowed by the handler.
+   */
+
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGTERM);
+  sigprocmask(SIG_BLOCK, &mask, NULL);
+
+  /* Add signal handler to avoid system default handler */
+
+  signal(SIGTSTP, &signal_handler);
+  signal(SIGCONT, &signal_handler);
+  signal(SIGTERM, &signal_handler);
 
   monkey = monkey_init(&param);
 

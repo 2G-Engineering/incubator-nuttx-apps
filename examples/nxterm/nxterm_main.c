@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -76,6 +77,9 @@ struct nxterm_state_s g_nxterm_vars;
 static int nxterm_initialize(void)
 {
   struct sched_param param;
+#ifdef CONFIG_EXAMPLES_NXTERM_NSH_FALLBACK
+  struct timespec abstime;
+#endif
   pthread_t thread;
   int ret;
 
@@ -142,6 +146,51 @@ static int nxterm_initialize(void)
 
       /* Don't return until we are connected to the server */
 
+#ifdef CONFIG_EXAMPLES_NXTERM_NSH_FALLBACK
+      pthread_detach(thread);
+
+      ret = clock_gettime(CLOCK_REALTIME, &abstime);
+      if (ret < 0)
+        {
+          printf("nxterm_initialize: clock_gettime failed: %d\n", errno);
+          nx_disconnect(g_nxterm_vars.hnx);
+          g_nxterm_vars.hnx = NULL;
+          return ERROR;
+        }
+
+      abstime.tv_sec += CONFIG_EXAMPLES_NXTERM_STARTUP_TIMEOUT;
+      while (!g_nxterm_vars.connected && !g_nxterm_vars.servererr)
+        {
+          /* Wait for the listener thread to report either a connection or
+           * a server error.  The server starts asynchronously, so a timeout
+           * is also needed when display initialization fails before it can
+           * send the first event.
+           */
+
+          ret = sem_timedwait(&g_nxterm_vars.eventsem, &abstime);
+          if (ret < 0 && errno != EINTR)
+            {
+              if (errno == ETIMEDOUT)
+                {
+                  printf("nxterm_initialize: NX startup timed out\n");
+                }
+              else
+                {
+                  printf("nxterm_initialize: sem_timedwait failed: %d\n",
+                         errno);
+                }
+
+              g_nxterm_vars.servererr = true;
+            }
+        }
+
+      if (!g_nxterm_vars.connected)
+        {
+          nx_disconnect(g_nxterm_vars.hnx);
+          g_nxterm_vars.hnx = NULL;
+          return ERROR;
+        }
+#else
       while (!g_nxterm_vars.connected)
         {
           /* Wait for the listener thread to wake us up when we really
@@ -150,6 +199,7 @@ static int nxterm_initialize(void)
 
           sem_wait(&g_nxterm_vars.eventsem);
         }
+#endif
     }
   else
     {
@@ -268,6 +318,13 @@ int main(int argc, FAR char *argv[])
 
   /* Determine the size and position of the window */
 
+#ifdef CONFIG_EXAMPLES_NXTERM_FULLSCREEN
+  g_nxterm_vars.wndo.wsize.w = g_nxterm_vars.xres;
+  g_nxterm_vars.wndo.wsize.h = g_nxterm_vars.yres;
+
+  g_nxterm_vars.wpos.x       = 0;
+  g_nxterm_vars.wpos.y       = 0;
+#else
   g_nxterm_vars.wndo.wsize.w = g_nxterm_vars.xres / 2 +
                                g_nxterm_vars.xres / 4;
   g_nxterm_vars.wndo.wsize.h = g_nxterm_vars.yres / 2 +
@@ -275,6 +332,7 @@ int main(int argc, FAR char *argv[])
 
   g_nxterm_vars.wpos.x       = g_nxterm_vars.xres / 8;
   g_nxterm_vars.wpos.y       = g_nxterm_vars.yres / 8;
+#endif
 
   /* Set the window position */
 
@@ -368,12 +426,22 @@ int main(int argc, FAR char *argv[])
   fflush(stdout);
   fflush(stderr);
 
+#ifdef CONFIG_EXAMPLES_NXTERM_PTYCONSOLE
+  ret = nxterm_pty_redirect(fd);
+  if (ret < 0)
+    {
+      printf("nxterm_main: PTY console setup failed: %d\n", -ret);
+      close(fd);
+      goto errout_with_driver;
+    }
+#else
   dup2(fd, 1);
   dup2(fd, 2);
 
   /* And we can close our original driver file descriptor */
 
   close(fd);
+#endif
 
   /* And start the console task.  It will inherit stdin, stdout, and stderr
    * from this task.
@@ -400,5 +468,10 @@ errout_with_nx:
   nx_disconnect(g_nxterm_vars.hnx);
 
 errout:
+#ifdef CONFIG_EXAMPLES_NXTERM_NSH_FALLBACK
+  printf("nxterm_main: Falling back to the system console\n");
+  return nsh_consolemain(argc, argv);
+#else
   return EXIT_FAILURE;
+#endif
 }

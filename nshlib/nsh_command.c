@@ -168,6 +168,11 @@ static const struct cmdmap_s g_cmdmap[] =
   CMD_MAP("cd",       cmd_cd,       1, 2, "[<dir-path>|-|~|..]"),
 #endif
 
+#if defined(CONFIG_FS_CHROOT) && !defined(CONFIG_NSH_DISABLE_CHROOT)
+  CMD_MAP("chroot",   cmd_chroot,   2, CONFIG_NSH_MAXARGUMENTS,
+    "<newroot> [<command> [args...]]"),
+#endif
+
 #if defined(CONFIG_FS_PERMISSION) && !defined(CONFIG_NSH_DISABLE_CHMOD)
   CMD_MAP("chmod",    cmd_chmod,    3, 3, "<octal-mode> <path>"),
 #endif
@@ -346,7 +351,7 @@ static const struct cmdmap_s g_cmdmap[] =
 #  endif
 #endif
 
-#if !defined(CONFIG_NSH_DISABLE_LN) && defined(CONFIG_PSEUDOFS_SOFTLINKS)
+#if !defined(CONFIG_NSH_DISABLE_LN) && defined(CONFIG_FS_LINKS)
   CMD_MAP("ln",       cmd_ln,       3, 4, "[-s] <target> <link>"),
 #endif
 
@@ -503,7 +508,7 @@ static const struct cmdmap_s g_cmdmap[] =
   CMD_MAP("pwd",      cmd_pwd,      1, 1, NULL),
 #endif
 
-#if !defined(CONFIG_NSH_DISABLE_READLINK) && defined(CONFIG_PSEUDOFS_SOFTLINKS)
+#if !defined(CONFIG_NSH_DISABLE_READLINK) && defined(CONFIG_FS_LINKS)
   CMD_MAP("readlink", cmd_readlink, 2, 2, "<link>"),
 #endif
 
@@ -1274,7 +1279,7 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
 
   index = builtin_isavail(cmd);
 
-  if (index > 0)
+  if (index >= 0)
     {
       /* Get the builtin structure by index */
 

@@ -29,12 +29,14 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/param.h>
+#include <unistd.h>
 
 #include "init.h"
 #include "parser.h"
@@ -96,9 +98,13 @@ static int option_gentle_kill(FAR struct service_manager_s *sm,
                               int argc, FAR char **argv);
 static int option_restart_period(FAR struct service_manager_s *sm,
                                  int argc, FAR char **argv);
+static int option_fallback(FAR struct service_manager_s *sm,
+                           int argc, FAR char **argv);
 static int option_override(FAR struct service_manager_s *sm,
                            int argc, FAR char **argv);
 static int option_oneshot(FAR struct service_manager_s *sm,
+                          int argc, FAR char **argv);
+static int option_console(FAR struct service_manager_s *sm,
                           int argc, FAR char **argv);
 #ifdef CONFIG_BOARDCTL_RESET
 static int option_reboot_on_failure(FAR struct service_manager_s *sm,
@@ -114,8 +120,10 @@ static const struct cmd_map_s g_option[] =
   {"class", 2, NXINIT_ACTION_CMD_ARGS_MAX, option_class},
   {"gentle_kill", 1, 1, option_gentle_kill},
   {"restart_period", 2, 2, option_restart_period},
+  {"fallback", 1, 1, option_fallback},
   {"override", 1, 1, option_override},
   {"oneshot", 1, 1, option_oneshot},
+  {"console", 1, 2, option_console},
 #ifdef CONFIG_BOARDCTL_RESET
   {"reboot_on_failure", 2, 2, option_reboot_on_failure},
 #endif
@@ -128,9 +136,11 @@ static const struct flag_str_s g_flag_str[] =
   {SVC_ONESHOT, "oneshot"},
   {SVC_RUNNING, "running"},
   {SVC_RESTARTING, "restarting"},
+  {SVC_CONSOLE, "console"},
   {SVC_GENTLE_KILL, "gentle_kill"},
   {SVC_REMOVE, "remove"},
   {SVC_SIGKILL, "sigkill"},
+  {SVC_FALLBACK, "fallback"},
   {SVC_OVERRIDE, "override"},
 };
 #endif
@@ -197,6 +207,7 @@ static void remove_service(FAR struct service_s *service)
       free(service->argv[i]);
     }
 
+  free(service->console);
   list_delete(&service->node);
   free(service);
 }
@@ -253,6 +264,16 @@ static int option_restart_period(FAR struct service_manager_s *sm,
   return 0;
 }
 
+static int option_fallback(FAR struct service_manager_s *sm,
+                           int argc, FAR char **argv)
+{
+  FAR struct service_s *s = list_last_entry(&sm->services, struct service_s,
+                                            node);
+
+  add_flags(s, SVC_FALLBACK);
+  return 0;
+}
+
 static int option_override(FAR struct service_manager_s *sm,
                            int argc, FAR char **argv)
 {
@@ -273,12 +294,50 @@ static int option_oneshot(FAR struct service_manager_s *sm,
   return 0;
 }
 
+/****************************************************************************
+ * Name: option_console
+ *
+ * Description:
+ *   Handle the service option "console [<device>]".  The service is given
+ *   'device' (CONFIG_SYSTEM_NXINIT_CONSOLE_DEV if omitted) as its stdin,
+ *   stdout and stderr, so that a service which does not open a console
+ *   device on its own still gets a working console.
+ *
+ ****************************************************************************/
+
+static int option_console(FAR struct service_manager_s *sm,
+                          int argc, FAR char **argv)
+{
+  FAR struct service_s *s = list_last_entry(&sm->services, struct service_s,
+                                            node);
+
+  add_flags(s, SVC_CONSOLE);
+
+  if (argc > 1)
+    {
+      /* 'argv' points into the parser line buffer, which is reused for the
+       * next line, so the device name must be duplicated here.
+       */
+
+      free(s->console);
+      s->console = strdup(argv[1]);
+      if (s->console == NULL)
+        {
+          init_err("Alloc console device");
+          return -ENOMEM;
+        }
+    }
+
+  return 0;
+}
+
 #ifdef CONFIG_BOARDCTL_RESET
 static int option_reboot_on_failure(FAR struct service_manager_s *sm,
                                     int argc, FAR char **argv)
 {
   FAR struct service_s *s = list_last_entry(&sm->services, struct service_s,
                                             node);
+
   s->reset_reason = atoi(argv[1]);
   return 0;
 }
@@ -322,7 +381,11 @@ int init_service_refresh(FAR struct service_manager_s *sm)
           ms = TIMESPEC2MS(diff);
           if (ms >= service->restart_period)
             {
-              init_service_start(service);
+              if (init_service_start(service) < 0)
+                {
+                  min = MIN(min, service->restart_period);
+                }
+
               continue;
             }
 
@@ -425,8 +488,59 @@ void init_service_reap(FAR struct service_s *service, int status)
     }
 }
 
+/****************************************************************************
+ * Name: console_file_actions
+ *
+ * Description:
+ *   Build the spawn file actions which redirect the stdio of a service
+ *   flagged SVC_CONSOLE to its console device.  The actions are performed
+ *   in the context of the new task, so the stdio of NxInit itself is left
+ *   untouched.
+ *
+ ****************************************************************************/
+
+static int console_file_actions(FAR posix_spawn_file_actions_t *actions,
+                               FAR struct service_s *service)
+{
+  FAR const char *dev = service->console ?
+                        service->console : CONFIG_SYSTEM_NXINIT_CONSOLE_DEV;
+  int ret;
+
+  ret = posix_spawn_file_actions_init(actions);
+  if (ret != 0)
+    {
+      init_err("posix_spawn_file_actions_init %d", ret);
+      return -ret;
+    }
+
+  ret = posix_spawn_file_actions_addopen(actions, STDIN_FILENO, dev,
+                                        O_RDWR, 0);
+  if (ret == 0)
+    {
+      ret = posix_spawn_file_actions_adddup2(actions, STDIN_FILENO,
+                                             STDOUT_FILENO);
+    }
+
+  if (ret == 0)
+    {
+      ret = posix_spawn_file_actions_adddup2(actions, STDIN_FILENO,
+                                             STDERR_FILENO);
+    }
+
+  if (ret != 0)
+    {
+      init_err("Add console '%s' file action %d", dev, ret);
+      posix_spawn_file_actions_destroy(actions);
+      return -ret;
+    }
+
+  return 0;
+}
+
 int init_service_start(FAR struct service_s *service)
 {
+  FAR posix_spawn_file_actions_t *pactions = NULL;
+  posix_spawn_file_actions_t actions;
   posix_spawnattr_t attr;
   sigset_t mask;
   int ret;
@@ -465,9 +579,29 @@ int init_service_start(FAR struct service_s *service)
       return -ret;
     }
 
-  ret = posix_spawnp(&pid, service->argv[2], NULL, &attr, &service->argv[2],
-                     environ);
+  clock_gettime(CLOCK_MONOTONIC, &service->time_started);
+
+  if (check_flags(service, SVC_CONSOLE))
+    {
+      ret = console_file_actions(&actions, service);
+      if (ret < 0)
+        {
+          posix_spawnattr_destroy(&attr);
+          init_service_reap(service, -ret);
+          return ret;
+        }
+
+      pactions = &actions;
+    }
+
+  ret = posix_spawnp(&pid, service->argv[2], pactions, &attr,
+                     &service->argv[2], environ);
   posix_spawnattr_destroy(&attr);
+  if (pactions != NULL)
+    {
+      posix_spawn_file_actions_destroy(pactions);
+    }
+
   if (ret != 0)
     {
       init_err("Starting service '%s': %d", service->argv[1], ret);
@@ -476,7 +610,6 @@ int init_service_start(FAR struct service_s *service)
     }
 
   service->pid = pid;
-  clock_gettime(CLOCK_MONOTONIC, &service->time_started);
   add_flags(service, SVC_RUNNING);
   remove_flags(service, SVC_RESTARTING);
   remove_flags(service, SVC_DISABLED);
@@ -649,17 +782,31 @@ int init_service_check(FAR const struct parser_s *parser)
         {
           if (!strcmp(s->argv[1], tmp->argv[1]))
             {
-              if (!check_flags(tmp, SVC_OVERRIDE))
+              if (check_flags(tmp, SVC_OVERRIDE))
+                {
+                  init_info("override: remove old service '%s'",
+                            s->argv[1]);
+                  add_flags(s, SVC_DISABLED | SVC_REMOVE);
+                }
+              else if (check_flags(tmp, SVC_FALLBACK))
+                {
+                  init_info("fallback: ignore new service '%s'",
+                            tmp->argv[1]);
+                  add_flags(tmp, SVC_DISABLED | SVC_REMOVE);
+                }
+              else if (check_flags(s, SVC_FALLBACK))
+                {
+                  init_info("fallback: replace old service '%s'",
+                            s->argv[1]);
+                  add_flags(s, SVC_DISABLED | SVC_REMOVE);
+                }
+              else
                 {
                   init_err("Redefined service '%s'", tmp->argv[1]);
                   init_dump_service(s);
                   init_dump_service(tmp);
                   return -EEXIST;
                 }
-
-              init_info("Remove duplicate definition of service '%s'",
-                        tmp->argv[1]);
-              add_flags(s, SVC_DISABLED | SVC_REMOVE);
             }
         }
     }

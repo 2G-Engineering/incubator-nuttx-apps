@@ -219,6 +219,9 @@ struct nxterm_state_s
 {
   volatile bool          haveres;   /* True: Have screen resolution */
   volatile bool          connected; /* True: Connected to server */
+#ifdef CONFIG_EXAMPLES_NXTERM_NSH_FALLBACK
+  volatile bool          servererr; /* True: Server connection failed */
+#endif
   sem_t                  eventsem;  /* Control waiting for display events */
   pid_t                  pid;       /* Console task ID */
   NXHANDLE               hnx;       /* The connection handler */
@@ -253,5 +256,9 @@ extern const struct nx_callback_s g_nxtoolcb;
 /* Server thread support */
 
 FAR void *nxterm_listener(FAR void *arg);
+
+#ifdef CONFIG_EXAMPLES_NXTERM_PTYCONSOLE
+int nxterm_pty_redirect(int nxtermfd);
+#endif
 
 #endif /* __APPS_EXAMPLES_NXTERM_NXTERM_INTERNAL_H */

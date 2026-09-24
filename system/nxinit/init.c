@@ -27,12 +27,15 @@
 #include <nuttx/config.h>
 
 #include <errno.h>
+#include <inttypes.h>
 #include <poll.h>
-#include <sys/param.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/boardctl.h>
+#include <sys/param.h>
 #include <sys/wait.h>
 
-#include <netutils/netinit.h>
+#include <nuttx/usb/usbdev_trace.h>
 
 #include "action.h"
 #include "builtin.h"
@@ -94,7 +97,7 @@ static void reap_process(FAR struct service_manager_s *sm,
       if (pid == am->pid_running)
         {
           name = am->running->argv[0];
-          init_action_reap_command(am);
+          init_action_reap_command(am, ret);
         }
 
       service = init_service_find_by_pid(sm, pid);
@@ -109,6 +112,77 @@ static void reap_process(FAR struct service_manager_s *sm,
                service ? "Service" : "Command", name, pid, status, ret);
     }
 }
+
+#ifdef CONFIG_BOARDCTL_RESET_CAUSE
+static int init_boot_reason(FAR struct action_manager_s *am)
+{
+  static FAR const char *const resetcause[] =
+    {
+      [BOARDIOC_RESETCAUSE_NONE]        = "unknown",
+      [BOARDIOC_RESETCAUSE_SYS_CHIPPOR] = "cold",
+      [BOARDIOC_RESETCAUSE_SYS_RWDT]    = "watchdog",
+      [BOARDIOC_RESETCAUSE_SYS_BOR]     = "undervoltage",
+      [BOARDIOC_RESETCAUSE_CORE_DPSP]   = "warm",
+      [BOARDIOC_RESETCAUSE_CORE_MWDT]   = "watchdog",
+      [BOARDIOC_RESETCAUSE_CORE_RWDT]   = "watchdog",
+      [BOARDIOC_RESETCAUSE_CPU_MWDT]    = "watchdog",
+      [BOARDIOC_RESETCAUSE_CPU_RWDT]    = "watchdog",
+      [BOARDIOC_RESETCAUSE_PIN]         = "powerkey",
+      [BOARDIOC_RESETCAUSE_LOWPOWER]    = "lowpower",
+      [BOARDIOC_RESETCAUSE_UNKOWN]      = "unknown",
+    };
+
+  static FAR const char * const resetflag[] =
+    {
+      [BOARDIOC_SOFTRESETCAUSE_USER_REBOOT]             = "reboot",
+      [BOARDIOC_SOFTRESETCAUSE_ASSERT]                  = "assert",
+      [BOARDIOC_SOFTRESETCAUSE_PANIC]                   = "kernel_panic",
+      [BOARDIOC_SOFTRESETCAUSE_ENTER_BOOTLOADER]        = "bootloader",
+      [BOARDIOC_SOFTRESETCAUSE_ENTER_RECOVERY]          = "recovery",
+      [BOARDIOC_SOFTRESETCAUSE_RESTORE_FACTORY]         = "factory_reset",
+      [BOARDIOC_SOFTRESETCAUSE_RESTORE_FACTORY_INQUIRY] =
+        "factory_reset_inquiry",
+      [BOARDIOC_SOFTRESETCAUSE_THERMAL]                 = "thermal",
+    };
+
+  char buf[CONFIG_SYSTEM_NXINIT_RC_LINE_MAX];
+  struct boardioc_reset_cause_s reset;
+  FAR const char *value;
+  int ret;
+
+  memset(&reset, 0, sizeof(reset));
+  ret = boardctl(BOARDIOC_RESET_CAUSE, (uintptr_t)&reset);
+  if (ret < 0)
+    {
+      init_err("boardctl BOARDIOC_RESET_CAUSE failed: %d", ret);
+      return ret;
+    }
+
+  if (reset.cause >= nitems(resetcause))
+    {
+      reset.cause = nitems(resetcause) - 1;
+    }
+
+  if (reset.flag >= nitems(resetflag))
+    {
+      reset.flag = nitems(resetflag) - 1;
+    }
+
+  if (resetcause[reset.cause])
+    {
+      sprintf(buf, "%s,%" PRIu32 "", resetcause[reset.cause], reset.flag);
+      value = buf;
+    }
+  else
+    {
+      value = resetflag[reset.flag];
+    }
+
+  return init_property_set(am->prop, "sys.boot.reason", value);
+}
+#else
+#  define init_boot_reason(am) (0)
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -163,7 +237,7 @@ int main(int argc, FAR char *argv[])
     }
 
 #ifdef CONFIG_USBDEV_TRACE
-  usbtrace_enable(TRACE_BITSET);
+  usbtrace_enable(TRACE_DEVERROR_BIT | TRACE_CLSERROR_BIT);
 #endif
 
   for (i = 0; i < nitems(poller); i++)
@@ -179,7 +253,7 @@ int main(int argc, FAR char *argv[])
         }
     }
 
-  r = init_parse_config_file(parser, CONFIG_SYSTEM_NXINIT_RC_FILE_PATH);
+  r = init_parse_configs(parser);
   if (r < 0)
     {
       goto out;
@@ -188,18 +262,13 @@ int main(int argc, FAR char *argv[])
   init_dump_actions(&am.actions);
   init_dump_services(&sm.services);
 
+  r = init_boot_reason(&am);
+  if (r < 0)
+    {
+      goto out;
+    }
+
   init_action_add_event(&am, "boot");
-
-  init_action_add_event(&am, "init");
-
-#ifdef CONFIG_NETUTILS_NETINIT
-  netinit_bringup();
-  init_action_add_event(&am, "netinit");
-#endif
-
-#ifdef CONFIG_SYSTEM_NXINIT_FINALINIT
-  init_action_add_event(&am, "finalinit");
-#endif
 
   for (; ; )
     {

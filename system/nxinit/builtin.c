@@ -25,11 +25,22 @@
  ****************************************************************************/
 
 #include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <spawn.h>
+#include <unistd.h>
+#include <sys/boardctl.h>
+#include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/wait.h>
+
+#include <netutils/netinit.h>
+
+#ifdef CONFIG_RPTUN
+#include <nuttx/rptun/rptun.h>
+#endif
 
 #include "builtin.h"
 #include "init.h"
@@ -60,6 +71,10 @@ static int cmd_start(FAR struct action_manager_s *am,
                      int argc, FAR char **argv);
 static int cmd_stop(FAR struct action_manager_s *am,
                     int argc, FAR char **argv);
+#ifndef CONFIG_DISABLE_ENVIRON
+static int cmd_set(FAR struct action_manager_s *am,
+                   int argc, FAR char **argv);
+#endif
 #if CONFIG_SYSTEM_NXINIT_ACTION_EVENTS_MAX > 1
 static int cmd_setprop(FAR struct action_manager_s *am,
                        int argc, FAR char **argv);
@@ -70,6 +85,25 @@ static int cmd_class_start(FAR struct action_manager_s *am,
                            int argc, FAR char **argv);
 static int cmd_class_stop(FAR struct action_manager_s *am,
                           int argc, FAR char **argv);
+#ifdef CONFIG_BOARDCTL_BOOT_IMAGE
+static int cmd_boot(FAR struct action_manager_s *am,
+                    int argc, FAR char **argv);
+#endif
+
+#ifdef CONFIG_BOARDCTL_START_CPU
+static int cmd_start_cpu(FAR struct action_manager_s *am,
+                         int argc, FAR char **argv);
+#endif
+#ifdef CONFIG_NETUTILS_NETINIT
+static int cmd_netinit(FAR struct action_manager_s *am,
+                       int argc, FAR char **argv);
+#endif
+#ifdef CONFIG_RPTUN
+static int cmd_rptun(FAR struct action_manager_s *am,
+                     int argc, FAR char **argv);
+#endif
+static int cmd_unlink(FAR struct action_manager_s *am,
+                      int argc, FAR char **argv);
 
 /****************************************************************************
  * Private Data
@@ -77,21 +111,88 @@ static int cmd_class_stop(FAR struct action_manager_s *am,
 
 static const struct cmd_map_s g_builtin[] =
 {
+#ifdef CONFIG_BOARDCTL_BOOT_IMAGE
+  {"boot", 1, 3, cmd_boot},
+#endif
+#ifdef CONFIG_BOARDCTL_START_CPU
+  {"start_cpu", 1, 3, cmd_start_cpu},
+#endif
+#ifdef CONFIG_NETUTILS_NETINIT
+  {"netinit", 1, 1, cmd_netinit},
+#endif
   {"class_start", 2, 2, cmd_class_start},
   {"class_stop", 2, 2, cmd_class_stop},
   {"exec", 3, 99, cmd_exec},
   {"exec_start", 2, 2, cmd_exec_start},
+#ifndef CONFIG_DISABLE_ENVIRON
+  {"set", 3, 3, cmd_set},
+#endif
 #if CONFIG_SYSTEM_NXINIT_ACTION_EVENTS_MAX > 1
   {"setprop", 3, 3, cmd_setprop},
 #endif
   {"start", 2, 2, cmd_start},
   {"stop", 2, 2, cmd_stop},
   {"trigger", 2, 2, cmd_trigger},
+#ifdef CONFIG_RPTUN
+  {"rptun", 3, 3, cmd_rptun},
+#endif
+  {"unlink", 2, 2, cmd_unlink},
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+#ifdef CONFIG_BOARDCTL_BOOT_IMAGE
+static int cmd_boot(FAR struct action_manager_s *am,
+                    int argc, FAR char **argv)
+{
+  struct boardioc_boot_info_s info;
+
+  UNUSED(am);
+  memset(&info, 0, sizeof(info));
+
+  if (argc > 1)
+    {
+      info.path = argv[1];
+    }
+
+  if (argc > 2)
+    {
+      info.header_size = strtoul(argv[2], NULL, 0);
+    }
+
+  boardctl(BOARDIOC_BOOT_IMAGE, (uintptr_t)&info);
+  init_err("boot image '%s' %" PRIu32 "", info.path ? info.path : "",
+           info.header_size);
+  return -ENOENT;
+}
+#endif
+
+#ifdef CONFIG_BOARDCTL_START_CPU
+static int cmd_start_cpu(FAR struct action_manager_s *am,
+                         int argc, FAR char **argv)
+{
+  int cpuid = 0;
+
+  if (argc > 1)
+    {
+      cpuid = strtol(argv[1], NULL, 0);
+    }
+
+  init_info("start cpu %d", cpuid);
+  return boardctl(BOARDIOC_START_CPU, cpuid);
+}
+#endif
+
+#ifdef CONFIG_NETUTILS_NETINIT
+static int cmd_netinit(FAR struct action_manager_s *am,
+                       int argc, FAR char **argv)
+{
+  UNUSED(am);
+  return netinit_bringup();
+}
+#endif
 
 static int cmd_class_start(FAR struct action_manager_s *am,
                            int argc, FAR char **argv)
@@ -144,6 +245,16 @@ static int cmd_stop(FAR struct action_manager_s *am,
   return init_service_stop(service);
 }
 
+#ifndef CONFIG_DISABLE_ENVIRON
+static int cmd_set(FAR struct action_manager_s *am,
+                   int argc, FAR char **argv)
+{
+  UNUSED(am);
+  init_info("setenv '%s' '%s'", argv[1], argv[2]);
+  return setenv(argv[1], argv[2], 1);
+}
+#endif
+
 #if CONFIG_SYSTEM_NXINIT_ACTION_EVENTS_MAX > 1
 static int cmd_setprop(FAR struct action_manager_s *am, int argc,
                        FAR char **argv)
@@ -173,6 +284,63 @@ static int cmd_exec(FAR struct action_manager_s *am,
     }
 
   return -EINVAL;
+}
+
+#ifdef CONFIG_RPTUN
+static int cmd_rptun(FAR struct action_manager_s *am,
+                     int argc, FAR char **argv)
+{
+  int fd;
+  int ret;
+
+  UNUSED(am);
+
+  fd = open(argv[2], O_WRONLY | O_CLOEXEC);
+  if (fd < 0)
+    {
+      init_err("rptun %s: open '%s' failed: %d",
+               argv[1], argv[2], errno);
+      return -errno;
+    }
+
+  if (!strcmp(argv[1], "start"))
+    {
+      ret = ioctl(fd, RPTUNIOC_START, 0);
+    }
+  else if (!strcmp(argv[1], "stop"))
+    {
+      ret = ioctl(fd, RPTUNIOC_STOP, 0);
+    }
+  else
+    {
+      init_err("rptun: unknown command '%s'", argv[1]);
+      ret = -EINVAL;
+    }
+
+  if (ret < 0)
+    {
+      init_err("rptun %s: failed: %d", argv[1], errno);
+    }
+
+  close(fd);
+  return ret < 0 ? ret : 0;
+}
+#endif
+
+static int cmd_unlink(FAR struct action_manager_s *am,
+                      int argc, FAR char **argv)
+{
+  int ret;
+
+  UNUSED(am);
+
+  ret = unlink(argv[1]);
+  if (ret < 0)
+    {
+      init_err("unlink '%s' failed: %d", argv[1], errno);
+    }
+
+  return ret;
 }
 
 /****************************************************************************

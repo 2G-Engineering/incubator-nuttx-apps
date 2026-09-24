@@ -97,6 +97,10 @@ int getopt_test(void);
 
 int memmem_test(void);
 
+/* libc_strto.c *************************************************************/
+
+int strto_test(void);
+
 /* setvbuf.c ****************************************************************/
 
 #ifndef CONFIG_STDIO_DISABLE_BUFFERING
@@ -137,9 +141,16 @@ void restart_test(void);
 int waitpid_test(void);
 #endif
 
+/* chroot.c *****************************************************************/
+
+#if defined(CONFIG_FS_CHROOT) && defined(CONFIG_SCHED_WAITPID) && \
+    !defined(CONFIG_BUILD_KERNEL)
+int chroot_test(void);
+#endif
+
 /* wqueue.c *****************************************************************/
 
-#if defined(CONFIG_SCHED_LPWORK) || defined(CONFIG_SCHED_HPWORK)
+#ifdef CONFIG_TESTING_OSTEST_WQUEUE
 void wqueue_test(void);
 #endif
 

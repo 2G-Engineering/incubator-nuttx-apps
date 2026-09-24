@@ -50,11 +50,35 @@ if(CONFIG_TESTING_NET_TEST)
       ${SRCS})
   endif()
 
+  if(CONFIG_TESTING_NET_LOCAL)
+    set(SRCS
+        ${CMAKE_CURRENT_LIST_DIR}/local/test_local.c
+        ${CMAKE_CURRENT_LIST_DIR}/local/test_local_common.c
+        ${CMAKE_CURRENT_LIST_DIR}/local/test_local_scm_rights.c)
+
+    nuttx_add_application(
+      NAME
+      cmocka_net_local
+      PRIORITY
+      ${CONFIG_TESTING_NET_TEST_PRIORITY}
+      STACKSIZE
+      ${CONFIG_TESTING_NET_TEST_STACKSIZE}
+      MODULE
+      ${CONFIG_TESTING_NET_TEST}
+      DEPENDS
+      cmocka
+      INCLUDE_DIRECTORIES
+      ${CMAKE_CURRENT_LIST_DIR}/utils
+      SRCS
+      ${SRCS})
+  endif()
+
   if(CONFIG_TESTING_NET_OTHERS)
     set(SRCS
         ${CMAKE_CURRENT_LIST_DIR}/others/test_others.c
         ${CMAKE_CURRENT_LIST_DIR}/others/test_others_common.c
-        ${CMAKE_CURRENT_LIST_DIR}/others/test_others_bufpool.c)
+        ${CMAKE_CURRENT_LIST_DIR}/others/test_others_bufpool.c
+        ${CMAKE_CURRENT_LIST_DIR}/others/test_others_chksum.c)
 
     nuttx_add_application(
       NAME
@@ -69,6 +93,25 @@ if(CONFIG_TESTING_NET_TEST)
       cmocka
       INCLUDE_DIRECTORIES
       ${CMAKE_CURRENT_LIST_DIR}/utils
+      SRCS
+      ${SRCS})
+  endif()
+
+  if(CONFIG_TESTING_NET_TIMESTAMP)
+    set(SRCS ${CMAKE_CURRENT_LIST_DIR}/timestamp/test_timestamp.c
+             ${CMAKE_CURRENT_LIST_DIR}/timestamp/test_timestamp_common.c)
+
+    nuttx_add_application(
+      NAME
+      cmocka_net_timestamp
+      PRIORITY
+      ${CONFIG_TESTING_NET_TEST_PRIORITY}
+      STACKSIZE
+      ${CONFIG_TESTING_NET_TEST_STACKSIZE}
+      MODULE
+      ${CONFIG_TESTING_NET_TEST}
+      DEPENDS
+      cmocka
       SRCS
       ${SRCS})
   endif()

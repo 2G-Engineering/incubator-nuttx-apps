@@ -36,5 +36,6 @@
 /* register this as object request broker structure */
 
 ORB_DECLARE(sensor_temp);
+ORB_DECLARE(sensor_ambient_temp);
 
 #endif

@@ -155,6 +155,7 @@ static void show_variable(const char *var_name, const char *exptd_value,
                           bool var_valid)
 {
   char *actual_value = getenv(var_name);
+
   if (actual_value)
     {
       if (var_valid)
@@ -288,6 +289,7 @@ static int user_main(int argc, char *argv[])
 
   printf("\nuser_main: libc tests\n");
   memmem_test();
+  strto_test();
   check_test_memory_usage();
 
   /* If retention of child status is enable, then suppress it for this task.
@@ -302,19 +304,19 @@ static int user_main(int argc, char *argv[])
 
 #if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_SCHED_CHILD_STATUS) && \
     defined(CONFIG_ENABLE_ALL_SIGNALS)
-    {
-      struct sigaction sa;
-      int ret;
+  {
+    struct sigaction sa;
+    int ret;
 
-      sa.sa_handler = SIG_IGN;
-      sa.sa_flags = SA_NOCLDWAIT;
-      ret = sigaction(SIGCHLD, &sa, NULL);
-      if (ret < 0)
-        {
-          printf("user_main: ERROR: sigaction failed: %d\n", errno);
-          ASSERT(false);
-        }
-    }
+    sa.sa_handler = SIG_IGN;
+    sa.sa_flags = SA_NOCLDWAIT;
+    ret = sigaction(SIGCHLD, &sa, NULL);
+    if (ret < 0)
+      {
+        printf("user_main: ERROR: sigaction failed: %d\n", errno);
+        ASSERT(false);
+      }
+  }
 #endif
 
 #ifndef CONFIG_DISABLE_ENVIRON
@@ -403,6 +405,20 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
+#if defined(CONFIG_FS_CHROOT) && defined(CONFIG_SCHED_WAITPID) && \
+    !defined(CONFIG_BUILD_KERNEL)
+      /* Check chroot() filesystem jail */
+
+      printf("\nuser_main: chroot test\n");
+      if (chroot_test() != 0)
+        {
+          printf("user_main: ERROR chroot test failed\n");
+          ASSERT(false);
+        }
+
+      check_test_memory_usage();
+#endif
+
 #if defined(CONFIG_TESTING_OSTEST_MULTIUSER) && defined(CONFIG_SCHED_USER_IDENTITY)
       /* Multi-user identity and file permission regression tests */
 
@@ -416,8 +432,7 @@ static int user_main(int argc, char *argv[])
       check_test_memory_usage();
 #endif
 
-#if !defined(CONFIG_DISABLE_PTHREAD) && defined(CONFIG_BUILD_FLAT) && \
-    defined(CONFIG_SCHED_WORKQUEUE)
+#if defined(CONFIG_TESTING_OSTEST_WQUEUE) && defined(CONFIG_BUILD_FLAT)
       /* Check work queues */
 
       printf("\nuser_main: wqueue test\n");
@@ -753,6 +768,14 @@ int main(int argc, FAR char **argv)
   if (argc >= 2 && strcmp(argv[1], "user_main") == 0)
     {
       return user_main(argc - 1 , &argv[1]);
+    }
+#endif
+
+#ifdef CONFIG_TESTING_OSTEST_WQUEUE
+  if (argc == 2 && strcmp(argv[1], "wqueue") == 0)
+    {
+      wqueue_test();
+      return EXIT_SUCCESS;
     }
 #endif
 

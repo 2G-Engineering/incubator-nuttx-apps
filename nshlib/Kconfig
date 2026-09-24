@@ -361,6 +361,11 @@ config NSH_DISABLE_CD
 	bool "Disable cd"
 	default DEFAULT_SMALL
 
+config NSH_DISABLE_CHROOT
+	bool "Disable chroot"
+	default DEFAULT_SMALL
+	depends on FS_CHROOT
+
 config NSH_DISABLE_CHMOD
 	bool "Disable chmod"
 	default DEFAULT_SMALL
@@ -504,7 +509,7 @@ config NSH_DISABLE_LOMTD
 config NSH_DISABLE_LN
 	bool "Disable ln"
 	default DEFAULT_SMALL
-	depends on PSEUDOFS_SOFTLINKS
+	depends on FS_LINKS
 
 config NSH_DISABLE_LS
 	bool "Disable ls"
@@ -631,7 +636,7 @@ config NSH_DISABLE_PWD
 config NSH_DISABLE_READLINK
 	bool "Disable readlink"
 	default DEFAULT_SMALL
-	depends on PSEUDOFS_SOFTLINKS
+	depends on FS_LINKS
 
 config NSH_DISABLE_SWITCHBOOT
 	bool "Switch boot partition"

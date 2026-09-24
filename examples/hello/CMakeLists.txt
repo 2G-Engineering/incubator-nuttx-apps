@@ -21,13 +21,31 @@
 # ##############################################################################
 
 if(CONFIG_EXAMPLES_HELLO)
-  nuttx_add_application(
-    NAME
-    ${CONFIG_EXAMPLES_HELLO_PROGNAME}
-    SRCS
-    hello_main.c
-    STACKSIZE
-    ${CONFIG_EXAMPLES_HELLO_STACKSIZE}
-    PRIORITY
-    ${CONFIG_EXAMPLES_HELLO_PRIORITY})
+  if(CONFIG_EXAMPLES_HELLO_RESTRICTED)
+    nuttx_add_application(
+      NAME
+      ${CONFIG_EXAMPLES_HELLO_PROGNAME}
+      SRCS
+      hello_main.c
+      STACKSIZE
+      ${CONFIG_EXAMPLES_HELLO_STACKSIZE}
+      PRIORITY
+      ${CONFIG_EXAMPLES_HELLO_PRIORITY}
+      UID
+      0
+      GID
+      0
+      MODE
+      484)
+  else()
+    nuttx_add_application(
+      NAME
+      ${CONFIG_EXAMPLES_HELLO_PROGNAME}
+      SRCS
+      hello_main.c
+      STACKSIZE
+      ${CONFIG_EXAMPLES_HELLO_STACKSIZE}
+      PRIORITY
+      ${CONFIG_EXAMPLES_HELLO_PRIORITY})
+  endif()
 endif()

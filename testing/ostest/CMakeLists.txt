@@ -22,7 +22,7 @@
 
 if(CONFIG_TESTING_OSTEST)
 
-  set(SRCS getopt.c libc_memmem.c restart.c sighelper.c)
+  set(SRCS getopt.c libc_memmem.c libc_strto.c restart.c sighelper.c)
 
   if(CONFIG_ENABLE_ALL_SIGNALS)
     list(APPEND SRCS sighand.c signest.c)
@@ -66,6 +66,14 @@ if(CONFIG_TESTING_OSTEST)
 
   if(CONFIG_SCHED_WAITPID)
     list(APPEND SRCS waitpid.c)
+  endif()
+
+  if(CONFIG_FS_CHROOT)
+    if(CONFIG_SCHED_WAITPID)
+      if(NOT CONFIG_BUILD_KERNEL)
+        list(APPEND SRCS chroot.c)
+      endif()
+    endif()
   endif()
 
   if(NOT CONFIG_DISABLE_PTHREAD)
@@ -118,14 +126,14 @@ if(CONFIG_TESTING_OSTEST)
       list(APPEND SRCS sporadic.c sporadic2.c)
     endif()
 
-    if(CONFIG_SCHED_WORKQUEUE)
-      list(APPEND SRCS wqueue.c)
-    endif()
-
     if(CONFIG_PRIORITY_INHERITANCE)
       list(APPEND SRCS prioinherit.c)
     endif() # CONFIG_PRIORITY_INHERITANCE
   endif() # CONFIG_DISABLE_PTHREAD
+
+  if(CONFIG_TESTING_OSTEST_WQUEUE)
+    list(APPEND SRCS wqueue.c)
+  endif()
 
   if(NOT CONFIG_DISABLE_MQUEUE)
     if(NOT CONFIG_DISABLE_PTHREAD)
