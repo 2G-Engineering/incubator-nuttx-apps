@@ -36,7 +36,7 @@ if(CONFIG_TESTING_LTP)
       DOWNLOAD_DIR ${CMAKE_CURRENT_LIST_DIR}
       URL "${LTP_DOWNLOAD_URL}${LTPS_VERSION}.zip" SOURCE_DIR
           ${CMAKE_CURRENT_LIST_DIR}/ltp BINARY_DIR
-          ${CMAKE_BINARY_DIR}/apps/testing/ltp/ltp
+          ${NUTTX_BINARY_DIR}/apps/testing/ltp/ltp
       PATCH_COMMAND
         patch -p1 -d ${LTP_UNPACK} <
         ${CMAKE_CURRENT_LIST_DIR}/0001-pthread_rwlock_unlock-follow-linux.patch
@@ -85,6 +85,12 @@ if(CONFIG_TESTING_LTP)
     if(NOT CONFIG_PTHREAD_SPINLOCKS)
       list(APPEND BLACKWORDS "pthread_spin_init" "pthread_spin_destroy"
            "pthread_spin_trylock")
+    endif()
+
+    # See testing/ltp/Makefile.
+
+    if(NOT CONFIG_ARCH_HAVE_FORK)
+      list(APPEND BLACKWORDS "[^v_]fork(")
     endif()
     list(
       APPEND

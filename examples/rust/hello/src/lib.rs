@@ -1,6 +1,7 @@
 extern crate serde;
 extern crate serde_json;
 
+use core::ffi::{c_char, c_int, CStr};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -9,10 +10,29 @@ struct Person {
     age: u8,
 }
 
-// Function hello_rust_cargo without manglng
+fn print_args(argc: c_int, argv: *mut *mut c_char) {
+    if argv.is_null() {
+        return;
+    }
+
+    for i in 1..argc {
+        let arg = unsafe { *argv.add(i as usize) };
+        if arg.is_null() {
+            continue;
+        }
+
+        let arg = unsafe { CStr::from_ptr(arg) }.to_string_lossy();
+        println!("{}: {}", i, arg);
+    }
+}
+
+// Function hello_rust_cargo without mangling
 #[no_mangle]
-pub extern "C" fn hello_rust_cargo_main() {
-    // Print hello world to stdout
+pub extern "C" fn hello_rust_cargo_main(argc: c_int, argv: *mut *mut c_char) -> c_int {
+    print_args(argc, argv);
+
+    #[cfg(feature = "sim")]
+    println!("On simulator");
 
     let john = Person {
         name: "John".to_string(),
@@ -49,8 +69,5 @@ pub extern "C" fn hello_rust_cargo_main() {
         .block_on(async {
             println!("Hello world from tokio!");
         });
-
-    loop {
-        // Do nothing
-    }
+    0
 }

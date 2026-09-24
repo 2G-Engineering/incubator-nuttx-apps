@@ -87,6 +87,15 @@ int nsh_session(FAR struct console_stdio_s *pstate,
           nsh_exit(vtbl, 1);
           return -1; /* nsh_exit does not return */
         }
+
+#ifdef CONFIG_SCHED_USER_IDENTITY
+      /* nsh_consolemain always passes NSH_LOGIN_LOCAL, even when console
+       * login is disabled.  Apply #/$ markers only after a real login
+       * so CI/NTFC still sees CONFIG_NSH_PROMPT_STRING at boot.
+       */
+
+      nsh_update_prompt_after_login();
+#endif
     }
   else
 #endif /* CONFIG_NSH_CONSOLE_LOGIN */
@@ -100,6 +109,10 @@ int nsh_session(FAR struct console_stdio_s *pstate,
           nsh_exit(vtbl, 1);
           return -1; /* nsh_exit does not return */
         }
+
+#ifdef CONFIG_SCHED_USER_IDENTITY
+      nsh_update_prompt_after_login();
+#endif
     }
 #endif /* CONFIG_NSH_TELNET_LOGIN */
 
@@ -222,6 +235,12 @@ int nsh_session(FAR struct console_stdio_s *pstate,
       /* Display the prompt string */
 
       write(OUTFD(pstate), nsh_prompt(), strlen(nsh_prompt()));
+
+#if defined(CONFIG_READLINE_TABCOMPLETION) || defined(CONFIG_READLINE_EDIT)
+      /* Set the prompt so readline can redraw it for editing features */
+
+      readline_prompt(nsh_prompt());
+#endif
 
       /* readline() normally returns the number of characters read, but
        * will return EOF on end of file or if an error occurs.  EOF

@@ -74,18 +74,20 @@ config NSH_PROMPT_STRING_ROOT
 	default ""
 	depends on SCHED_USER_IDENTITY
 	---help---
-		If non-empty, NSH uses this prompt when the effective UID is zero.
-		If empty, the prompt from NSH_PROMPT_STRING (or ENV/HOSTNAME) is used.
-		Set explicitly for multi-user shells (for example, "nsh# ").
+		Optional full prompt override when the effective UID is zero.
+		If empty, NSH keeps NSH_PROMPT_STRING until login; after login the
+		last '>' in the base prompt becomes '#' (for example, "nsh> "
+		becomes "nsh# "), or '#' is appended when the prompt has no '>'.
 
 config NSH_PROMPT_STRING_USER
 	string "Prompt string for non-root effective UID"
 	default ""
 	depends on SCHED_USER_IDENTITY
 	---help---
-		If non-empty, NSH uses this prompt when the effective UID is non-zero.
-		If empty, the prompt from NSH_PROMPT_STRING (or ENV/HOSTNAME) is used.
-		Set explicitly for multi-user shells (for example, "nsh$ ").
+		Optional full prompt override when the effective UID is non-zero.
+		If empty, NSH keeps NSH_PROMPT_STRING until login; after login the
+		last '>' in the base prompt becomes '$' (for example, "nsh> "
+		becomes "nsh$ "), or '$' is appended when the prompt has no '>'.
 
 config NSH_PROMPT_MAX
 	int "Maximum Size of Prompt String"
@@ -411,6 +413,10 @@ config NSH_DISABLE_DIRNAME
 
 config NSH_DISABLE_DMESG
 	bool "Disable dmesg"
+	default DEFAULT_SMALL
+
+config NSH_DISABLE_DU
+	bool "Disable du"
 	default DEFAULT_SMALL
 
 config NSH_DISABLE_ECHO
@@ -1086,6 +1092,7 @@ config NSH_USBKBD
 	bool "Use USB keyboard input"
 	default n
 	depends on NSH_CONSOLE && USBHOST_HIDKBD && !NSH_USBCONSOLE
+	depends on INPUT_KEYBOARD_BYTESTREAM
 	---help---
 		Normally NSH uses the same device for stdin, stdout, and stderr.  By
 		default, that device is /dev/console.  If this option is selected,
@@ -1093,6 +1100,9 @@ config NSH_USBKBD
 		keyboard is connected directly to the target (via a USB host
 		interface) and the data from the keyboard will drive NSH.  NSH
 		output (stdout and stderr) will still go to /dev/console.
+
+		NSH reads the keyboard as a stream of characters, which is what
+		INPUT_KEYBOARD_BYTESTREAM makes a keyboard device deliver.
 
 if NSH_USBKBD
 
@@ -1201,6 +1211,28 @@ config NSH_DISABLE_TELNETSTART
 
 endmenu # Telnet Configuration
 
+menu "Dropbear Configuration"
+
+config NSH_DROPBEAR
+	bool "Start Dropbear SSH server"
+	default n
+	depends on NETUTILS_DROPBEAR
+	depends on NSH_BUILTIN_APPS
+	depends on !NSH_DISABLEBG
+	select NSH_LOGIN
+	---help---
+		If NSH_DROPBEAR is set to 'y', then NSH starts the Dropbear SSH
+		server automatically.
+
+config NSH_DISABLE_DROPBEARSTART
+	bool "Disable to start Dropbear"
+	default n
+	depends on NSH_DROPBEAR
+	---help---
+		Determines if NSH starts Dropbear automatically.
+
+endmenu # Dropbear Configuration
+
 config NSH_LOGIN
 	bool
 	default n
@@ -1208,32 +1240,42 @@ config NSH_LOGIN
 config NSH_CONSOLE_LOGIN
 	bool "Console Login"
 	default n
+	depends on FSUTILS_PASSWD
+	depends on !ETC_ROMFS || BOARD_ETC_ROMFS_PASSWD_ENABLE
 	select NSH_LOGIN
 	---help---
 		If defined, then the console user will be required to provide a
-		username and password to start the NSH shell.
+		username and password to start the NSH shell.  Requires
+		CONFIG_FSUTILS_PASSWD (PBKDF2-HMAC-SHA256) so credentials are
+		verified against the encrypted password file.
+
+		When CONFIG_ETC_ROMFS is enabled, also enable
+		CONFIG_BOARD_ETC_ROMFS_PASSWD_ENABLE so /etc/passwd is generated
+		at build time (or provide the passwd file by other means and leave
+		ETC_ROMFS disabled).
 
 config NSH_TELNET_LOGIN
 	bool "Telnet Login"
 	default n
-	depends on NSH_TELNET
+	depends on NSH_TELNET && FSUTILS_PASSWD
+	depends on !ETC_ROMFS || BOARD_ETC_ROMFS_PASSWD_ENABLE
 	select NSH_LOGIN
 	---help---
 		If defined, then the Telnet user will be required to provide a
-		username and password to start the NSH shell.
+		username and password to start the NSH shell.  Requires
+		CONFIG_FSUTILS_PASSWD (PBKDF2-HMAC-SHA256) so credentials are
+		verified against the encrypted password file.
+
+		When CONFIG_ETC_ROMFS is enabled, also enable
+		CONFIG_BOARD_ETC_ROMFS_PASSWD_ENABLE so /etc/passwd is generated
+		at build time (or provide the passwd file by other means and leave
+		ETC_ROMFS disabled).
 
 if NSH_LOGIN
 
 choice
 	prompt "Verification method"
-	default NSH_LOGIN_PASSWD if FSUTILS_PASSWD
-	default NSH_LOGIN_FIXED if !FSUTILS_PASSWD
-
-config NSH_LOGIN_FIXED
-	bool "Fixed username/password"
-	---help---
-		Verify user credentials by matching to fixed username and password
-		strings
+	default NSH_LOGIN_PASSWD
 
 config NSH_LOGIN_PLATFORM
 	bool "Platform username/password"
@@ -1265,17 +1307,10 @@ endchoice # Verification method
 
 config NSH_LOGIN_USERNAME
 	string "Login username"
-	default "admin"
+	default "root"
 	depends on !NSH_LOGIN_PASSWD
 	---help---
-		Login user name.  Default: "admin"
-
-config NSH_LOGIN_PASSWORD
-	string "Login password"
-	default "Administrator"
-	depends on !NSH_LOGIN_PASSWD
-	---help---
-		Login password:  Default: "Administrator"
+		Login user name.  Default: "root"
 
 config NSH_LOGIN_FAILDELAY
 	int "Login failure delay"

@@ -44,15 +44,19 @@ struct action_cmd_s
   FAR char *argv[CONFIG_SYSTEM_NXINIT_ACTION_CMD_ARGS_MAX];
 };
 
+struct action_event_s
+{
+  FAR const char *key;
+  FAR char *value;
+  bool invert;
+  bool pending;
+};
+
 struct action_s
 {
   struct list_node node;          /* Action list node */
   struct list_node ready_node;    /* Ready list node */
-
-  /* Event trigger */
-
-  FAR const char *event;
-
+  struct action_event_s events[CONFIG_SYSTEM_NXINIT_ACTION_EVENTS_MAX];
   struct list_node cmds;          /* Command header, struct action_cmd_s */
 };
 
@@ -61,7 +65,6 @@ struct action_manager_s
   struct list_node actions;       /* Action header, struct action_s */
   struct list_node ready_actions; /* Ready header, struct action_s */
 
-  FAR char *events[CONFIG_SYSTEM_NXINIT_ACTION_MANAGER_EVENT_MAX];
   FAR struct action_s *current;
 
   FAR struct action_cmd_s *running;
@@ -71,7 +74,26 @@ struct action_manager_s
   struct timespec time_run;
 #endif
   FAR struct service_manager_s *sm;
+
+  FAR struct init_poller_s *prop;
 };
+
+/* Event evaluation result reported by init_action_event_cb.
+ * TRIGGERED means the event is satisfied and its key is the one that just
+ * changed, SATISFIED means it stays satisfied from an earlier change.
+ */
+
+enum action_event_state_e
+{
+  EVENT_STATE_UNSATISFIED = 0,
+  EVENT_STATE_SATISFIED,
+  EVENT_STATE_TRIGGERED,
+};
+
+typedef CODE int (*init_action_event_cb)(FAR struct action_manager_s *,
+                                         FAR struct action_s *,
+                                         FAR struct action_event_s *,
+                                         FAR void *arg);
 
 /****************************************************************************
  * Public Function Prototypes
@@ -83,6 +105,12 @@ int  init_action_run_command(FAR struct action_manager_s *am);
 void init_action_reap_command(FAR struct action_manager_s *am);
 int  init_action_parse(FAR const struct parser_s *parser,
                        bool create, FAR char *buf);
+int  init_action_foreach_event(FAR struct action_manager_s *am,
+                               init_action_event_cb cb,
+                               FAR void *arg);
+void init_action_trigger_event(FAR struct action_manager_s *am,
+                               FAR const char *key,
+                               FAR const char *value);
 #ifdef CONFIG_SYSTEM_NXINIT_DEBUG
 void init_dump_actions(FAR struct list_node *head);
 #else

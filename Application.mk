@@ -122,6 +122,7 @@ ifneq ($(strip $(PROGNAME)),)
   NLIST := $(shell seq 1 $(words $(PROGNAME)))
   $(foreach i, $(NLIST), \
     $(eval PROGNAME_$(word $i,$(PROGOBJ)) := $(word $i,$(PROGNAME))) \
+    $(eval PROGSYM_$(word $i,$(PROGOBJ)) := $(subst -,_,$(word $i,$(PROGNAME)))) \
     $(eval PROGOBJ_$(word $i,$(PROGLIST)) := $(word $i,$(PROGOBJ))) \
     $(eval PRIORITY_$(word $i,$(REGLIST)) := \
         $(if $(word $i,$(PRIORITY)),$(word $i,$(PRIORITY)),$(lastword $(PRIORITY)))) \
@@ -133,7 +134,31 @@ ifneq ($(strip $(PROGNAME)),)
         $(if $(word $i,$(GID)),$(word $i,$(GID)),$(lastword $(GID)))) \
     $(eval MODE_$(word $i,$(REGLIST)) := \
         $(if $(word $i,$(MODE)),$(word $i,$(MODE)),$(lastword $(MODE)))) \
+    $(eval STACKSIZE_$(word $i,$(PROGLIST)) := $(STACKSIZE_$(word $i,$(REGLIST)))) \
+    $(eval PRIORITY_$(word $i,$(PROGLIST)) := $(PRIORITY_$(word $i,$(REGLIST)))) \
+    $(eval UID_$(word $i,$(PROGLIST)) := $(UID_$(word $i,$(REGLIST)))) \
+    $(eval GID_$(word $i,$(PROGLIST)) := $(GID_$(word $i,$(REGLIST)))) \
+    $(eval MODE_$(word $i,$(PROGLIST)) := $(MODE_$(word $i,$(REGLIST)))) \
   )
+
+  # Emit the application's configured attributes as absolute ELF symbols
+  # (nx_stacksize, nx_priority, and nx_uid/nx_gid/nx_mode under
+  # CONFIG_SCHED_USER_IDENTITY) so the binary loader can recover them.
+  # Per-target so each PROGLIST entry picks up its own STACKSIZE_/PRIORITY_.
+
+  $(PROGLIST): MODLDFLAGS += \
+    $(if $(STACKSIZE_$@),--defsym nx_stacksize=$(STACKSIZE_$@)) \
+    $(if $(filter-out SCHED_PRIORITY_DEFAULT,$(PRIORITY_$@)),--defsym nx_priority=$(PRIORITY_$@))
+ifeq ($(CONFIG_SCHED_USER_IDENTITY),y)
+  $(PROGLIST): MODLDFLAGS += \
+    $(if $(UID_$@),--defsym nx_uid=$(UID_$@)) \
+    $(if $(GID_$@),--defsym nx_gid=$(GID_$@)) \
+    $(if $(MODE_$@),--defsym nx_mode=$(MODE_$@))
+endif
+
+  # Keep the attribute symbols through --strip-unneeded so the binary loader
+  # can still read them from the stripped runtime image in bin/.
+  $(PROGLIST): NX_KEEP = $(if $(STACKSIZE_$@),-K nx_stacksize) $(if $(filter-out SCHED_PRIORITY_DEFAULT,$(PRIORITY_$@)),-K nx_priority) $(if $(UID_$@),-K nx_uid) $(if $(GID_$@),-K nx_gid) $(if $(MODE_$@),-K nx_mode)
 endif
 
 # Condition flags
@@ -148,7 +173,7 @@ ifeq ($(WASM_BUILD),y)
   DO_REGISTRATION = n
 endif
 
-ifeq ($(DYNLIB),y)
+ifeq ($(BUILD_MODULE),y)
   DO_REGISTRATION = n
 endif
 
@@ -223,7 +248,7 @@ endef
 # rename "main()" in $1 to "xxx_main()" and save to $2
 define RENAMEMAIN
 	$(ECHO_BEGIN)"Rename main() in $1 and save to $2"
-	$(Q) ${shell cat $1 | sed -e "s/fn[ ]\+main/fn $(addsuffix _main,$(PROGNAME_$@))/" > $2}
+	$(Q) ${shell cat $1 | sed -e "s/fn[ ]\+main/fn $(addsuffix _main,$(PROGSYM_$@))/" > $2}
 	$(ECHO_END)
 endef
 
@@ -310,7 +335,7 @@ $(PROGLIST): $(MAINCOBJ) $(MAINCXXOBJ) $(MAINRUSTOBJ) $(MAINZIGOBJ) $(MAINDOBJ) 
 ifneq ($(CONFIG_DEBUG_SYMBOLS),)
 	$(Q) mkdir -p $(BINDIR_DEBUG)
 	$(Q) cp $@ $(BINDIR_DEBUG)
-	$(Q) $(MODULESTRIP) $@
+	$(Q) $(MODULESTRIP) $(NX_KEEP) $@
 endif
 
 install:: $(PROGLIST)
@@ -319,14 +344,14 @@ install:: $(PROGLIST)
 else
 
 $(MAINCXXOBJ): $(PREFIX)%$(CXXEXT)$(SUFFIX)$(OBJEXT): %$(CXXEXT)
-	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGNAME_$@))})
-	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGNAME_$@))})
+	$(eval $<_CXXFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGSYM_$@))})
+	$(eval $<_CXXELFFLAGS += ${shell $(DEFINE) "$(CXX)" main=$(addsuffix _main,$(PROGSYM_$@))})
 	$(if $(and $(CONFIG_MODULES),$(MODCXXFLAGS)), \
 		$(call ELFCOMPILEXX, $<, $@), $(call COMPILEXX, $<, $@))
 
 $(MAINCOBJ): $(PREFIX)%.c$(SUFFIX)$(OBJEXT): %.c
-	$(eval $<_CFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGNAME_$@)))
-	$(eval $<_CELFFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGNAME_$@)))
+	$(eval $<_CFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGSYM_$@)))
+	$(eval $<_CELFFLAGS += ${DEFINE_PREFIX}main=$(addsuffix _main,$(PROGSYM_$@)))
 	$(if $(and $(CONFIG_MODULES),$(MODCFLAGS)), \
 		$(call ELFCOMPILE, $<, $@), $(call COMPILE, $<, $@))
 
@@ -362,10 +387,11 @@ ifeq ($(DO_REGISTRATION),y)
 
 $(REGLIST): $(DEPCONFIG) Makefile
 	$(eval PROGNAME_$@ := $(basename $(notdir $@)))
+	$(eval PROGSYM_$@ := $(subst -,_,$(PROGNAME_$@)))
 ifeq ($(CONFIG_SCHED_USER_IDENTITY),y)
-	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGNAME_$@)_main),$(UID_$@),$(GID_$@),$(MODE_$@))
+	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGSYM_$@)_main),$(UID_$@),$(GID_$@),$(MODE_$@))
 else
-	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGNAME_$@)_main))
+	$(call REGISTER,$(PROGNAME_$@),$(PRIORITY_$@),$(STACKSIZE_$@),$(if $(BUILD_MODULE),,$(PROGSYM_$@)_main))
 endif
 
 register:: $(REGLIST)
@@ -393,6 +419,7 @@ clean::
 	$(call CLEANAROBJS)
 	$(call CLEAN)
 distclean:: clean
+	$(call DELFILE, .kconfig)
 	$(call DELFILE, Make.dep)
 	$(call DELFILE, .depend)
 

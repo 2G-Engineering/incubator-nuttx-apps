@@ -557,7 +557,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv4
   struct in_addr addr;
   in_addr_t gip = INADDR_ANY;
-  in_addr_t mip;
+  in_addr_t mip = INADDR_ANY;
 #endif
 #ifdef CONFIG_NET_IPv6
   struct in6_addr addr6;
@@ -584,6 +584,8 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #endif
   bool missingarg = true;
   bool badarg = false;
+  bool ifup = false;
+  bool ifdown = false;
 #ifdef CONFIG_NET_ARP
   arp_cfg_e arpflag = ARP_DEFAULT;
 #endif
@@ -623,163 +625,168 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
    *    ifconfig ifname [ip_address] [named options]
    */
 
-  if (argc > 2)
+  for (i = 1; i < argc; i++)
     {
-      for (i = 1; i < argc; i++)
+      if (i == 1)
         {
-          if (i == 1)
+          ifname = argv[i];
+          missingarg = false;
+        }
+      else
+        {
+          tmp = argv[i];
+
+          if (!strcmp(tmp, "dr") || !strcmp(tmp, "gw") ||
+              !strcmp(tmp, "gateway"))
             {
-              ifname = argv[i];
-              missingarg = false;
-            }
-          else
-            {
-              tmp = argv[i];
-
-              if (!strcmp(tmp, "dr") || !strcmp(tmp, "gw") ||
-                  !strcmp(tmp, "gateway"))
+              if (argc - 1 >= i + 1)
                 {
-                  if (argc - 1 >= i + 1)
-                    {
-                      gwip = argv[i + 1];
-                      i++;
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-              else if (!strcmp(tmp, "netmask"))
-                {
-                  if (argc - 1 >= i + 1)
-                    {
-                      mask = argv[i + 1];
-                      i++;
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-              else if (!strcmp(tmp, "inet"))
-                {
-#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
-                  inet6 = false;
-#elif !defined(CONFIG_NET_IPv4)
-                  badarg = true;
-#endif
-                }
-              else if (!strcmp(tmp, "inet6"))
-                {
-#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
-                  inet6 = true;
-#elif !defined(CONFIG_NET_IPv6)
-                  badarg = true;
-#endif
-                }
-
-#ifdef CONFIG_NET_IPv6
-              else if (!strcmp(tmp, "prefixlen"))
-                {
-                  if (argc - 1 >= i + 1)
-                    {
-                      preflen = argv[i + 1];
-                      i++;
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-#endif
-
-#ifdef HAVE_HWADDR
-              /* REVISIT: How will we handle Ethernet and SLIP together? */
-
-              else if (!strcmp(tmp, "hw"))
-                {
-                  if (argc - 1 >= i + 1)
-                    {
-                      hw = argv[i + 1];
-                      i++;
-
-                      badarg = nsh_addrconv(hw, &macaddr);
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-#endif
-
-#ifdef CONFIG_NETDB_DNSCLIENT
-              else if (!strcmp(tmp, "dns"))
-                {
-                  if (argc - 1 >= i + 1)
-                    {
-                      dns = argv[i + 1];
-                      i++;
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-#endif
-              else if (!strcmp(tmp, "add"))
-                {
-#if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDEV_MULTIPLE_IPv6)
-                  remove = false;
-                  continue;
-                }
-              else if (!strcmp(tmp, "del"))
-                {
-                  remove = true;
-#endif
-                  continue;
-                }
-              else if (!strcmp(tmp, "mtu"))
-                {
-                  if (argc - 1 >= i + 1)
-                    {
-                      mtu = atoi(argv[i + 1]);
-                      i++;
-                      if (mtu < 1280)
-                        {
-                          mtu = 1280;
-                        }
-                    }
-                  else
-                    {
-                      badarg = true;
-                    }
-                }
-#ifdef CONFIG_NET_ARP
-              else if (!strcmp(tmp, "arp"))
-                {
-                  /* Enable arp function on interface */
-
-                  arpflag = ARP_ENABLE;
-                }
-              else if (!strcmp(tmp, "-arp"))
-                {
-                  /* Disable arp function on interface */
-
-                  arpflag = ARP_DISABLE;
-                }
-#endif
-              else if (hostip == NULL && i <= 4)
-                {
-                  /* Let first non-option be host ip, to support inet/inet6
-                   * options before address.
-                   */
-
-                  hostip = tmp;
+                  gwip = argv[i + 1];
+                  i++;
                 }
               else
                 {
                   badarg = true;
                 }
+            }
+          else if (!strcmp(tmp, "netmask"))
+            {
+              if (argc - 1 >= i + 1)
+                {
+                  mask = argv[i + 1];
+                  i++;
+                }
+              else
+                {
+                  badarg = true;
+                }
+            }
+          else if (!strcmp(tmp, "inet"))
+            {
+#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
+              inet6 = false;
+#elif !defined(CONFIG_NET_IPv4)
+              badarg = true;
+#endif
+            }
+          else if (!strcmp(tmp, "inet6"))
+            {
+#if defined(CONFIG_NET_IPv4) && defined(CONFIG_NET_IPv6)
+              inet6 = true;
+#elif !defined(CONFIG_NET_IPv6)
+              badarg = true;
+#endif
+            }
+
+#ifdef CONFIG_NET_IPv6
+          else if (!strcmp(tmp, "prefixlen"))
+            {
+              if (argc - 1 >= i + 1)
+                {
+                  preflen = argv[i + 1];
+                  i++;
+                }
+              else
+                {
+                  badarg = true;
+                }
+            }
+#endif
+
+#ifdef HAVE_HWADDR
+          /* REVISIT: How will we handle Ethernet and SLIP together? */
+
+          else if (!strcmp(tmp, "hw"))
+            {
+              if (argc - 1 >= i + 1)
+                {
+                  hw = argv[i + 1];
+                  i++;
+
+                  badarg = nsh_addrconv(hw, &macaddr);
+                }
+              else
+                {
+                  badarg = true;
+                }
+            }
+#endif
+
+#ifdef CONFIG_NETDB_DNSCLIENT
+          else if (!strcmp(tmp, "dns"))
+            {
+              if (argc - 1 >= i + 1)
+                {
+                  dns = argv[i + 1];
+                  i++;
+                }
+              else
+                {
+                  badarg = true;
+                }
+            }
+#endif
+          else if (!strcmp(tmp, "add"))
+            {
+#if defined(CONFIG_NET_IPv6) && defined(CONFIG_NETDEV_MULTIPLE_IPv6)
+              remove = false;
+              continue;
+            }
+          else if (!strcmp(tmp, "del"))
+            {
+              remove = true;
+#endif
+              continue;
+            }
+          else if (!strcmp(tmp, "mtu"))
+            {
+              if (argc - 1 >= i + 1)
+                {
+                  mtu = atoi(argv[i + 1]);
+                  i++;
+                  if (mtu < 1280)
+                    {
+                      mtu = 1280;
+                    }
+                }
+              else
+                {
+                  badarg = true;
+                }
+            }
+#ifdef CONFIG_NET_ARP
+          else if (!strcmp(tmp, "arp"))
+            {
+              /* Enable arp function on interface */
+
+              arpflag = ARP_ENABLE;
+            }
+          else if (!strcmp(tmp, "-arp"))
+            {
+              /* Disable arp function on interface */
+
+              arpflag = ARP_DISABLE;
+            }
+#endif
+          else if (!strcmp(tmp, "up"))
+            {
+              ifup = true;
+            }
+          else if (!strcmp(tmp, "down"))
+            {
+              ifdown = true;
+            }
+          else if (hostip == NULL && i <= 4)
+            {
+              /* Let first non-option be host ip, to support inet/inet6
+               * options before address.
+               */
+
+              hostip = tmp;
+            }
+          else
+            {
+              badarg = true;
             }
         }
     }
@@ -809,7 +816,6 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
   if (mtu != 0)
     {
       netlib_set_mtu(ifname, mtu);
-      return OK;
     }
 
   /* Set IP address */
@@ -839,11 +845,11 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
               nsh_error(vtbl, g_fmtarginvalid, argv[0]);
               return ERROR;
             }
-        }
 
 #ifndef CONFIG_NETDEV_MULTIPLE_IPv6
-      netlib_set_ipv6addr(ifname, &addr6);
+          netlib_set_ipv6addr(ifname, &addr6);
 #endif
+        }
     }
 #endif /* CONFIG_NET_IPv6 */
 
@@ -851,31 +857,25 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv6
   else
 #endif
+  if (hostip != NULL)
     {
-      if (hostip != NULL)
-        {
 #if defined(CONFIG_NETUTILS_DHCPC)
-          if (strcmp(hostip, "dhcp") == 0)
-            {
-              /* Set DHCP addr */
+      if (strcmp(hostip, "dhcp") == 0)
+        {
+          /* Set DHCP addr */
 
-              ninfo("DHCPC Mode\n");
-              addr.s_addr = 0;
-              gip         = 0;
-            }
-          else
-#endif
-            {
-              /* Set host IP address */
-
-              ninfo("Host IP: %s\n", hostip);
-              addr.s_addr = inet_addr(hostip);
-              gip         = addr.s_addr;
-            }
+          ninfo("DHCPC Mode\n");
+          addr.s_addr = 0;
+          gip         = 0;
         }
       else
+#endif
         {
-          addr.s_addr = 0;
+          /* Set host IP address */
+
+          ninfo("Host IP: %s\n", hostip);
+          addr.s_addr = inet_addr(hostip);
+          gip         = addr.s_addr;
         }
 
       netlib_set_ipv4addr(ifname, &addr);
@@ -908,33 +908,39 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
           ninfo("Prefixlen: %s\n", preflen);
           netlib_prefix2ipv6netmask(atoi(preflen), &mask6);
         }
-      else
+      else if (hostip != NULL)
         {
           ninfo("Netmask: Default\n");
           inet_pton(AF_INET6, "ffff:ffff:ffff:ffff::", &mask6);
         }
 
 #ifdef CONFIG_NETDEV_MULTIPLE_IPv6
-      plen = netlib_ipv6netmask2prefix(mask6.in6_u.u6_addr16);
-      if (remove)
+      if (hostip != NULL)
         {
-          ret = netlib_del_ipv6addr(ifname, &addr6, plen);
-        }
-      else
-        {
-          ret = netlib_add_ipv6addr(ifname, &addr6, plen);
-        }
+          plen = netlib_ipv6netmask2prefix(mask6.in6_u.u6_addr16);
+          if (remove)
+            {
+              ret = netlib_del_ipv6addr(ifname, &addr6, plen);
+            }
+          else
+            {
+              ret = netlib_add_ipv6addr(ifname, &addr6, plen);
+            }
 
-      if (ret < 0)
-        {
-          perror("Failed to manage IPv6 address");
+          if (ret < 0)
+            {
+              perror("Failed to manage IPv6 address");
 
-          /* REVISIT: Should we return ERROR or just let it go? */
+              /* REVISIT: Should we return ERROR or just let it go? */
 
-          return ERROR;
+              return ERROR;
+            }
         }
 #else
-      netlib_set_ipv6netmask(ifname, &mask6);
+      if (mask != NULL || preflen != NULL || hostip != NULL)
+        {
+          netlib_set_ipv6netmask(ifname, &mask6);
+        }
 #endif /* CONFIG_NETDEV_MULTIPLE_IPv6 */
     }
 #endif /* CONFIG_NET_IPv6 */
@@ -943,6 +949,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv6
   else
 #endif
+  if (mask != NULL || hostip != NULL)
     {
       if (mask != NULL)
         {
@@ -989,6 +996,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv6
   else
 #endif
+  if (gwip != NULL || hostip != NULL)
     {
       if (gwip != NULL)
         {
@@ -1030,14 +1038,14 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
               nsh_error(vtbl, g_fmtarginvalid, argv[0]);
               return ERROR;
             }
+
+          netlib_set_ipv6dnsaddr(&addr6);
         }
-      else
+      else if (hostip != NULL)
         {
           ninfo("DNS: Default\n");
-          addr6 = gip6;
+          netlib_set_ipv6dnsaddr(&gip6);
         }
-
-      netlib_set_ipv6dnsaddr(&addr6);
     }
 #endif /* CONFIG_NET_IPv6 */
 
@@ -1045,6 +1053,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #ifdef CONFIG_NET_IPv6
   else
 #endif
+  if (dns != NULL || hostip != NULL)
     {
       if (dns != NULL)
         {
@@ -1063,8 +1072,7 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 #endif /* CONFIG_NETDB_DNSCLIENT */
 
 #if defined(CONFIG_NETUTILS_DHCPC)
-
-  if (!gip)
+  if (hostip != NULL && strcmp(hostip, "dhcp") == 0)
     {
       netlib_obtain_ipv4addr(ifname);
     }
@@ -1080,6 +1088,17 @@ int cmd_ifconfig(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
       netlib_ifnoarp(ifname);
     }
 #endif
+
+  /* Bring the interface up or down once everything else is in place. */
+
+  if (ifup)
+    {
+      netlib_ifup(ifname);
+    }
+  else if (ifdown)
+    {
+      netlib_ifdown(ifname);
+    }
 
 #if !defined(CONFIG_NET_IPv4) && !defined(CONFIG_NET_IPv6)
   UNUSED(hostip);

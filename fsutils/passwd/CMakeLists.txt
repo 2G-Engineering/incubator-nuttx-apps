@@ -23,7 +23,8 @@
 if(CONFIG_FSUTILS_PASSWD)
   set(CSRCS)
 
-  list(APPEND CSRCS passwd_verify.c passwd_find.c passwd_encrypt.c)
+  list(APPEND CSRCS passwd_verify.c passwd_find.c passwd_encrypt.c
+       passwd_pbkdf2.c)
 
   if(NOT CONFIG_FSUTILS_PASSWD_READONLY)
     list(

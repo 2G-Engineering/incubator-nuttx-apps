@@ -26,6 +26,7 @@ include $(APPDIR)/Make.defs
 
 ifeq ($(CONFIG_FSUTILS_PASSWD),y)
 CSRCS += passwd_verify.c passwd_find.c passwd_encrypt.c
+CSRCS += passwd_pbkdf2.c
 ifneq ($(CONFIG_FSUTILS_PASSWD_READONLY),y)
 CSRCS += passwd_adduser.c passwd_deluser.c passwd_update.c passwd_append.c
 CSRCS += passwd_delete.c passwd_lock.c

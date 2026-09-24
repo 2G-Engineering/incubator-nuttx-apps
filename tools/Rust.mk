@@ -27,7 +27,8 @@
 #
 # Supported architectures and their target triples:
 #   - x86: i686-unknown-nuttx
-#   - x86_64: x86_64-unknown-nuttx
+#   - x86_64: x86_64-unknown-nuttx-macho for sim on macOS,
+#              x86_64-unknown-nuttx otherwise
 #   - armv7a: armv7a-nuttx-eabi, armv7a-nuttx-eabihf
 #   - thumbv6m: thumbv6m-nuttx-eabi
 #   - thumbv7a: thumbv7a-nuttx-eabi, thumbv7a-nuttx-eabihf
@@ -37,6 +38,8 @@
 #   - thumbv8m.base: thumbv8m.base-nuttx-eabi, thumbv8m.base-nuttx-eabihf
 #   - riscv32: riscv32imc/imac/imafc-unknown-nuttx-elf
 #   - riscv64: riscv64imac/imafdc-unknown-nuttx-elf
+#   - aarch64: aarch64-unknown-nuttx-macho for sim on macOS,
+#              aarch64-unknown-nuttx otherwise
 #
 # Usage:   $(call RUST_TARGET_TRIPLE)
 #
@@ -47,13 +50,19 @@
 define RUST_TARGET_TRIPLE
 $(or \
   $(and $(filter x86_64,$(LLVM_ARCHTYPE)), \
-    $(APPDIR)/tools/x86_64-unknown-nuttx.json \
+    $(if $(and $(filter y,$(CONFIG_ARCH_SIM)),$(filter y,$(CONFIG_HOST_MACOS))), \
+      $(TOPDIR)/tools/x86_64-unknown-nuttx-macho.json, \
+      $(TOPDIR)/tools/x86_64-unknown-nuttx.json \
+    ) \
   ), \
   $(and $(filter x86,$(LLVM_ARCHTYPE)), \
-    $(APPDIR)/tools/i486-unknown-nuttx.json \
+    $(TOPDIR)/tools/i486-unknown-nuttx.json \
   ), \
   $(and $(filter aarch64,$(LLVM_ARCHTYPE)), \
-    $(if $(filter y,$(CONFIG_HOST_MACOS)),aarch64-apple-darwin) \
+    $(if $(and $(filter y,$(CONFIG_ARCH_SIM)),$(filter y,$(CONFIG_HOST_MACOS))), \
+      $(TOPDIR)/tools/aarch64-unknown-nuttx-macho.json, \
+      $(TOPDIR)/tools/aarch64-unknown-nuttx.json \
+    ) \
   ), \
   $(and $(filter thumb%,$(LLVM_ARCHTYPE)), \
     $(if $(filter thumbv8m%,$(LLVM_ARCHTYPE)), \
@@ -81,11 +90,12 @@ endef
 
 # Build Rust project using cargo
 #
-# Usage:   $(call RUST_CARGO_BUILD,cratename,prefix)
+# Usage:   $(call RUST_CARGO_BUILD,cratename,prefix[,features])
 #
 # Inputs:
 #   cratename - Name of the Rust crate (e.g. hello)
 #   prefix    - Path prefix to the crate (e.g. path/to/project)
+#   features  - Optional Cargo features to enable
 #
 # Output:
 #   None, builds the Rust project
@@ -96,7 +106,8 @@ define RUST_CARGO_BUILD
     RUSTFLAGS="-Zunstable-options -Cpanic=immediate-abort" \
     cargo build --release -Zbuild-std=std,panic_abort -Zjson-target-spec \
 		--manifest-path $(2)/$(1)/Cargo.toml \
-		--target $(call RUST_TARGET_TRIPLE)
+		--target $(call RUST_TARGET_TRIPLE) \
+		$(if $(strip $(3)),--features $(3),)
 endef
 else
 define RUST_CARGO_BUILD
@@ -104,7 +115,8 @@ define RUST_CARGO_BUILD
 	NUTTX_INCLUDE_DIR=$(TOPDIR)/include:$(TOPDIR)/include/arch \
     cargo build -Zbuild-std=std,panic_abort -Zjson-target-spec \
 		--manifest-path $(2)/$(1)/Cargo.toml \
-		--target $(call RUST_TARGET_TRIPLE)
+		--target $(call RUST_TARGET_TRIPLE) \
+		$(if $(strip $(3)),--features $(3),)
 endef
 endif
 
@@ -138,4 +150,19 @@ define RUST_GET_BINDIR
 $(2)/$(1)/target/$(strip $(if $(findstring .json,$(call RUST_TARGET_TRIPLE)), \
 	$(basename $(notdir $(call RUST_TARGET_TRIPLE))), \
 	$(call RUST_TARGET_TRIPLE)))/$(if $(CONFIG_DEBUG_FULLOPT),release,debug)/lib$(1).a
+endef
+
+# Collect crate input files for a crate
+#
+# Usage:   $(call RUST_CARGO_SRCS,cratename,prefix)
+#
+# Inputs:
+#   cratename - Name of the Rust crate (e.g. hello)
+#   prefix    - Path prefix to the crate (e.g. path/to/project)
+#
+# Output:
+#   List of crate input files (excluding the cargo target directory)
+
+define RUST_CARGO_SRCS
+$(shell find $(2)/$(1) -type f -not -path '$(2)/$(1)/target/*' 2>/dev/null)
 endef

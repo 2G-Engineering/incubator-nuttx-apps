@@ -34,8 +34,10 @@ include(nuttx_parse_function_args)
 #   - riscv32: riscv32imc/imac/imafc-unknown-nuttx-elf
 #   - riscv64: riscv64imac/imafdc-unknown-nuttx-elf
 #   - x86: i686-unknown-nuttx
-#   - x86_64: x86_64-unknown-nuttx
-#   - aarch64: aarch64-apple-darwin
+#   - x86_64: x86_64-unknown-nuttx-macho for sim on macOS,
+#              x86_64-unknown-nuttx otherwise
+#   - aarch64: aarch64-unknown-nuttx-macho for sim on macOS,
+#              aarch64-unknown-nuttx otherwise
 #
 # Inputs:
 #   ARCHTYPE - Architecture type (e.g. thumbv7m, riscv32)
@@ -48,15 +50,22 @@ include(nuttx_parse_function_args)
 # ~~~
 
 function(nuttx_rust_target_triple ARCHTYPE ABITYPE CPUTYPE OUTPUT)
-  get_filename_component(APPDIR "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/.."
-                         ABSOLUTE)
   if(ARCHTYPE STREQUAL "x86_64")
-    set(TARGET_TRIPLE "${APPDIR}/tools/x86_64-unknown-nuttx.json")
+    if(CONFIG_ARCH_SIM AND CONFIG_HOST_MACOS)
+      set(TARGET_TRIPLE
+          "${PROJECT_SOURCE_DIR}/tools/x86_64-unknown-nuttx-macho.json")
+    else()
+      set(TARGET_TRIPLE "${PROJECT_SOURCE_DIR}/tools/x86_64-unknown-nuttx.json")
+    endif()
   elseif(ARCHTYPE STREQUAL "x86")
-    set(TARGET_TRIPLE "${APPDIR}/tools/i486-unknown-nuttx.json")
+    set(TARGET_TRIPLE "${PROJECT_SOURCE_DIR}/tools/i486-unknown-nuttx.json")
   elseif(ARCHTYPE STREQUAL "aarch64")
-    if(APPLE)
-      set(TARGET_TRIPLE "aarch64-apple-darwin")
+    if(CONFIG_ARCH_SIM AND CONFIG_HOST_MACOS)
+      set(TARGET_TRIPLE
+          "${PROJECT_SOURCE_DIR}/tools/aarch64-unknown-nuttx-macho.json")
+    else()
+      set(TARGET_TRIPLE
+          "${PROJECT_SOURCE_DIR}/tools/aarch64-unknown-nuttx.json")
     endif()
   elseif(ARCHTYPE MATCHES "thumb")
     if(ARCHTYPE MATCHES "thumbv8m")
@@ -121,6 +130,8 @@ endfunction()
 #    hello
 #    CRATE_PATH
 #    ${CMAKE_CURRENT_SOURCE_DIR}/hello
+#    FEATURES
+#    sim
 #  )
 # ~~~
 
@@ -133,6 +144,8 @@ function(nuttx_add_rust)
     ONE_VALUE
     CRATE_NAME
     CRATE_PATH
+    MULTI_VALUE
+    FEATURES
     REQUIRED
     CRATE_NAME
     CRATE_PATH
@@ -149,6 +162,10 @@ function(nuttx_add_rust)
     set(RUST_PROFILE "debug")
     set(RUST_PANIC_FLAGS "")
   endif()
+
+  foreach(feature ${FEATURES})
+    list(APPEND RUST_FEATURE_FLAGS --features ${feature})
+  endforeach()
 
   # Get the Rust target triple
   nuttx_rust_target_triple(${LLVM_ARCHTYPE} ${LLVM_ABITYPE} ${LLVM_CPUTYPE}
@@ -185,11 +202,11 @@ function(nuttx_add_rust)
     OUTPUT ${RUST_LIB_PATH}
     COMMAND
       ${CMAKE_COMMAND} -E env
-      NUTTX_INCLUDE_DIR=${PROJECT_SOURCE_DIR}/include:${CMAKE_BINARY_DIR}/include:${CMAKE_BINARY_DIR}/include/arch
+      NUTTX_INCLUDE_DIR=${PROJECT_SOURCE_DIR}/include:${NUTTX_BINARY_DIR}/include:${NUTTX_BINARY_DIR}/include/arch
       RUSTFLAGS=${RUST_PANIC_FLAGS} cargo build ${RUST_PROFILE_FLAG}
       -Zbuild-std=std,panic_abort -Zjson-target-spec --manifest-path
       ${CRATE_PATH}/Cargo.toml --target ${RUST_TARGET} --target-dir
-      ${RUST_BUILD_DIR}
+      ${RUST_BUILD_DIR} ${RUST_FEATURE_FLAGS}
     DEPENDS ${RUST_CRATE_SOURCES}
     COMMENT "Building Rust crate ${CRATE_NAME}"
     VERBATIM)

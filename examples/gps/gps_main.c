@@ -26,6 +26,7 @@
 
 #include <nuttx/config.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <wchar.h>
@@ -52,9 +53,11 @@ int main(int argc, FAR char *argv[])
 {
   int fd;
   int cnt;
+  ssize_t nread;
   char ch;
   char line[MINMEA_MAX_LENGTH];
   char *port = "/dev/ttyS1";
+  bool truncated;
 
   /* Get the GPS serial port argument. If none specified, default to ttyS1 */
 
@@ -79,17 +82,37 @@ int main(int argc, FAR char *argv[])
       /* Read until we complete a line */
 
       cnt = 0;
-      do
+      truncated = false;
+
+      for (; ; )
         {
-          read(fd, &ch, 1);
-          if (ch != '\r' && ch != '\n')
+          nread = read(fd, &ch, 1);
+          if (nread <= 0)
+            {
+              continue;
+            }
+
+          if (ch == '\r' || ch == '\n')
+            {
+              break;
+            }
+
+          if (cnt < MINMEA_MAX_LENGTH - 1)
             {
               line[cnt++] = ch;
             }
+          else
+            {
+              truncated = true;
+            }
         }
-      while (ch != '\r' && ch != '\n');
 
       line[cnt] = '\0';
+
+      if (truncated)
+        {
+          continue;
+        }
 
       switch (minmea_sentence_id(line, false))
         {
@@ -99,21 +122,24 @@ int main(int argc, FAR char *argv[])
 
               if (minmea_parse_rmc(&frame, line))
                 {
-                  printf("Fixed-point Latitude...........: %" PRIdLEAST32
-                         "\n",
+                  printf("Fixed-point Latitude................: %"
+                         PRIdLEAST32 " (NMEA * 1000)\n",
                          minmea_rescale(&frame.latitude, 1000));
-                  printf("Fixed-point Longitude..........: %" PRIdLEAST32
-                         "\n",
+                  printf("Fixed-point Longitude...............: %"
+                         PRIdLEAST32 " (NMEA * 1000)\n",
                          minmea_rescale(&frame.longitude, 1000));
-                  printf("Fixed-point Speed..............: %" PRIdLEAST32
-                         "\n",
+                  printf("Fixed-point Speed...................: %"
+                         PRIdLEAST32 " (knots * 1000)\n",
                          minmea_rescale(&frame.speed, 1000));
-                  printf("Floating point degree latitude.: %2.6f\n",
+                  printf("Floating point Latitude.............: %2.6f "
+                         "degrees\n",
                          minmea_tocoord(&frame.latitude));
-                  printf("Floating point degree longitude: %2.6f\n",
+                  printf("Floating point Longitude............: %2.6f "
+                         "degrees\n",
                          minmea_tocoord(&frame.longitude));
-                  printf("Floating point speed...........: %2.6f\n",
-                         minmea_tocoord(&frame.speed));
+                  printf("Floating point Speed................: %2.6f "
+                         "knots\n",
+                         minmea_tofloat(&frame.speed));
                 }
               else
                 {
@@ -130,9 +156,9 @@ int main(int argc, FAR char *argv[])
                 {
                   printf("Fix quality....................: %d\n",
                          frame.fix_quality);
-                  printf("Altitude.......................: %" PRIdLEAST32
-                         "\n",
-                         frame.altitude.value);
+                  printf("Altitude.......................: %2.6f %c\n",
+                         minmea_tofloat(&frame.altitude),
+                         frame.altitude_units ? frame.altitude_units : '?');
                   printf("Tracked satellites.............: %d\n",
                          frame.satellites_tracked);
                 }

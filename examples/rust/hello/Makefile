@@ -27,8 +27,19 @@ PRIORITY  = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO_PRIORITY)
 STACKSIZE = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO_STACKSIZE)
 MODULE    = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO)
 
-context::
-	$(call RUST_CARGO_BUILD,hello,$(APPDIR)/examples/rust)
+RUST_LIB  := $(call RUST_GET_BINDIR,hello,$(APPDIR)/examples/rust)
+RUST_SRCS := $(call RUST_CARGO_SRCS,hello,$(APPDIR)/examples/rust)
+
+ifeq ($(CONFIG_ARCH_SIM),y)
+HELLO_RUST_FEATURES := sim
+endif
+
+$(RUST_LIB): $(RUST_SRCS)
+	$(call RUST_CARGO_BUILD,hello,$(APPDIR)/examples/rust,$(HELLO_RUST_FEATURES))
+
+context:: $(RUST_LIB)
+
+all:: $(RUST_LIB)
 
 clean::
 	$(call RUST_CARGO_CLEAN,hello,$(APPDIR)/examples/rust)

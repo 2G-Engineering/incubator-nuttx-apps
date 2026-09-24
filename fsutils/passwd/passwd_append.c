@@ -69,7 +69,7 @@ int passwd_append(FAR const char *username, FAR const char *password)
     {
       int errcode = errno;
       DEBUGASSERT(errcode > 0);
-      return errcode;
+      return -errcode;
     }
 
   /* The format of the password file is:

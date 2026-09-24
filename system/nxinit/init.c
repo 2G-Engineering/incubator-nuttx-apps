@@ -38,6 +38,7 @@
 #include "builtin.h"
 #include "init.h"
 #include "import.h"
+#include "property.h"
 #include "service.h"
 
 /****************************************************************************
@@ -48,21 +49,6 @@
           ((ms) == INT_MAX ? NULL \
                            : ((ts)->tv_sec = (ms) / 1000, \
                               (ts)->tv_nsec = ((ms) % 1000) * 1000000, (ts)))
-
-/****************************************************************************
- * Private Types
- ****************************************************************************/
-
-struct init_event_s
-{
-  FAR struct pollfd *pfd;
-  FAR void *priv;
-  FAR struct service_manager_s *sm;
-  FAR struct action_manager_s *am;
-  CODE int  (*init)   (FAR struct init_event_s *);
-  CODE void (*handle) (FAR struct init_event_s *);
-  CODE void (*deinit) (FAR struct init_event_s *);
-};
 
 /****************************************************************************
  * Private Functions
@@ -139,7 +125,6 @@ int main(int argc, FAR char *argv[])
     {
       .actions = LIST_INITIAL_VALUE(am.actions),
       .ready_actions = LIST_INITIAL_VALUE(am.ready_actions),
-      .events = { 0 },
       .current = NULL,
       .running = NULL,
       .pid_running = -1,
@@ -154,11 +139,16 @@ int main(int argc, FAR char *argv[])
       {NULL},
     };
 
-  struct init_event_s ev[] =
+  struct init_poller_s poller[] =
     {
+      {
+        .init = init_property_init,
+        .handle = init_property_handler,
+        .deinit = init_property_deinit,
+      },
     };
 
-  struct pollfd pfds[nitems(ev)];
+  struct pollfd pfds[nitems(poller)];
   sigset_t mask;
   size_t i;
   int r;
@@ -176,12 +166,12 @@ int main(int argc, FAR char *argv[])
   usbtrace_enable(TRACE_BITSET);
 #endif
 
-  for (i = 0; i < nitems(ev); i++)
+  for (i = 0; i < nitems(poller); i++)
     {
-      ev[i].sm = &sm;
-      ev[i].am = &am;
-      ev[i].pfd = &pfds[i];
-      r = ev[i].init(&ev[i]);
+      poller[i].sm = &sm;
+      poller[i].am = &am;
+      poller[i].pfd = &pfds[i];
+      r = poller[i].init(&poller[i]);
       if (r < 0)
         {
           init_err("Init event %zu", i);
@@ -237,11 +227,11 @@ int main(int argc, FAR char *argv[])
           break;
         }
 
-      for (i = 0; i < nitems(ev); i++)
+      for (i = 0; i < nitems(poller); i++)
         {
-          if (ev[i].pfd->revents & ev[i].pfd->events)
+          if (poller[i].pfd->revents & poller[i].pfd->events)
             {
-              ev[i].handle(&ev[i]);
+              poller[i].handle(&poller[i]);
             }
         }
 
@@ -251,9 +241,9 @@ int main(int argc, FAR char *argv[])
 out:
   while (i--)
     {
-      if (ev[i].deinit)
+      if (poller[i].deinit)
         {
-          ev[i].deinit(&ev[i]);
+          poller[i].deinit(&poller[i]);
         }
     }
 

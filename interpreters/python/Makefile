@@ -56,7 +56,7 @@ CFLAGS += -Wno-shadow -Wno-undef -Wno-format -Wno-builtin-macro-redefined
 CFLAGS += -Wno-type-limits -Wno-implicit-fallthrough -Wno-char-subscripts
 CFLAGS += -Wno-sign-compare -Wno-unused-const-variable -Wno-unused-function
 CFLAGS += -Wno-unused-variable -Wno-overflow -Wno-unused-but-set-variable
-CFLAGS += -Wno-strict-prototypes -nostdlib
+CFLAGS += -Wno-strict-prototypes -Wno-maybe-uninitialized -nostdlib
 
 DEPPATH += --dep-path $(CPYTHON_UNPACKNAME)$(DELIM)Programs
 VPATH   += :$(CPYTHON_UNPACKNAME)$(DELIM)Programs
@@ -114,10 +114,22 @@ ifeq ($(CONFIG_ARCH_HAVE_FORK),y)
 else
 	@echo "export ac_cv_func_fork=\"no\"" >> $@
 endif
+ifneq ($(CONFIG_ARCH_HAVE_VFORK),)
+	@echo "export ac_cv_func_vfork=\"yes\"" >> $@
+else
+	@echo "export ac_cv_func_vfork=\"no\"" >> $@
+endif
 ifeq ($(CONFIG_SYSTEM_SYSTEM),y)
 	@echo "export ac_cv_func_system=\"yes\"" >> $@
 else
 	@echo "export ac_cv_func_system=\"no\"" >> $@
+endif
+ifeq ($(CONFIG_NET),y)
+	@echo "export ac_cv_func_getaddrinfo=\"yes\"" >> $@
+	@echo "export ac_cv_func_getnameinfo=\"yes\"" >> $@
+else
+	@echo "export ac_cv_func_getaddrinfo=\"no\"" >> $@
+	@echo "export ac_cv_func_getnameinfo=\"no\"" >> $@
 endif
 
 # The `Setup.local` file enables or disables Python modules.
@@ -128,11 +140,17 @@ endif
 
 $(SETUP_LOCAL):
 	$(Q) ( cp $(SETUP_LOCAL).in $(SETUP_LOCAL))
-ifneq ($(CONFIG_ARCH_HAVE_FORK),y)
+# _posixsubprocess is the fork-then-exec path, so vfork() is enough for it;
+# os.fork() itself needs a real fork() and is governed by ac_cv_func_fork
+# above.
+ifeq ($(CONFIG_ARCH_HAVE_FORK)$(CONFIG_ARCH_HAVE_VFORK),)
 	@echo "_posixsubprocess" >> $@
 endif
 ifneq ($(CONFIG_LIBC_DLFCN),y)
 	@echo "_ctypes" >> $@
+endif
+ifneq ($(CONFIG_NET),y)
+	@echo "_socket" >> $@
 endif
 
 # For the Python's `configure` script, please consider the following
@@ -145,6 +163,12 @@ endif
 # Also, use -O0 for OPT because -Os is causing problems in
 # Python/Modules/getpath.c (issue will be filed soon to track this
 # problem).
+
+ifneq ($(CONFIG_NET),y)
+PYTHON_CONFIGURE_EXTRAS = --disable-ipv6
+else
+PYTHON_CONFIGURE_EXTRAS =
+endif
 
 $(TARGETBUILD)/Makefile: $(HOSTPYTHON) $(CONFIG_SITE) $(SETUP_LOCAL)
 	$(Q) mkdir -p $(TARGETBUILD)/Modules
@@ -175,29 +199,50 @@ $(TARGETBUILD)/Makefile: $(HOSTPYTHON) $(CONFIG_SITE) $(SETUP_LOCAL)
 			 --without-pymalloc \
 			 --disable-test-modules \
 			 --with-ensurepip=no \
+			 $(PYTHON_CONFIGURE_EXTRAS) \
 		)
 	$(Q) sed -i 's/^#define HAVE_LIBB2 1/\/* #undef HAVE_LIBB2 *\//' $(TARGETBUILD)/pyconfig.h
 	$(Q) sed -i 's/-lb2//g' $(TARGETBUILD)/Makefile
 
+BUNDLED_WHEELS_DIR = $(CPYTHON_PATH)/Lib/ensurepip/_bundled
+# PyPI downloads use the host system pip, not $(HOSTPYTHON)'s ensurepip bundle:
+# pip 24.x vendors urllib3 that breaks on Python 3.13 (zlib.Decompress.unused_data).
+HOSTPIP = python3 -m pip
+
 $(TARGETLIBPYTHON): $(TARGETBUILD)/Makefile
+ifneq ($(or $(filter y,$(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP)),$(filter y,$(CONFIG_INTERPRETERS_CPYTHON_INSTALL_NUTTX_PACKAGE))),)
+	$(Q) mkdir -p $(BUNDLED_WHEELS_DIR)
+endif
 ifeq ($(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP),y)
-	$(Q) mkdir -p $(CPYTHON_PATH)/Lib/ensurepip/_bundled
 	$(Q) ( \
 		PIP_WHEEL_VERSION=$$($(HOSTPYTHON) -c "import ensurepip; print(ensurepip._PIP_VERSION)"); \
-		PIP_WHEEL=$(CPYTHON_PATH)/Lib/ensurepip/_bundled/pip-$${PIP_WHEEL_VERSION}-py3-none-any.whl; \
+		PIP_WHEEL=$(BUNDLED_WHEELS_DIR)/pip-$${PIP_WHEEL_VERSION}-py3-none-any.whl; \
 		if [ ! -f "$${PIP_WHEEL}" ]; then \
 			echo "Fetching pip wheel $${PIP_WHEEL_VERSION} for ensurepip bundle"; \
-			$(HOSTPYTHON) -m pip download --only-binary=:all: --no-deps --dest $(CPYTHON_PATH)/Lib/ensurepip/_bundled pip==$${PIP_WHEEL_VERSION}; \
+			$(HOSTPIP) download --only-binary=:all: --no-deps --dest $(BUNDLED_WHEELS_DIR) pip==$${PIP_WHEEL_VERSION}; \
 		fi; \
 		echo "Pre-compiling pip wheel with build Python (must match embedded CPython version)"; \
-		$(HOSTPYTHON) $(CURDIR)/repack_wheel_add_pyc.py "$${PIP_WHEEL}"; \
+		$(HOSTPYTHON) $(CURDIR)/repack_wheel_add_pyc.py --package pip "$${PIP_WHEEL}"; \
+	)
+endif
+ifeq ($(CONFIG_INTERPRETERS_CPYTHON_INSTALL_NUTTX_PACKAGE),y)
+	$(Q) ( \
+		set -e; \
+		NUTTX_WHEEL=$$(ls $(BUNDLED_WHEELS_DIR)/nuttx_periphery-*-py3-none-any.whl 2>/dev/null | head -1 || true); \
+		if [ -z "$${NUTTX_WHEEL}" ]; then \
+			echo "Fetching latest nuttx-periphery wheel for ensurepip bundle"; \
+			$(HOSTPIP) download --only-binary=:all: --no-deps --dest $(BUNDLED_WHEELS_DIR) nuttx-periphery; \
+			NUTTX_WHEEL=$$(ls $(BUNDLED_WHEELS_DIR)/nuttx_periphery-*-py3-none-any.whl); \
+		fi; \
+		echo "Pre-compiling nuttx-periphery wheel with build Python (must match embedded CPython version)"; \
+		$(HOSTPYTHON) $(CURDIR)/repack_wheel_add_pyc.py --package nuttx_periphery "$${NUTTX_WHEEL}"; \
 	)
 endif
 	$(MAKE) -C $(TARGETBUILD) regen-frozen
 	$(MAKE) -C $(TARGETBUILD) libpython$(CPYTHON_VERSION_MINOR).a wasm_stdlib
 	$(Q) ( cp $(TARGETBUILD)/libpython$(CPYTHON_VERSION_MINOR).a $(TARGETLIBPYTHON) )
 	$(Q) $(UNPACK) $(TARGETMODULESPACK) -d $(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)
-ifeq ($(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP),y)
+ifneq ($(or $(filter y,$(CONFIG_INTERPRETERS_CPYTHON_ENABLE_PIP)),$(filter y,$(CONFIG_INTERPRETERS_CPYTHON_INSTALL_NUTTX_PACKAGE))),)
 	$(Q) mkdir -p $(TARGETMODULES)/python$(CPYTHON_VERSION_MINOR)/site-packages
 	$(Q) ( \
 		set -e; \

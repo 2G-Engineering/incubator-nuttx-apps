@@ -143,10 +143,12 @@ if(CONFIG_TESTING_OSTEST)
     endif()
   endif()
 
+  if(CONFIG_ARCH_HAVE_VFORK)
+    list(APPEND SRCS vfork.c)
+  endif()
+
   if(CONFIG_ARCH_HAVE_FORK)
-    if(CONFIG_SCHED_WAITPID)
-      list(APPEND SRCS vfork.c)
-    endif()
+    list(APPEND SRCS fork.c)
   endif()
 
   if(CONFIG_ARCH_SETJMP_H)
@@ -161,7 +163,10 @@ if(CONFIG_TESTING_OSTEST)
     list(APPEND SRCS nxevent.c)
   endif()
 
-  if(CONFIG_ARCH_HAVE_PERF_EVENTS)
+  # perf_gettime() and perf_getfreq() live in the kernel and are not system
+  # calls, so only a flat build can reach them from here.
+
+  if(CONFIG_ARCH_HAVE_PERF_EVENTS AND CONFIG_BUILD_FLAT)
     list(APPEND SRCS perf_gettime.c)
   endif()
 
@@ -173,6 +178,7 @@ if(CONFIG_TESTING_OSTEST)
   endif()
 
   set(OSTEST_SRCS ostest_main.c ${SRCS})
-  nuttx_add_application(NAME ostest SRCS ${OSTEST_SRCS})
+  nuttx_add_application(NAME ostest SRCS ${OSTEST_SRCS} STACKSIZE
+                        ${CONFIG_DEFAULT_TASK_STACKSIZE})
 
 endif()

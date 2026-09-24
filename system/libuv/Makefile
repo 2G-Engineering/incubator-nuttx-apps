@@ -129,13 +129,14 @@ ifneq ($(CONFIG_NET_UDP),)
 CSRCS += udp.c
 endif
 
-ifeq ($(findstring y,$(CONFIG_LIBUV_UTILS_TEST)$(CONFIG_LIBUV_UTILS_BENCHMARK)), y)
+ifneq ($(CONFIG_LIBUV_UTILS_TEST)$(CONFIG_LIBUV_UTILS_BENCHMARK),)
 PRIORITY  = $(CONFIG_LIBUV_UTILS_PRIORITY)
 STACKSIZE = $(CONFIG_LIBUV_UTILS_STACKSIZE)
 endif
 
 ifneq ($(CONFIG_LIBUV_UTILS_TEST),)
 
+MODULE = $(CONFIG_LIBUV_UTILS_TEST)
 PROGNAME = uv_run_tests
 MAINSRC  = run-tests.c
 
@@ -143,11 +144,24 @@ CSRCS += runner.c
 CSRCS += runner-unix.c
 CSRCS += echo-server.c
 
-CSRCS += $(wildcard libuv/test/test-*.c)
+LIBUV_TEST_CSRCS  = $(wildcard libuv/test/test-*.c)
+
+# test-fork.c and test-pipe-close-stdout-read-stdin.c call fork(), so they
+# cannot be built where NuttX does not provide it.  Nothing is lost either
+# way: every test they define is already excluded from the task list on
+# NuttX by 0001-libuv-port-for-nuttx.patch.
+
+ifeq ($(CONFIG_ARCH_HAVE_FORK),)
+LIBUV_TEST_CSRCS := $(filter-out libuv/test/test-fork.c,$(LIBUV_TEST_CSRCS))
+LIBUV_TEST_CSRCS := $(filter-out libuv/test/test-pipe-close-stdout-read-stdin.c,$(LIBUV_TEST_CSRCS))
+endif
+
+CSRCS += $(LIBUV_TEST_CSRCS)
 endif
 
 ifneq ($(CONFIG_LIBUV_UTILS_BENCHMARK),)
 
+MODULE = $(CONFIG_LIBUV_UTILS_BENCHMARK)
 PROGNAME = uv_run_benchmarks
 MAINSRC  = run-benchmarks.c
 

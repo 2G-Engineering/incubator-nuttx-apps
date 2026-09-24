@@ -284,8 +284,14 @@ void sched_lock_test(void);
 
 /* vfork.c ******************************************************************/
 
-#if defined(CONFIG_ARCH_HAVE_FORK) && defined(CONFIG_SCHED_WAITPID)
+#ifdef CONFIG_ARCH_HAVE_VFORK
 int vfork_test(void);
+#endif
+
+/* fork.c *******************************************************************/
+
+#ifdef CONFIG_ARCH_HAVE_FORK
+int fork_test(void);
 #endif
 
 /* setjmp.c *****************************************************************/
@@ -304,7 +310,7 @@ void spinlock_test(void);
 
 /* perf_gettime.c ***********************************************************/
 
-#ifdef CONFIG_ARCH_HAVE_PERF_EVENTS
+#if defined(CONFIG_ARCH_HAVE_PERF_EVENTS) && defined(CONFIG_BUILD_FLAT)
 void perf_gettime_test(void);
 #endif
 

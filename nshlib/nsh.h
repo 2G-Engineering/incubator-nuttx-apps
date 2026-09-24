@@ -266,8 +266,7 @@
  * If CONFIG_NSH_TELNET_LOGIN is defined, then these additional
  * options may be specified:
  *
- * CONFIG_NSH_LOGIN_USERNAME - Login user name.  Default: "admin"
- * CONFIG_NSH_LOGIN_PASSWORD - Login password:  Default: "Administrator"
+ * CONFIG_NSH_LOGIN_USERNAME - Login user name.  Default: "root"
  * CONFIG_NSH_LOGIN_FAILCOUNT - Number of login retry attempts.
  *   Default 3.
  */
@@ -275,11 +274,7 @@
 #ifdef CONFIG_NSH_TELNET_LOGIN
 
 #  ifndef CONFIG_NSH_LOGIN_USERNAME
-#    define CONFIG_NSH_LOGIN_USERNAME  "admin"
-#  endif
-
-#  ifndef CONFIG_NSH_LOGIN_PASSWORD
-#    define CONFIG_NSH_LOGIN_PASSWORD  "nuttx"
+#    define CONFIG_NSH_LOGIN_USERNAME  "root"
 #  endif
 
 #  ifndef CONFIG_NSH_LOGIN_FAILCOUNT
@@ -416,12 +411,13 @@
 
 #define NSH_HAVE_IOBUFFER 1
 
-/* The I/O buffer is needed for the ls, cp, and ps commands.  It is also
- * needed if the platform supplied MOTD is configured.
+/* The I/O buffer is needed for the ls, cp, du, and ps commands.  It is
+ * also needed if the platform supplied MOTD is configured.
  */
 
 #if defined(CONFIG_NSH_DISABLE_LS) && defined(CONFIG_NSH_DISABLE_CP) && \
-    defined(CONFIG_NSH_DISABLE_PS) && !defined(CONFIG_NSH_PLATFORM_MOTD) && \
+    defined(CONFIG_NSH_DISABLE_DU) && defined(CONFIG_NSH_DISABLE_PS) && \
+    !defined(CONFIG_NSH_PLATFORM_MOTD) && \
     defined(CONFIG_DISABLE_ENVIRON)
 #  undef NSH_HAVE_IOBUFFER
 #endif
@@ -826,6 +822,7 @@ int nsh_parse(FAR struct nsh_vtbl_s *vtbl, FAR char *cmdline);
 
 FAR const char *nsh_prompt(void);
 void nsh_update_prompt(void);
+void nsh_update_prompt_after_login(void);
 
 /****************************************************************************
  * Name: nsh_login
@@ -842,6 +839,10 @@ int nsh_login(FAR struct console_stdio_s *pstate);
 
 #ifdef CONFIG_NSH_TELNET_LOGIN
 int nsh_telnetlogin(FAR struct console_stdio_s *pstate);
+#endif
+
+#if defined(CONFIG_NSH_DROPBEAR) && !defined(CONFIG_NSH_DISABLE_DROPBEARSTART)
+int nsh_dropbearstart(void);
 #endif
 
 /* Application interface */
@@ -996,6 +997,9 @@ int cmd_irqinfo(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #endif
 #ifndef CONFIG_NSH_DISABLE_LS
   int cmd_ls(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
+#endif
+#ifndef CONFIG_NSH_DISABLE_DU
+  int cmd_du(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #endif
 #if defined(CONFIG_SYSLOG_DEVPATH) && !defined(CONFIG_NSH_DISABLE_DMESG)
   int cmd_dmesg(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
