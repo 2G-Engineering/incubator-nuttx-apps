@@ -152,6 +152,5 @@ config TWM4NX_DEBUG
 		and CONFIG_DEBUG_ERROR (but not the corresponding
 		CONFIG_DEBUG_GRAPHICS_* settings)
 
-source "$APPSDIR/graphics/twm4nx/apps/Kconfig"
 
 endif # GRAPHICS_TWM4NX
