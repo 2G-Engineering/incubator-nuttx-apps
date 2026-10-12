@@ -24,6 +24,7 @@
 
 #include <nuttx/config.h>
 #include <inttypes.h>
+#include <sys/param.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -127,6 +128,119 @@ static uint64_t crc64emac_expected_crc[] =
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: crc8smbus_reference
+ ****************************************************************************/
+
+static uint8_t crc8smbus_reference(FAR const uint8_t *src, size_t len,
+                                 uint8_t crc)
+{
+  size_t i;
+  unsigned int bit;
+
+  for (i = 0; i < len; i++)
+    {
+      crc ^= src[i];
+      for (bit = 0; bit < 8; bit++)
+        {
+          crc = (crc << 1) ^ ((crc & 0x80) ? 0x07 : 0);
+        }
+    }
+
+  return crc;
+}
+
+/****************************************************************************
+ * Name: test_case_crc8smbus
+ ****************************************************************************/
+
+static void test_case_crc8smbus(void **state)
+{
+  static const uint8_t check[] = "123456789";
+  static const uint8_t frame[] =
+  {
+    0x11, 0x00
+  };
+
+  uint8_t data[256];
+  uint8_t crc;
+  size_t split;
+  unsigned int seed;
+  unsigned int i;
+
+  /* Known CRC-8/SMBUS check value and a BQ769x0 address/data frame. */
+
+  assert_int_equal(crc8smbus(check, sizeof(check) - 1), 0xf4);
+  assert_int_equal(crc8smbus(frame, sizeof(frame)), 0x42);
+  assert_int_equal(crc8smbus(check, 0), 0);
+
+  for (split = 0; split <= sizeof(check) - 1; split++)
+    {
+      crc = crc8smbuspart(check, split, 0);
+      crc = crc8smbuspart(check + split, sizeof(check) - 1 - split, crc);
+      assert_int_equal(crc, 0xf4);
+    }
+
+  for (i = 0; i < sizeof(data); i++)
+    {
+      data[i] = i;
+    }
+
+  /* Verify all seed values against an independent bitwise algorithm. */
+
+  for (seed = 0; seed <= UINT8_MAX; seed++)
+    {
+      assert_int_equal(crc8smbuspart(data, 0, seed), seed);
+      assert_int_equal(crc8smbuspart(data, sizeof(data), seed),
+                       crc8smbus_reference(data, sizeof(data), seed));
+    }
+
+  crc = 0;
+  for (i = 0; i < sizeof(frame); i++)
+    {
+      crc = crc8smbuspart(&frame[i], 1, crc);
+    }
+
+  assert_int_equal(crc, 0x42);
+}
+
+/****************************************************************************
+ * Name: test_case_crc8ccitt_compatibility
+ ****************************************************************************/
+
+static void test_case_crc8ccitt_compatibility(void **state)
+{
+  static const uint8_t frame[] =
+  {
+    0x11, 0x00
+  };
+
+  uint8_t data[256];
+  uint8_t expected;
+  uint8_t crc;
+  unsigned int seed;
+  unsigned int i;
+
+  /* Preserve the existing complemented API, including incremental use. */
+
+  assert_int_equal(crc8ccitt(frame, sizeof(frame)), 0x6a);
+  crc = crc8ccittpart(frame, 1, 0);
+  assert_int_equal(crc8ccittpart(frame + 1, 1, crc), 0x6a);
+
+  for (i = 0; i < sizeof(data); i++)
+    {
+      data[i] = i;
+    }
+
+  for (seed = 0; seed <= UINT8_MAX; seed++)
+    {
+      expected = crc8smbus_reference(data, sizeof(data), seed ^ 0xff);
+      assert_int_equal(crc8ccittpart(data, sizeof(data), seed),
+                       expected ^ 0xff);
+      assert_int_equal(crc8ccittpart(data, 0, seed), seed);
+    }
+}
+
+/****************************************************************************
  * Name: test_case_crc8h1d
  ****************************************************************************/
 
@@ -136,7 +250,7 @@ static void test_case_crc8h1d(void **state)
   uint8_t crc8_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc8_value = crc8h1d(crc_test_data[index].data,
@@ -162,7 +276,7 @@ static void test_case_crc8h2f(void **state)
   uint8_t crc8_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc8_value = crc8h2f(crc_test_data[index].data,
@@ -188,7 +302,7 @@ static void test_case_crc16h1021(void **state)
   uint16_t crc16_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc16_value = crc16h1021(crc_test_data[index].data,
@@ -214,7 +328,7 @@ static void test_case_crc16h8005(void **state)
   uint16_t crc16_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc16_value = crc16h8005(crc_test_data[index].data,
@@ -240,7 +354,7 @@ static void test_case_crc32h04c11db7(void **state)
   uint32_t crc32_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc32_value = crc32h04c11db7(crc_test_data[index].data,
@@ -266,7 +380,7 @@ static void test_case_crc32hf4acfb13(void **state)
   uint32_t crc32_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc32_value = crc32hf4acfb13(crc_test_data[index].data,
@@ -292,7 +406,7 @@ static void test_case_crc64emac(void **state)
   uint64_t crc64_value;
 
   for (index = 0;
-       index < sizeof(crc_test_data) / sizeof(crc_test_data[0]);
+       index < nitems(crc_test_data);
        index++)
     {
       crc64_value = crc64emac(crc_test_data[index].data,
@@ -320,6 +434,8 @@ int main(int argc, FAR char *argv[])
 {
   const struct CMUnitTest tests[] =
   {
+    cmocka_unit_test(test_case_crc8smbus),
+    cmocka_unit_test(test_case_crc8ccitt_compatibility),
     cmocka_unit_test(test_case_crc8h1d),
     cmocka_unit_test(test_case_crc8h2f),
     cmocka_unit_test(test_case_crc16h1021),
