@@ -22,10 +22,8 @@
 
 include $(APPDIR)/Make.defs
 
-# FDPIC modules executed in place from xipfs.  The modules are embedded as
-# headers, built from the sources in modules/ by an explicit 'make regen'
-# there: linking one needs arm-uclinuxfdpiceabi binutils, which this build
-# does not.
+# FDPIC modules executed in place from xipfs.  The modules are built in
+# modules/, and embedded here after they are linked.
 
 MAINSRC   = fdpicxip_main.c
 
@@ -33,5 +31,26 @@ PROGNAME  = fdpicxip
 PRIORITY  = SCHED_PRIORITY_DEFAULT
 STACKSIZE = $(CONFIG_DEFAULT_TASK_STACKSIZE)
 MODULE    = $(CONFIG_EXAMPLES_FDPICXIP)
+
+BLOBS   = qsorter libcounter.so user libshape.so cxxuser lazymod
+BLOBSRC = fdpicxip_blobs.c
+BLOBOBJ = $(BLOBSRC:.c=$(OBJEXT))
+
+$(BLOBSRC): $(addprefix $(BINDIR)$(DELIM),$(BLOBS))
+	$(Q) modules$(DELIM)mkblobs.sh g_fdpicxip $^ > $@.tmp
+	$(Q) $(call TESTANDREPLACEFILE, $@.tmp, $@)
+
+$(BLOBOBJ): %$(OBJEXT): %.c
+	$(call COMPILE, $<, $@)
+
+postinstall:: $(BLOBOBJ)
+	$(call ARLOCK, $(call CONVERT_PATH,$(BIN)), $^)
+
+clean::
+	$(Q) $(MAKE) -C modules clean APPDIR="$(APPDIR)" TOPDIR="$(TOPDIR)"
+
+distclean::
+	$(Q) $(MAKE) -C modules distclean APPDIR="$(APPDIR)" TOPDIR="$(TOPDIR)"
+	$(call DELFILE, $(BLOBSRC) $(BLOBOBJ))
 
 include $(APPDIR)/Application.mk

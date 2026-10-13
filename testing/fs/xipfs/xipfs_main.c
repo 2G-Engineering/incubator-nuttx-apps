@@ -49,16 +49,6 @@
 #ifdef CONFIG_FDPIC
 #  include <elf.h>
 #  include <spawn.h>
-
-#  include "libshape_bin.h"
-#  include "cxxuser_bin.h"
-#  include "funcdesc_bin.h"
-#  include "lazymod_bin.h"
-#  include "libcounter_bin.h"
-#  include "counteruser_bin.h"
-#  include "callback_bin.h"
-#  include "missingsym_bin.h"
-#  include "manyneeded_bin.h"
 #endif
 
 /****************************************************************************
@@ -69,6 +59,35 @@
 #define MTDDEV    CONFIG_TESTING_FS_XIPFS_MTD
 
 #define PATH(name) MOUNTPT "/" name
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+#ifdef CONFIG_FDPIC
+/* The modules in examples/fdpicxip/modules, which mkblobs.sh embeds after
+ * they are linked.
+ */
+
+extern const unsigned char g_xipfs_callback[];
+extern const unsigned int g_xipfs_callback_len;
+extern const unsigned char g_xipfs_cxxuser[];
+extern const unsigned int g_xipfs_cxxuser_len;
+extern const unsigned char g_xipfs_funcdesc[];
+extern const unsigned int g_xipfs_funcdesc_len;
+extern const unsigned char g_xipfs_lazymod[];
+extern const unsigned int g_xipfs_lazymod_len;
+extern const unsigned char g_xipfs_libcounter_so[];
+extern const unsigned int g_xipfs_libcounter_so_len;
+extern const unsigned char g_xipfs_libshape_so[];
+extern const unsigned int g_xipfs_libshape_so_len;
+extern const unsigned char g_xipfs_manyneeded[];
+extern const unsigned int g_xipfs_manyneeded_len;
+extern const unsigned char g_xipfs_missingsym[];
+extern const unsigned int g_xipfs_missingsym_len;
+extern const unsigned char g_xipfs_user[];
+extern const unsigned int g_xipfs_user_len;
+#endif
 
 /****************************************************************************
  * Private Data
@@ -1018,59 +1037,59 @@ static void test_defrag(void)
    * extent above the hole.
    */
 
-    {
-      uint32_t beststart = 0;
-      uint32_t nextstart = 0;
-      char lastpath[64];
-      char holepath[64];
+  {
+    uint32_t beststart = 0;
+    uint32_t nextstart = 0;
+    char lastpath[64];
+    char holepath[64];
 
-      lastpath[0] = '\0';
-      holepath[0] = '\0';
+    lastpath[0] = '\0';
+    holepath[0] = '\0';
 
-      for (i = 1; i < 10; i += 2)
-        {
-          snprintf(path, sizeof(path), PATH("frag%d.bin"), i);
-          if (extent_info(path, &info) < 0)
-            {
-              continue;
-            }
+    for (i = 1; i < 10; i += 2)
+      {
+        snprintf(path, sizeof(path), PATH("frag%d.bin"), i);
+        if (extent_info(path, &info) < 0)
+          {
+            continue;
+          }
 
-          if (lastpath[0] == '\0' || info.start_block > beststart)
-            {
-              nextstart = beststart;
-              strlcpy(holepath, lastpath, sizeof(holepath));
-              beststart = info.start_block;
-              strlcpy(lastpath, path, sizeof(lastpath));
-            }
-          else if (holepath[0] == '\0' || info.start_block > nextstart)
-            {
-              nextstart = info.start_block;
-              strlcpy(holepath, path, sizeof(holepath));
-            }
-        }
+        if (lastpath[0] == '\0' || info.start_block > beststart)
+          {
+            nextstart = beststart;
+            strlcpy(holepath, lastpath, sizeof(holepath));
+            beststart = info.start_block;
+            strlcpy(lastpath, path, sizeof(lastpath));
+          }
+        else if (holepath[0] == '\0' || info.start_block > nextstart)
+          {
+            nextstart = info.start_block;
+            strlcpy(holepath, path, sizeof(holepath));
+          }
+      }
 
-      if (lastpath[0] != '\0' && holepath[0] != '\0')
-        {
-          unlink(holepath);
+    if (lastpath[0] != '\0' && holepath[0] != '\0')
+      {
+        unlink(holepath);
 
-          fd = open(lastpath, O_RDONLY | O_CLOEXEC);
-          if (fd >= 0)
-            {
-              ret = run_defrag(0, &result);
-              CHECK("an open file is reported as blocking, not as done",
-                    ret == 0 &&
-                    result.reason == XIPFS_DEFRAG_BLOCKED_OPEN,
-                    "unexpected reason");
-              close(fd);
-            }
+        fd = open(lastpath, O_RDONLY | O_CLOEXEC);
+        if (fd >= 0)
+          {
+            ret = run_defrag(0, &result);
+            CHECK("an open file is reported as blocking, not as done",
+                  ret == 0 &&
+                  result.reason == XIPFS_DEFRAG_BLOCKED_OPEN,
+                  "unexpected reason");
+            close(fd);
+          }
 
-          /* Put it back so the pinned test below has the same layout to
-           * work with as before.
-           */
+        /* Put it back so the pinned test below has the same layout to
+         * work with as before.
+         */
 
-          create_file(holepath, small, 1);
-        }
-    }
+        create_file(holepath, small, 1);
+      }
+  }
 
   /* A pinned extent must be skipped, and defrag must say so rather than
    * silently reporting success.
@@ -2132,7 +2151,7 @@ static void test_fdpic(void)
    * the wrong GOT half is invisible until it is branched through.
    */
 
-  ret = stage_blob(PATH("funcdesc"), g_funcdesc, g_funcdesc_len);
+  ret = stage_blob(PATH("funcdesc"), g_xipfs_funcdesc, g_xipfs_funcdesc_len);
   CHECK("stage the FUNCDESC module", ret == 0, strerror(-ret));
 
   args[0] = (FAR char *)"funcdesc";
@@ -2150,7 +2169,7 @@ static void test_fdpic(void)
    * loaded cleanly and then hard-faulted on its first call out.
    */
 
-  ret = stage_blob(PATH("lazymod"), g_lazymod, g_lazymod_len);
+  ret = stage_blob(PATH("lazymod"), g_xipfs_lazymod, g_xipfs_lazymod_len);
   CHECK("stage the DT_JMPREL module", ret == 0, strerror(-ret));
 
   args[0] = (FAR char *)"lazymod";
@@ -2175,7 +2194,7 @@ static void test_fdpic(void)
    * The module reports a bitmask, so all four are evaluated per run.
    */
 
-  ret = stage_blob(PATH("callback"), g_callback, g_callback_len);
+  ret = stage_blob(PATH("callback"), g_xipfs_callback, g_xipfs_callback_len);
   CHECK("stage the callback module", ret == 0, strerror(-ret));
 
   args[0] = (FAR char *)"callback";
@@ -2253,7 +2272,7 @@ static void test_fdpic(void)
    * marker differs.
    */
 
-  corrupt = malloc(g_funcdesc_len);
+  corrupt = malloc(g_xipfs_funcdesc_len);
   if (corrupt != NULL)
     {
       /* xipfs is write-once, so the edit happens on the way in.  EI_OSABI
@@ -2261,10 +2280,10 @@ static void test_fdpic(void)
        * perfectly valid ELF shared object and simply not a module.
        */
 
-      memcpy(corrupt, g_funcdesc, g_funcdesc_len);
+      memcpy(corrupt, g_xipfs_funcdesc, g_xipfs_funcdesc_len);
       corrupt[EI_OSABI] = ELFOSABI_NONE;
 
-      ret = stage_blob(PATH("corrupt"), corrupt, g_funcdesc_len);
+      ret = stage_blob(PATH("corrupt"), corrupt, g_xipfs_funcdesc_len);
       free(corrupt);
     }
   else
@@ -2297,10 +2316,11 @@ static void test_fdpic(void)
    * globals, and the total would come back wrong.
    */
 
-  ret = stage_blob(PATH("libcounter.so"), g_libcounter, g_libcounter_len);
+  ret = stage_blob(PATH("libcounter.so"), g_xipfs_libcounter_so,
+                   g_xipfs_libcounter_so_len);
   CHECK("stage the leaf library", ret == 0, strerror(-ret));
 
-  ret = stage_blob(PATH("counteruser"), g_counteruser, g_counteruser_len);
+  ret = stage_blob(PATH("counteruser"), g_xipfs_user, g_xipfs_user_len);
   CHECK("stage its consumer", ret == 0, strerror(-ret));
 
   args[0] = (FAR char *)"counteruser";
@@ -2319,10 +2339,11 @@ static void test_fdpic(void)
    * them is only observable while they overlap.
    */
 
-  ret = stage_blob(PATH("libshape.so"), g_libshape, g_libshape_len);
+  ret = stage_blob(PATH("libshape.so"), g_xipfs_libshape_so,
+                   g_xipfs_libshape_so_len);
   CHECK("stage the C++ shared library", ret == 0, strerror(-ret));
 
-  ret = stage_blob(PATH("cxxuser"), g_cxxuser, g_cxxuser_len);
+  ret = stage_blob(PATH("cxxuser"), g_xipfs_cxxuser, g_xipfs_cxxuser_len);
   CHECK("stage the C++ module", ret == 0, strerror(-ret));
 
   for (i = 0; i < 2; i++)
@@ -2350,14 +2371,13 @@ static void test_fdpic(void)
 
   usleep(150000);
 
-  /* One library, so one pin.  Both instances name it in DT_NEEDED, the
-   * loader opens it with dlopen(), and the second open takes a reference to
-   * what the first loaded rather than loading it again.
+  /* Each instance is a task group with its own registry, so each loads
+   * the library: one pin per instance on the one flash copy.
    */
 
   ret = extent_info(PATH("libshape.so"), &info);
-  CHECK("one flash copy of the library, pinned once for both instances",
-        ret == 0 && info.pincount == 1, "wrong pin count");
+  CHECK("one flash copy of the library, pinned once per instance",
+        ret == 0 && info.pincount == 2, "wrong pin count");
 
   /* Wait for both, but do not read the exit status from waitpid().
    *
@@ -2405,23 +2425,20 @@ static void test_fdpic(void)
         (fails & USER_FAIL_LIB_CTOR) == 0, "global left as .bss");
   CHECK("the library was constructed before the module needing it",
         (fails & USER_FAIL_ORDER) == 0, "wrong DT_NEEDED order");
-  CHECK("every add an instance makes lands in the one shared library",
+  CHECK("every add an instance makes lands in its library",
         (fails & USER_FAIL_SHARED) == 0, "an instance lost its own adds");
 
   /* Destructors run on unload, which happens as each task is reaped --
    * after waitpid() has already returned.
    *
-   * The library is one object, so its destructor runs once, when the last
-   * instance holding it goes.  Both instances handed it a marker path and
-   * the second one to do so won, which is why this looks for exactly one
-   * file rather than for a particular one.  What it holds is the total of
-   * both instances' adds: three each of one and two.
+   * Each instance has its own copy of the library data, so each destructor
+   * writes its own marker with only its own adds: three of its seed.
    */
 
   usleep(200000);
 
   found = 0;
-  total = -1;
+  total = 0;
 
   for (i = 0; i < 2; i++)
     {
@@ -2429,14 +2446,18 @@ static void test_fdpic(void)
       if (ret >= 0)
         {
           found++;
-          total = ret;
+        }
+
+      if (ret == 3 * (i + 1))
+        {
+          total++;
         }
     }
 
-  CHECK("the library's destructor ran once, at the last close",
-        found == 1, "marker missing or written twice");
-  CHECK("it ran with the state both instances had built up",
-        total == 3 * (1 + 2), "wrong total");
+  CHECK("the library's destructor ran once per instance",
+        found == 2, "marker missing");
+  CHECK("each ran with the state of its own instance only",
+        total == 2, "wrong total");
 
   ret = extent_info(PATH("libshape.so"), &info);
   CHECK("the library's pins return to zero once both instances are gone",
@@ -2572,12 +2593,12 @@ static void test_fdpic_reject(void)
 
   /* A 64-bit class byte: the loader is 32-bit only. */
 
-  img = dup_blob(g_funcdesc, g_funcdesc_len);
+  img = dup_blob(g_xipfs_funcdesc, g_xipfs_funcdesc_len);
   if (img != NULL)
     {
       img[EI_CLASS] = ELFCLASS64;
       expect_refused("a non-32-bit ELF class is refused", img,
-                     g_funcdesc_len);
+                     g_xipfs_funcdesc_len);
       free(img);
     }
 
@@ -2585,11 +2606,12 @@ static void test_fdpic_reject(void)
    * module even with the FDPIC marker set.
    */
 
-  img = dup_blob(g_funcdesc, g_funcdesc_len);
+  img = dup_blob(g_xipfs_funcdesc, g_xipfs_funcdesc_len);
   if (img != NULL)
     {
       ((FAR Elf32_Ehdr *)img)->e_type = ET_EXEC;
-      expect_refused("a non-ET_DYN object is refused", img, g_funcdesc_len);
+      expect_refused("a non-ET_DYN object is refused", img,
+                     g_xipfs_funcdesc_len);
       free(img);
     }
 
@@ -2597,12 +2619,12 @@ static void test_fdpic_reject(void)
    * away before any of its relocations are applied.
    */
 
-  img = dup_blob(g_funcdesc, g_funcdesc_len);
+  img = dup_blob(g_xipfs_funcdesc, g_xipfs_funcdesc_len);
   if (img != NULL)
     {
       ((FAR Elf32_Ehdr *)img)->e_machine = EM_X86_64;
       expect_refused("a module for the wrong machine is refused", img,
-                     g_funcdesc_len);
+                     g_xipfs_funcdesc_len);
       free(img);
     }
 
@@ -2613,13 +2635,13 @@ static void test_fdpic_reject(void)
    * DT_PLTREL tag to flip.
    */
 
-  img = dup_blob(g_lazymod, g_lazymod_len);
+  img = dup_blob(g_xipfs_lazymod, g_xipfs_lazymod_len);
   if (img != NULL)
     {
-      if (corrupt_dyn(img, g_lazymod_len, DT_PLTREL, DT_RELA))
+      if (corrupt_dyn(img, g_xipfs_lazymod_len, DT_PLTREL, DT_RELA))
         {
           expect_refused("a module with RELA PLT relocations is refused",
-                         img, g_lazymod_len);
+                         img, g_xipfs_lazymod_len);
         }
       else
         {
@@ -2635,7 +2657,7 @@ static void test_fdpic_reject(void)
    * leave the module's imports dangling.
    */
 
-  ret = stage_blob(PATH("counteruser"), g_counteruser, g_counteruser_len);
+  ret = stage_blob(PATH("counteruser"), g_xipfs_user, g_xipfs_user_len);
   if (ret == 0)
     {
       FAR char *args[3];
@@ -2665,15 +2687,15 @@ static void test_fdpic_reject(void)
    */
 
   expect_refused("a module importing an unexported symbol is refused",
-                 g_missingsym, g_missingsym_len);
+                 g_xipfs_missingsym, g_xipfs_missingsym_len);
 
-  /* More than FDPIC_MAX_NEEDED (8) DT_NEEDED entries.  The module is refused
-   * while its dynamic section is parsed, before any dependency is loaded, so
-   * the nine libraries it was linked against need not be present.
+  /* One DT_NEEDED entry more than CONFIG_LIBC_ELF_MAXDEPEND.  The module is
+   * refused before any dependency is loaded, so the libraries it was linked
+   * against need not be present.
    */
 
   expect_refused("a module with too many DT_NEEDED entries is refused",
-                 g_manyneeded, g_manyneeded_len);
+                 g_xipfs_manyneeded, g_xipfs_manyneeded_len);
 }
 #endif /* CONFIG_FDPIC */
 

@@ -26,7 +26,9 @@
 
 #include <nuttx/config.h>
 
+#include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -325,6 +327,7 @@ out:
 int main(int argc, FAR char *argv[])
 {
   int status = EXIT_SUCCESS;
+
   if (2 > argc)
     {
       fprintf(stderr,
